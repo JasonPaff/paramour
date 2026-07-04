@@ -3,6 +3,7 @@
  * C16 and C17 concern route-param (path) serialization and land with the
  * path-building milestone.
  */
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -10,6 +11,7 @@ import type { Codec } from "../src/codec.js";
 
 import {
   ParamourError,
+  ParseError,
   SearchDecodeError,
   SerializeError,
 } from "../src/errors.js";
@@ -201,6 +203,20 @@ describe("determinism and elision", () => {
     expect(searchToString(config, { page: 4 })).toBe("?page=4");
     expect(searchToString(config, { page: 3 })).toBe("");
   });
+
+  it("D8 elision tracks the live default: mutating a reference-typed default cannot desync encode from decode", () => {
+    const initial = { view: "grid" };
+    const config = {
+      f: p.json(z.object({ view: z.string() })).default(initial),
+    };
+    initial.view = "list";
+    // The stale config-time value is explicit input now — it must survive.
+    expect(searchToString(config, { f: { view: "grid" } })).toBe(
+      "?f=%7B%22view%22%3A%22grid%22%7D",
+    );
+    // The live default elides.
+    expect(searchToString(config, { f: { view: "list" } })).toBe("");
+  });
 });
 
 describe("decode-side hygiene", () => {
@@ -234,6 +250,53 @@ describe("decode-side hygiene", () => {
         tag: [5, true],
       } as unknown as Record<string, string[]>),
     ).toThrow(ParamourError);
+  });
+
+  it("non-string source array elements stay loud through .catch()", () => {
+    expect(() =>
+      decodeSearch({ q: p.string().catch("fb") }, { q: [5] } as unknown as {
+        q: string[];
+      }),
+    ).toThrow(/must be strings/);
+  });
+
+  it("impure array index getters cannot smuggle junk past validation (copy is validated, copy is used)", () => {
+    let reads = 0;
+    const tampered: string[] = [];
+    Object.defineProperty(tampered, "0", {
+      get: (): number | string => (reads++ === 0 ? "x" : 42),
+    });
+    expect(decodeSearch({ tag: p.stringArray() }, { tag: tampered })).toEqual({
+      tag: ["x"],
+    });
+  });
+
+  it("user code mutating the source mid-decode cannot change later keys' reads", () => {
+    const source: Record<string, string> = { a: "1", b: "2" };
+    const sneaky = p.custom<string>({
+      parse: (raw) => {
+        source.b = "999";
+        return raw;
+      },
+      serialize: (value) => value,
+    });
+    expect(decodeSearch({ a: sneaky, b: p.string() }, source)).toEqual({
+      a: "1",
+      b: "2",
+    });
+  });
+
+  it("a URLSearchParams subclass yielding non-string values is a loud ParamourError, not a silent key drop", () => {
+    const lying = new URLSearchParams("q=x");
+    Object.defineProperty(lying, Symbol.iterator, {
+      value: function* (): Generator<readonly [string, undefined]> {
+        yield ["q", undefined];
+      },
+    });
+    expect(() => decodeSearch({ q: p.string() }, lying)).toThrow(ParamourError);
+    expect(() => decodeSearch({ q: p.string() }, lying)).toThrow(
+      /must be strings/,
+    );
   });
 
   it("issues aggregate across keys", () => {
@@ -323,6 +386,76 @@ describe("error contract — every throw is a ParamourError", () => {
     );
   });
 
+  it("a custom serialize returning a non-string is a loud SerializeError, never a dropped param", () => {
+    const lookup = new Map<string, string>();
+    const codec = p.custom<string>({
+      parse: (raw) => raw,
+      serialize: (value) => lookup.get(value) as unknown as string,
+    });
+    expect(() => encodeSearch({ q: codec }, { q: "miss" })).toThrow(
+      SerializeError,
+    );
+    expect(() => encodeSearch({ q: codec }, { q: "miss" })).toThrow(
+      /must return a string/,
+    );
+  });
+
+  it("a custom parse throwing an unstringifiable value is still recovered by .catch()", () => {
+    const impl = {
+      parse(): string {
+        // An unstringifiable throw (no usable primitive conversion) is the point.
+        throw Object.create(null);
+      },
+      serialize: (value: string) => value,
+    };
+    expect(
+      decodeSearch({ x: p.custom<string>(impl).catch("fallback") }, { x: "v" }),
+    ).toEqual({ x: "fallback" });
+    // ...and aggregates as an issue without .catch().
+    expect(() =>
+      decodeSearch({ x: p.custom<string>(impl) }, { x: "v" }),
+    ).toThrow(SearchDecodeError);
+  });
+
+  it("a SerializeError from a custom parse stays loud through .catch()", () => {
+    const codec = p
+      .custom<string>({
+        parse() {
+          throw new SerializeError("canonicalization failed");
+        },
+        serialize: (value) => value,
+      })
+      .catch("fallback");
+    expect(() => decodeSearch({ x: codec }, { x: "v" })).toThrow(
+      SerializeError,
+    );
+    expect(() => decodeSearch({ x: codec }, { x: "v" })).toThrow(
+      "canonicalization failed",
+    );
+  });
+
+  it("null or non-object encode input is a loud SerializeError, not all-absent", () => {
+    const config = { q: p.string().optional() };
+    expect(() =>
+      encodeSearch(config, null as unknown as InferSearchInput<typeof config>),
+    ).toThrow(SerializeError);
+    expect(() =>
+      encodeSearch(
+        config,
+        undefined as unknown as InferSearchInput<typeof config>,
+      ),
+    ).toThrow(SerializeError);
+  });
+
+  it("null decode source is a loud ParamourError, not a raw TypeError", () => {
+    expect(() =>
+      decodeSearch(
+        { q: p.string() },
+        null as unknown as Record<string, string>,
+      ),
+    ).toThrow(ParamourError);
+  });
+
   it("a ParamourError from a custom parse stays loud through .catch()", () => {
     const codec = p
       .custom<string>({
@@ -388,6 +521,61 @@ describe("prototype-chain hygiene", () => {
     ]);
   });
 
+  it("class methods and constructor are not present input values", () => {
+    const config = {
+      page: p.integer(),
+      sort: p.enum(["asc", "desc"]).optional(),
+    };
+    /* eslint-disable @typescript-eslint/class-literal-property-style */
+    class Filters {
+      get page() {
+        return 3;
+      }
+      sort() {
+        return "a method, not a value";
+      }
+    }
+    /* eslint-enable @typescript-eslint/class-literal-property-style */
+    expect(
+      encodeSearch(
+        config,
+        new Filters() as unknown as InferSearchInput<typeof config>,
+      ),
+    ).toEqual([["page", "3"]]);
+
+    const ctorConfig = { constructor: p.string().optional() };
+    // eslint-disable-next-line @typescript-eslint/no-extraneous-class -- an instance with no own properties is the point
+    class Plain {}
+    expect(
+      encodeSearch(
+        ctorConfig,
+        new Plain() as unknown as InferSearchInput<typeof ctorConfig>,
+      ),
+    ).toEqual([]);
+  });
+
+  it("a throwing prototype getter surfaces as a SerializeError, not a raw foreign error", () => {
+    class Boom {
+      get page(): number {
+        throw new RangeError("store not hydrated");
+      }
+    }
+    expect(() => encodeSearch({ page: p.integer() }, new Boom())).toThrow(
+      SerializeError,
+    );
+    expect(() => encodeSearch({ page: p.integer() }, new Boom())).toThrow(
+      "store not hydrated",
+    );
+  });
+
+  it("cross-realm inputs do not surface their realm's Object.prototype members", () => {
+    const config = { constructor: p.string().optional(), q: p.string() };
+    const foreign = runInNewContext("({ q: 'hi' })") as InferSearchInput<
+      typeof config
+    >;
+    expect(encodeSearch(config, foreign)).toEqual([["q", "hi"]]);
+  });
+
   it("a __proto__ config key decodes to an own property", () => {
     const config = { ["__proto__"]: p.string() };
     const result = decodeSearch(config, new URLSearchParams("__proto__=x"));
@@ -408,7 +596,7 @@ describe("output-shape invariants (D4)", () => {
       "~arity": "single",
       "~catchValue": undefined,
       "~caught": false,
-      "~defaultSerialized": undefined,
+      "~defaultElides": false,
       "~defaultValue": undefined,
       "~parseElement": (raw: string) => raw,
       "~presence": "defaulted",
@@ -471,6 +659,25 @@ describe("default and catch value isolation", () => {
     };
     expect(() => decodeSearch(config, { page: "x" })).toThrow(
       /\.catch\(\) factory threw/,
+    );
+  });
+
+  it("a .catch() factory throwing ParseError is branded as a config-side failure, not passed through raw", () => {
+    const config = {
+      page: p.integer().catch((): number => {
+        throw new ParseError("nope");
+      }),
+    };
+    let caught: unknown;
+    try {
+      decodeSearch(config, { page: "x" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ParamourError);
+    expect(caught).not.toBeInstanceOf(ParseError);
+    expect((caught as Error).message).toMatch(
+      /\.catch\(\) factory threw: nope/,
     );
   });
 });

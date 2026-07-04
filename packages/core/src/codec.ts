@@ -1,4 +1,9 @@
-import { ParamourError } from "./errors.js";
+import {
+  foreignMessage,
+  ParamourError,
+  ParseError,
+  rebrandForeign,
+} from "./errors.js";
 
 /**
  * `any` is deliberate: `~out` appears in inferred method parameter positions
@@ -53,11 +58,13 @@ export interface Codec<
   readonly "~catchValue": (() => Out) | undefined;
   readonly "~caught": C;
   /**
-   * Wire form of a value-form `.default()`, serialized once at build time.
-   * `undefined` for factory defaults — those are excluded from D8 elision
-   * because a time-varying factory would elide values that decode differently.
+   * True when `.default()` received a value (not a factory). Value defaults
+   * participate in D8 elision, compared against the live default
+   * re-serialized per encode. Factory defaults never elide: a time-varying
+   * factory would elide an explicitly-passed value that later decodes as a
+   * different one.
    */
-  readonly "~defaultSerialized": string | undefined;
+  readonly "~defaultElides": boolean;
   /** Stored as a thunk regardless of the form passed to `.default()`. */
   readonly "~defaultValue": (() => Out) | undefined;
   /** phantom — carries `Out` for inference; never set at runtime */
@@ -85,7 +92,7 @@ export type PresenceOf<C extends AnyCodec> = C["~presence"];
 interface CodecState<Out> {
   readonly arity: Arity;
   readonly catchValue: (() => Out) | undefined;
-  readonly defaultSerialized: string | undefined;
+  readonly defaultElides: boolean;
   readonly defaultValue: (() => Out) | undefined;
   readonly parseElement: (raw: string) => unknown;
   readonly presence: Presence;
@@ -101,7 +108,7 @@ export function createCodec<Out, A extends Arity = "single">(impl: {
   return build<Out>({
     arity: impl.arity ?? "single",
     catchValue: undefined,
-    defaultSerialized: undefined,
+    defaultElides: false,
     defaultValue: undefined,
     parseElement: impl.parseElement,
     presence: "required",
@@ -129,15 +136,19 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
           `.default() is not available after .${state.presence === "optional" ? "optional" : "default"}()`,
         );
       }
+      // Value-form defaults are serialized once, here, so a schema-invalid
+      // or unserializable default fails at config-definition time — not on
+      // every subsequent encode. The wire form is deliberately NOT cached:
+      // D8 elision re-serializes the live default per encode, so mutating a
+      // reference-typed default can never desync encode from decode the way
+      // a stale build-time snapshot would. Factory defaults can't be
+      // pre-validated.
+      if (!isFactory(value)) {
+        serializeDefault(state.serializeElement, value);
+      }
       return build({
         ...state,
-        // Value-form defaults are serialized once, here, so a schema-invalid
-        // or unserializable default fails at config-definition time — not on
-        // every subsequent encode. Factory defaults can't be pre-validated.
-        defaultSerialized:
-          typeof value === "function"
-            ? undefined
-            : serializeDefault(state.serializeElement, value),
+        defaultElides: !isFactory(value),
         defaultValue: toThunk(value, "default"),
         presence: "defaulted",
       });
@@ -158,7 +169,7 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
     "~arity": state.arity,
     "~catchValue": state.catchValue,
     "~caught": state.catchValue !== undefined,
-    "~defaultSerialized": state.defaultSerialized,
+    "~defaultElides": state.defaultElides,
     "~defaultValue": state.defaultValue,
 
     "~parseElement": state.parseElement,
@@ -170,41 +181,52 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
   return codec as unknown as Codec<Out>;
 }
 
+/**
+ * Factory-vs-value discrimination for `.default()`/`.catch()` arguments.
+ * Single source of truth: `.default()`'s elision flag and {@link toThunk}
+ * must agree on it for D8 correctness. (An `Out` that is itself a function
+ * is indistinguishable from a factory — such values can't serialize anyway.)
+ */
+function isFactory<Out>(stored: (() => Out) | Out): stored is () => Out {
+  return typeof stored === "function";
+}
+
 function serializeDefault(
   serializeElement: (value: unknown) => string,
   value: unknown,
 ): string {
-  try {
-    return serializeElement(value);
-  } catch (error) {
-    if (error instanceof ParamourError) throw error;
-    throw new ParamourError(
-      ".default() value is not serializable by this codec",
-      { cause: error },
-    );
-  }
+  return rebrandForeign(
+    () => serializeElement(value),
+    (error) =>
+      new ParamourError(".default() value is not serializable by this codec", {
+        cause: error,
+      }),
+  );
 }
 
 /**
  * Normalizes a `.default()`/`.catch()` argument to a thunk. Factories are
  * invoked per decode/encode so each call gets a fresh value; the wrapper is
  * the one chokepoint where a throwing user factory is branded ParamourError.
- * (An `Out` that is itself a function is indistinguishable from a factory —
- * such values can't serialize anyway.)
  */
 function toThunk<Out>(
   stored: (() => Out) | Out,
   what: "catch" | "default",
 ): () => Out {
-  if (typeof stored !== "function") return () => stored;
-  const factory = stored as () => Out;
+  if (!isFactory(stored)) return () => stored;
   return () => {
     try {
-      return factory();
+      return stored();
     } catch (error) {
-      if (error instanceof ParamourError) throw error;
+      // ParseError is data-level by contract (recoverable via .catch()); a
+      // factory throwing one is a config-side failure that must not
+      // masquerade as a recoverable parse failure — brand it like a foreign
+      // throw. Every other ParamourError stays loud as-is.
+      if (error instanceof ParamourError && !(error instanceof ParseError)) {
+        throw error;
+      }
       throw new ParamourError(
-        `.${what}() factory threw: ${error instanceof Error ? error.message : typeof error}`,
+        `.${what}() factory threw: ${foreignMessage(error)}`,
         { cause: error },
       );
     }

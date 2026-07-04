@@ -1,7 +1,14 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import { type Codec, createCodec } from "./codec.js";
-import { ParamourError, ParseError, SerializeError } from "./errors.js";
+import {
+  foreignMessage,
+  ParamourError,
+  ParseError,
+  rebrandForeign,
+  SerializeError,
+  showValue,
+} from "./errors.js";
 
 // Wire grammars per wire-format spec §4. `Number()` alone is too loose
 // (accepts hex, trims whitespace), hence explicit anchored patterns.
@@ -103,23 +110,11 @@ function runSchemaSync<Out>(
 
 function serializeFiniteNumber(value: unknown): string {
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new SerializeError(`Expected a finite number, got ${show(value)}`);
+    throw new SerializeError(
+      `Expected a finite number, got ${showValue(value)}`,
+    );
   }
   return String(value);
-}
-
-/**
- * String() for error messages: objects without a usable primitive conversion
- * (null-prototype objects, Symbol.toPrimitive throwers) make String() itself
- * throw a raw TypeError, which would escape before the guard's SerializeError
- * is even constructed.
- */
-function show(value: unknown): string {
-  try {
-    return String(value);
-  } catch {
-    return `[unstringifiable ${typeof value}]`;
-  }
 }
 
 /**
@@ -127,13 +122,11 @@ function show(value: unknown): string {
  * toJSON() exceptions escape; wrap them so the ParamourError contract holds.
  */
 function stringifyJson(value: unknown): string {
-  try {
-    return JSON.stringify(value);
-  } catch (error) {
-    throw new SerializeError("Value is not JSON-serializable", {
-      cause: error,
-    });
-  }
+  return rebrandForeign(
+    () => JSON.stringify(value),
+    (error) =>
+      new SerializeError("Value is not JSON-serializable", { cause: error }),
+  );
 }
 
 /**
@@ -150,7 +143,9 @@ export const p = {
       },
       serializeElement: (value) => {
         if (typeof value !== "boolean") {
-          throw new SerializeError(`Expected a boolean, got ${show(value)}`);
+          throw new SerializeError(
+            `Expected a boolean, got ${showValue(value)}`,
+          );
         }
         return value ? "true" : "false";
       },
@@ -161,34 +156,24 @@ export const p = {
     parse: (raw: string) => Out;
     serialize: (value: Out) => string;
   }): Codec<Out> {
+    // Paramour's own errors are never downgraded: ANY ParamourError thrown
+    // by user parse/serialize code — config-level failures (async schema,
+    // builder misuse) but also value-level errors from reused paramour
+    // helpers — passes through loud, bypassing .catch() recovery and per-key
+    // aggregation. .catch() recovers foreign parse failures only, which
+    // rebrandForeign normalizes to ParseError so recovery sees them.
     return createCodec<Out>({
-      parseElement: (raw) => {
-        try {
-          return codec.parse(raw);
-        } catch (error) {
-          // Paramour's own errors are not foreign: config-level failures
-          // (async schema, builder misuse) must stay loud, never be
-          // downgraded to a .catch()-recoverable ParseError.
-          if (error instanceof ParamourError) throw error;
-          // Normalize foreign throws so .catch() recovery and per-key issue
-          // aggregation see them (they match on ParseError).
-          throw new ParseError(
-            error instanceof Error ? error.message : String(error),
-            { cause: error },
-          );
-        }
-      },
-      serializeElement: (value) => {
-        try {
-          return codec.serialize(value as Out);
-        } catch (error) {
-          if (error instanceof ParamourError) throw error;
-          throw new SerializeError(
-            error instanceof Error ? error.message : show(error),
-            { cause: error },
-          );
-        }
-      },
+      parseElement: (raw) =>
+        rebrandForeign(
+          () => codec.parse(raw),
+          (error) => new ParseError(foreignMessage(error), { cause: error }),
+        ),
+      serializeElement: (value) =>
+        rebrandForeign(
+          () => codec.serialize(value as Out),
+          (error) =>
+            new SerializeError(foreignMessage(error), { cause: error }),
+        ),
     });
   },
 
@@ -206,7 +191,7 @@ export const p = {
       serializeElement: (value) => {
         if (typeof value !== "string" || !set.has(value)) {
           throw new SerializeError(
-            `${show(value)} is not one of: ${members.join(", ")}`,
+            `${showValue(value)} is not one of: ${members.join(", ")}`,
           );
         }
         return value;

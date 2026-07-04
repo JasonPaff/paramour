@@ -108,4 +108,10 @@ test("array codecs: input key may be omitted (absent ≡ [])", () => {
   expect<{ q: string; tags: string[] }>().type.toBeAssignableTo<
     InferSearchInput<typeof config>
   >();
+  // Negative pin: an array key's optionality must not leak onto required
+  // scalar keys (a regression making ALL keys optional when any array key
+  // exists would pass every positive assertion above).
+  expect<{ tags: string[] }>().type.not.toBeAssignableTo<
+    InferSearchInput<typeof config>
+  >();
 });
