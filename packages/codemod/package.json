@@ -2,6 +2,10 @@
   "name": "@paramour-js/codemod",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "description": "Codemod for migrating from next-typesafe-url to paramour.",
   "author": "Jason Paff <jasonpaff@gmail.com>",
   "license": "MIT",

@@ -2,6 +2,10 @@
   "name": "paramour",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "description": "Type-safe routing companion for the Next.js App Router: validated route params and search params, typed path building, and explicit URL serialization.",
   "keywords": [
     "nextjs",

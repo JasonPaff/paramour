@@ -1,6 +1,6 @@
 # paramour
 
-> *paramour* — "param" + "amour": a library that loves your params.
+> _paramour_ — "param" + "amour": a library that loves your params.
 
 A fully type-safe routing companion for the Next.js App Router: validated, typed
 route params and search params, type-checked path building, and a predictable,

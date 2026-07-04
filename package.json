@@ -2,7 +2,17 @@
   "name": "paramour-monorepo",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "Monorepo for paramour — type-safe routing companion for the Next.js App Router.",
+  "scripts": {
+    "changeset": "changeset",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:types": "tstyche",
+    "typecheck": "pnpm -r run typecheck"
+  },
   "author": "Jason Paff <jasonpaff@gmail.com>",
   "license": "MIT",
   "repository": {
@@ -24,5 +34,16 @@
     }
   },
   "packageManager": "pnpm@11.9.0",
-  "devDependencies": {}
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-perfectionist": "^5.9.1",
+    "prettier": "^3.9.4",
+    "tstyche": "^7.2.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1",
+    "vitest": "^4.1.9"
+  }
 }

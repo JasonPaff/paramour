@@ -2,6 +2,10 @@
   "name": "@paramour-js/next",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "description": "Next.js integration for paramour: withTypedRoutes, client hooks, PageProps glue, and the codegen CLI.",
   "author": "Jason Paff <jasonpaff@gmail.com>",
   "license": "MIT",
