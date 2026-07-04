@@ -6,12 +6,17 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { SearchDecodeError, SerializeError } from "../src/errors.js";
+import {
+  ParamourError,
+  SearchDecodeError,
+  SerializeError,
+} from "../src/errors.js";
 import { p } from "../src/p.js";
 import {
   buildSearchString,
   decodeSearch,
   encodeSearch,
+  type InferSearchInput,
   searchToString,
 } from "../src/search.js";
 
@@ -139,8 +144,8 @@ describe("byte-layer serialization", () => {
     expect(searchToString({ q: p.string() }, { q: "a b" })).toBe("?q=a%20b");
   });
 
-  it("C20: a lone surrogate is a serialization error", () => {
-    expect(() => buildSearchString([["q", "\uD800"]])).toThrow(URIError);
+  it("C20: a lone surrogate is a serialization error (S7)", () => {
+    expect(() => buildSearchString([["q", "\uD800"]])).toThrow(SerializeError);
   });
 
   it("S3: only the empty string emits key=", () => {
@@ -209,5 +214,119 @@ describe("decode-side hygiene", () => {
     expect(() =>
       encodeSearch({ q: p.string() }, {} as unknown as { q: string }),
     ).toThrow(SerializeError);
+  });
+});
+
+describe("error contract — every throw is a ParamourError", () => {
+  it("non-array input for an array codec is a SerializeError", () => {
+    expect(() =>
+      encodeSearch(
+        { tag: p.stringArray() },
+        { tag: null as unknown as string[] },
+      ),
+    ).toThrow(SerializeError);
+  });
+
+  it("malformed source values are a ParamourError, not a raw TypeError", () => {
+    expect(() =>
+      decodeSearch({ page: p.integer() }, { page: 5 } as unknown as Record<
+        string,
+        string
+      >),
+    ).toThrow(ParamourError);
+    expect(() =>
+      decodeSearch({ page: p.integer() }, { page: null } as unknown as Record<
+        string,
+        string
+      >),
+    ).toThrow(ParamourError);
+  });
+
+  it("a custom codec throwing a plain Error is recovered by .catch()", () => {
+    const codec = p
+      .custom<string>({
+        parse() {
+          throw new Error("bad");
+        },
+        serialize: (value) => value,
+      })
+      .catch("fallback");
+    expect(decodeSearch({ x: codec }, { x: "v" })).toEqual({ x: "fallback" });
+  });
+
+  it("a custom codec throwing a plain Error aggregates as an issue", () => {
+    const codec = p.custom<string>({
+      parse() {
+        throw new Error("bad");
+      },
+      serialize: (value) => value,
+    });
+    expect(() => decodeSearch({ x: codec }, { x: "v" })).toThrow(
+      SearchDecodeError,
+    );
+  });
+});
+
+describe("prototype-chain hygiene", () => {
+  it("config keys colliding with Object.prototype members are not seen as present", () => {
+    // The casts are the point: at runtime `{}` still *inherits* constructor
+    // and toString, which a bare `values[key]` read would pick up.
+    const ctorConfig = { constructor: p.string().optional() };
+    expect(
+      encodeSearch(ctorConfig, {} as InferSearchInput<typeof ctorConfig>),
+    ).toEqual([]);
+    const toStringConfig = { toString: p.string().optional() };
+    expect(
+      encodeSearch(
+        toStringConfig,
+        {} as InferSearchInput<typeof toStringConfig>,
+      ),
+    ).toEqual([]);
+  });
+
+  it("a __proto__ config key decodes to an own property", () => {
+    const config = { ["__proto__"]: p.string() };
+    const result = decodeSearch(config, new URLSearchParams("__proto__=x"));
+    expect(Object.hasOwn(result, "__proto__")).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(result, "__proto__")?.value).toBe(
+      "x",
+    );
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+  });
+});
+
+describe("default and catch value isolation", () => {
+  it("factory defaults yield a fresh value per decode", () => {
+    const schema = z.object({ a: z.number() });
+    const config = { f: p.json(schema).default(() => ({ a: 1 })) };
+    const first = decodeSearch(config, {});
+    const second = decodeSearch(config, {});
+    expect(first.f).toEqual({ a: 1 });
+    expect(first.f).not.toBe(second.f);
+    first.f.a = 999;
+    expect(decodeSearch(config, {}).f).toEqual({ a: 1 });
+  });
+
+  it("factory catch values apply on parse failure", () => {
+    const config = { page: p.integer().catch(() => 1) };
+    expect(decodeSearch(config, { page: "x" })).toEqual({ page: 1 });
+  });
+
+  it("factory defaults participate in D8 elision at encode time", () => {
+    const config = { page: p.integer().default(() => 1) };
+    expect(searchToString(config, { page: 1 })).toBe("");
+    expect(searchToString(config, { page: 2 })).toBe("?page=2");
+    expect(searchToString(config, {})).toBe("");
+  });
+});
+
+describe("S5 caveat — integer-like keys", () => {
+  it("numeric-string keys enumerate first in ascending numeric order (documented deviation)", () => {
+    // eslint-disable-next-line perfectionist/sort-objects -- declaration order is the point
+    const config = { page: p.string(), "0": p.string() };
+    expect(encodeSearch(config, { 0: "b", page: "a" })).toEqual([
+      ["0", "b"],
+      ["page", "a"],
+    ]);
   });
 });

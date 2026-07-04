@@ -76,6 +76,12 @@ describe("p.boolean", () => {
       expect(() => parse(p.boolean(), raw)).toThrow(ParseError);
     }
   });
+
+  it("rejects non-booleans at serialize time (no truthy coercion)", () => {
+    for (const value of [1, 0, "true", "false", null, {}]) {
+      expect(() => serialize(p.boolean(), value)).toThrow(SerializeError);
+    }
+  });
 });
 
 describe("p.enum", () => {
@@ -106,6 +112,21 @@ describe("p.isoDate", () => {
       expect(() => parse(p.isoDate(), raw)).toThrow(ParseError);
     }
   });
+
+  it("handles years 0000-0099 (no Date.UTC two-digit-year quirk)", () => {
+    const date = parse(p.isoDate(), "0050-01-01") as Date;
+    expect(date.toISOString()).toBe("0050-01-01T00:00:00.000Z");
+    expect(serialize(p.isoDate(), date)).toBe("0050-01-01");
+  });
+
+  it("rejects Dates outside years 0000-9999 at serialize time", () => {
+    expect(() =>
+      serialize(p.isoDate(), new Date(Date.UTC(10000, 0, 1))),
+    ).toThrow(SerializeError);
+    const negative = new Date(Date.UTC(2000, 0, 1));
+    negative.setUTCFullYear(-1);
+    expect(() => serialize(p.isoDate(), negative)).toThrow(SerializeError);
+  });
 });
 
 describe("p.timestamp", () => {
@@ -134,6 +155,23 @@ describe("p.timestamp", () => {
       expect(() => parse(p.timestamp(), raw)).toThrow(ParseError);
     }
   });
+
+  it("rejects impossible calendar days the engine would normalize", () => {
+    for (const raw of [
+      "2024-02-30T12:00:00Z",
+      "2023-02-29T00:00:00Z",
+      "2024-04-31T00:00:00.500Z",
+      "2024-01-01T24:00:00Z",
+    ]) {
+      expect(() => parse(p.timestamp(), raw)).toThrow(ParseError);
+    }
+  });
+
+  it("rejects Dates outside years 0000-9999 at serialize time", () => {
+    expect(() => serialize(p.timestamp(), new Date(8.64e15))).toThrow(
+      SerializeError,
+    );
+  });
 });
 
 describe("p.json", () => {
@@ -160,6 +198,23 @@ describe("p.json", () => {
       SerializeError,
     );
   });
+
+  it("emits the schema's normalized value, not the original", () => {
+    const trimmed = z.object({ s: z.string().trim() });
+    expect(serialize(p.json(trimmed), { s: " a " })).toBe('{"s":"a"}');
+  });
+
+  it("transforming (In≠Out) schemas are parse-only: serialize throws", () => {
+    const transforming = z.object({ a: z.number() }).transform((o) => o.a);
+    expect(parse(p.json(transforming), '{"a":1}')).toBe(1);
+    expect(() => serialize(p.json(transforming), 1)).toThrow(SerializeError);
+  });
+
+  it("circular values are a SerializeError, not a raw TypeError", () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expect(() => serialize(p.json(z.any()), circular)).toThrow(SerializeError);
+  });
 });
 
 describe("Standard Schema refinements", () => {
@@ -171,6 +226,23 @@ describe("Standard Schema refinements", () => {
     const positive = p.integer(z.number().positive());
     expect(parse(positive, "5")).toBe(5);
     expect(() => parse(positive, "-5")).toThrow(ParseError);
+  });
+
+  it("runs the schema at serialize time too (no self-breaking URLs)", () => {
+    const positive = p.integer(z.number().min(1));
+    expect(serialize(positive, 5)).toBe("5");
+    expect(() => serialize(positive, 0)).toThrow(SerializeError);
+
+    const short = p.string(z.string().max(3));
+    expect(() => serialize(short, "toolong")).toThrow(SerializeError);
+
+    const bounded = p.number(z.number().max(10));
+    expect(() => serialize(bounded, 11)).toThrow(SerializeError);
+  });
+
+  it("emits the schema's normalized value at serialize time", () => {
+    const trimmed = p.string(z.string().trim());
+    expect(serialize(trimmed, " a ")).toBe("a");
   });
 
   it("throws a clear error for async schemas", () => {
@@ -199,6 +271,17 @@ describe("p.custom", () => {
     expect(parse(bigint, "9007199254740993")).toBe(9007199254740993n);
     expect(serialize(bigint, 9007199254740993n)).toBe("9007199254740993");
   });
+
+  it("wraps non-ParseError throws from parse in ParseError", () => {
+    const codec = p.custom<string>({
+      parse() {
+        throw new Error("bad");
+      },
+      serialize: (value) => value,
+    });
+    expect(() => parse(codec, "x")).toThrow(ParseError);
+    expect(() => parse(codec, "x")).toThrow("bad");
+  });
 });
 
 describe("modifier runtime guards (JS consumers)", () => {
@@ -222,5 +305,19 @@ describe("modifier runtime guards (JS consumers)", () => {
     expect(base["~presence"]).toBe("required");
     expect(defaulted["~presence"]).toBe("defaulted");
     expect(base["~defaultValue"]).toBeUndefined();
+  });
+
+  it("rejects presence modifiers on array codecs", () => {
+    const arr = p.stringArray() as unknown as {
+      default: (value: string[]) => unknown;
+      optional: () => unknown;
+    };
+    expect(() => arr.default(["a"])).toThrow(ParamourError);
+    expect(() => arr.optional()).toThrow(ParamourError);
+  });
+
+  it("~caught reflects catch state at runtime", () => {
+    expect(p.integer()["~caught"]).toBe(false);
+    expect(p.integer().catch(0)["~caught"]).toBe(true);
   });
 });

@@ -1,0 +1,8 @@
+{
+  // tstyche-only config: same compiler options as the package tsconfig, but
+  // *.tst.ts files are not excluded, so type tests certify the API under the
+  // repo's real settings (exactOptionalPropertyTypes etc.), not tstyche's
+  // built-in baseline.
+  "extends": "./tsconfig.json",
+  "exclude": []
+}

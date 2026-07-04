@@ -1,6 +1,8 @@
 import type { AnyCodec, OutputOf, PresenceOf } from "./codec.js";
 
+import { resolveCodecValue } from "./codec.js";
 import {
+  ParamourError,
   ParseError,
   SearchDecodeError,
   type SearchIssue,
@@ -45,17 +47,15 @@ type OptionalInputKeys<S extends SearchConfig> = {
 /**
  * Builds the byte-layer query string from decoded pairs. Hand-rolled on
  * purpose: URLSearchParams#toString would emit `+` for space; we emit `%20`
- * (S2). Returns "" for an empty pair set (S1).
+ * (S2). Returns "" for an empty pair set (S1). Unencodable text (lone
+ * surrogates) throws {@link SerializeError} (S7).
  */
 export function buildSearchString(
   pairs: readonly (readonly [string, string])[],
 ): string {
   if (pairs.length === 0) return "";
   return `?${pairs
-    .map(
-      ([key, value]) =>
-        `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
-    )
+    .map(([key, value]) => `${encodeComponent(key)}=${encodeComponent(value)}`)
     .join("&")}`;
 }
 
@@ -69,18 +69,22 @@ export function decodeSearch<S extends SearchConfig>(
 ): InferSearchOutput<S> {
   const map = toMultimap(source);
   const issues: SearchIssue[] = [];
-  const output: Record<string, unknown> = {};
+  // Built as entries so keys like "__proto__" become ordinary own properties
+  // of the result (Object.fromEntries uses define, not set, semantics).
+  const entries: [string, unknown][] = [];
 
   for (const [key, codec] of Object.entries(config)) {
     const values = map.get(key) ?? [];
 
     if (codec["~arity"] === "many") {
       // Array codecs consume all values in wire order; absent → [] (P6).
+      // Presence modifiers are banned on array codecs, so no absence
+      // handling exists here.
       try {
-        output[key] = values.map((raw) => codec["~parseElement"](raw));
+        entries.push([key, values.map((raw) => codec["~parseElement"](raw))]);
       } catch (error) {
         if (error instanceof ParseError && codec["~catchValue"] !== undefined) {
-          output[key] = codec["~catchValue"].value;
+          entries.push([key, resolveCodecValue(codec["~catchValue"].value)]);
         } else if (error instanceof ParseError) {
           issues.push({ key, message: error.message });
         } else {
@@ -94,10 +98,15 @@ export function decodeSearch<S extends SearchConfig>(
       // Absence is presence's job — .catch() never recovers it (D2).
       switch (codec["~presence"]) {
         case "defaulted":
-          output[key] = codec["~defaultValue"]?.value;
+          if (codec["~defaultValue"] !== undefined) {
+            entries.push([
+              key,
+              resolveCodecValue(codec["~defaultValue"].value),
+            ]);
+          }
           break;
         case "optional":
-          output[key] = undefined;
+          entries.push([key, undefined]);
           break;
         case "required":
           issues.push({ key, message: "required search param is missing" });
@@ -116,10 +125,10 @@ export function decodeSearch<S extends SearchConfig>(
           `received ${String(values.length)} values for a single-value param`,
         );
       }
-      output[key] = codec["~parseElement"](first);
+      entries.push([key, codec["~parseElement"](first)]);
     } catch (error) {
       if (error instanceof ParseError && codec["~catchValue"] !== undefined) {
-        output[key] = codec["~catchValue"].value;
+        entries.push([key, resolveCodecValue(codec["~catchValue"].value)]);
       } else if (error instanceof ParseError) {
         issues.push({ key, message: error.message });
       } else {
@@ -131,12 +140,15 @@ export function decodeSearch<S extends SearchConfig>(
   if (issues.length > 0) {
     throw new SearchDecodeError(issues);
   }
-  return output as InferSearchOutput<S>;
+  return Object.fromEntries(entries) as InferSearchOutput<S>;
 }
 
 /**
  * Encodes an input object to ordered wire pairs (decoded value layer).
  * Deterministic: config declaration order, array elements in order (S5).
+ * Caveat: JS property enumeration puts integer-like keys ("0", "42") first
+ * in ascending numeric order regardless of declaration — declaration order
+ * is unrecoverable for those, so they sort numerically before all others.
  * Params equal to their `.default()` are elided (design-02 D8), compared by
  * serialized wire form.
  */
@@ -148,7 +160,9 @@ export function encodeSearch<S extends SearchConfig>(
   const values = input as Record<string, unknown>;
 
   for (const [key, codec] of Object.entries(config)) {
-    const value = values[key];
+    // hasOwn, not a bare read: keys like "constructor" must not pick up
+    // inherited Object.prototype members as present values.
+    const value = Object.hasOwn(values, key) ? values[key] : undefined;
 
     if (value === undefined) {
       if (codec["~presence"] === "required") {
@@ -157,31 +171,29 @@ export function encodeSearch<S extends SearchConfig>(
       continue; // absent optional/defaulted param → key omitted (S3)
     }
 
-    const serialized: string[] =
-      codec["~arity"] === "many"
-        ? (value as unknown[]).map((element) =>
-            codec["~serializeElement"](element),
-          )
-        : [codec["~serializeElement"](value)];
+    if (codec["~arity"] === "many") {
+      if (!Array.isArray(value)) {
+        throw new SerializeError(
+          `search param "${key}" expects an array, got ${typeof value}`,
+        );
+      }
+      // Array codecs cannot carry defaults, so no elision applies.
+      for (const element of value) {
+        pairs.push([key, codec["~serializeElement"](element)]);
+      }
+      continue;
+    }
+
+    const serialized = codec["~serializeElement"](value);
 
     if (codec["~defaultValue"] !== undefined) {
-      const defaultSerialized: string[] =
-        codec["~arity"] === "many"
-          ? (codec["~defaultValue"].value as unknown[]).map((element) =>
-              codec["~serializeElement"](element),
-            )
-          : [codec["~serializeElement"](codec["~defaultValue"].value)];
-      const equalsDefault =
-        serialized.length === defaultSerialized.length &&
-        serialized.every(
-          (element, index) => element === defaultSerialized[index],
-        );
-      if (equalsDefault) continue; // D8 elision
+      const defaultSerialized = codec["~serializeElement"](
+        resolveCodecValue(codec["~defaultValue"].value),
+      );
+      if (serialized === defaultSerialized) continue; // D8 elision
     }
 
-    for (const element of serialized) {
-      pairs.push([key, element]);
-    }
+    pairs.push([key, serialized]);
   }
 
   return pairs;
@@ -193,6 +205,21 @@ export function searchToString<S extends SearchConfig>(
   input: InferSearchInput<S>,
 ): string {
   return buildSearchString(encodeSearch(config, input));
+}
+
+/**
+ * encodeURIComponent throws a raw URIError on lone surrogates; wrap it so
+ * the documented "every error is a ParamourError" contract holds (S7).
+ */
+function encodeComponent(text: string): string {
+  try {
+    return encodeURIComponent(text);
+  } catch (error) {
+    throw new SerializeError(
+      `text is not encodable as a URL component: ${String(error)}`,
+      { cause: error },
+    );
+  }
 }
 
 function toMultimap(source: SearchSource): Map<string, string[]> {
@@ -210,7 +237,15 @@ function toMultimap(source: SearchSource): Map<string, string[]> {
   }
   for (const [key, value] of Object.entries(source)) {
     if (value === undefined) continue;
-    map.set(key, typeof value === "string" ? [value] : [...value]);
+    if (typeof value === "string") {
+      map.set(key, [value]);
+    } else if (Array.isArray(value)) {
+      map.set(key, [...value]);
+    } else {
+      throw new ParamourError(
+        `search source value for "${key}" must be a string or string[], got ${typeof value}`,
+      );
+    }
   }
   return map;
 }

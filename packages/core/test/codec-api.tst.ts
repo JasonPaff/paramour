@@ -41,6 +41,18 @@ test("illegal chains are not callable", () => {
   expect(p.string().optional().optional()).type.toRaiseError();
 });
 
+test("array codecs reject presence modifiers; catch stays legal", () => {
+  expect(p.stringArray().default([])).type.toRaiseError();
+  expect(p.stringArray().optional()).type.toRaiseError();
+  expect(p.stringArray().catch(["a"])).type.not.toRaiseError();
+});
+
+test("default and catch accept a factory form", () => {
+  expect(p.integer().default(() => 1)).type.not.toRaiseError();
+  expect(p.integer().catch(() => 0)).type.not.toRaiseError();
+  expect(p.integer().default(() => "x")).type.toRaiseError();
+});
+
 test("Standard Schema refinements carry the schema output type", () => {
   const branded = p.string(z.string().brand<"UserId">());
   expect(branded["~out"]).type.toBe<string & z.$brand<"UserId">>();
