@@ -28,5 +28,11 @@
   "bugs": {
     "url": "https://github.com/JasonPaff/paramour/issues"
   },
-  "files": []
+  "files": [],
+  "dependencies": {
+    "@standard-schema/spec": "^1.1.0"
+  },
+  "devDependencies": {
+    "zod": "^4.4.3"
+  }
 }

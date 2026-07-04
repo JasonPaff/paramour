@@ -5,7 +5,15 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "coverage/**", "examples/**", "docs/**"],
+    // *.tst.ts type tests contain intentional type errors and are checked
+    // by tstyche, not by tsc or ESLint's project service.
+    ignores: [
+      "**/dist/**",
+      "**/*.tst.ts",
+      "coverage/**",
+      "examples/**",
+      "docs/**",
+    ],
   },
   eslint.configs.recommended,
   perfectionist.configs["recommended-natural"],

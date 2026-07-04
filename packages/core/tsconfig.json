@@ -1,7 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // URLSearchParams and friends — present in both Node and browsers.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "noEmit": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test"],
+  // Type tests contain intentional type errors (toRaiseError); they are
+  // checked by tstyche, not tsc.
+  "exclude": ["test/**/*.tst.ts"]
 }
