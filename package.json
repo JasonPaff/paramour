@@ -1,0 +1,20 @@
+{
+  "name": "paramour-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo for paramour — type-safe routing companion for the Next.js App Router.",
+  "author": "Jason Paff <jasonpaff@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JasonPaff/paramour.git"
+  },
+  "homepage": "https://github.com/JasonPaff/paramour#readme",
+  "bugs": {
+    "url": "https://github.com/JasonPaff/paramour/issues"
+  },
+  "engines": {
+    "node": ">=20.9"
+  },
+  "packageManager": "pnpm@10.30.1"
+}

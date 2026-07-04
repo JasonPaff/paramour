@@ -1,0 +1,28 @@
+{
+  "name": "paramour",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Type-safe routing companion for the Next.js App Router: validated route params and search params, typed path building, and explicit URL serialization.",
+  "keywords": [
+    "nextjs",
+    "app-router",
+    "typescript",
+    "routing",
+    "type-safe",
+    "search-params",
+    "route-params",
+    "standard-schema"
+  ],
+  "author": "Jason Paff <jasonpaff@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JasonPaff/paramour.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/JasonPaff/paramour#readme",
+  "bugs": {
+    "url": "https://github.com/JasonPaff/paramour/issues"
+  },
+  "files": []
+}
