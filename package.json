@@ -14,7 +14,15 @@
     "url": "https://github.com/JasonPaff/paramour/issues"
   },
   "engines": {
-    "node": ">=20.9"
+    "node": ">=24.18.0"
   },
-  "packageManager": "pnpm@11.9.0"
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.18.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@11.9.0",
+  "devDependencies": {}
 }
