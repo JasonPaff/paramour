@@ -103,9 +103,23 @@ function runSchemaSync<Out>(
 
 function serializeFiniteNumber(value: unknown): string {
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new SerializeError(`Expected a finite number, got ${String(value)}`);
+    throw new SerializeError(`Expected a finite number, got ${show(value)}`);
   }
   return String(value);
+}
+
+/**
+ * String() for error messages: objects without a usable primitive conversion
+ * (null-prototype objects, Symbol.toPrimitive throwers) make String() itself
+ * throw a raw TypeError, which would escape before the guard's SerializeError
+ * is even constructed.
+ */
+function show(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return `[unstringifiable ${typeof value}]`;
+  }
 }
 
 /**
@@ -136,7 +150,7 @@ export const p = {
       },
       serializeElement: (value) => {
         if (typeof value !== "boolean") {
-          throw new SerializeError(`Expected a boolean, got ${String(value)}`);
+          throw new SerializeError(`Expected a boolean, got ${show(value)}`);
         }
         return value ? "true" : "false";
       },
@@ -152,7 +166,10 @@ export const p = {
         try {
           return codec.parse(raw);
         } catch (error) {
-          if (error instanceof ParseError) throw error;
+          // Paramour's own errors are not foreign: config-level failures
+          // (async schema, builder misuse) must stay loud, never be
+          // downgraded to a .catch()-recoverable ParseError.
+          if (error instanceof ParamourError) throw error;
           // Normalize foreign throws so .catch() recovery and per-key issue
           // aggregation see them (they match on ParseError).
           throw new ParseError(
@@ -161,7 +178,17 @@ export const p = {
           );
         }
       },
-      serializeElement: (value) => codec.serialize(value as Out),
+      serializeElement: (value) => {
+        try {
+          return codec.serialize(value as Out);
+        } catch (error) {
+          if (error instanceof ParamourError) throw error;
+          throw new SerializeError(
+            error instanceof Error ? error.message : show(error),
+            { cause: error },
+          );
+        }
+      },
     });
   },
 
@@ -179,7 +206,7 @@ export const p = {
       serializeElement: (value) => {
         if (typeof value !== "string" || !set.has(value)) {
           throw new SerializeError(
-            `${String(value)} is not one of: ${members.join(", ")}`,
+            `${show(value)} is not one of: ${members.join(", ")}`,
           );
         }
         return value;

@@ -47,6 +47,10 @@ test("array codecs reject presence modifiers; catch stays legal", () => {
   expect(p.stringArray().catch(["a"])).type.not.toRaiseError();
 });
 
+test("catch preserves 'many' arity", () => {
+  expect(p.stringArray().catch(["a"])["~arity"]).type.toBe<"many">();
+});
+
 test("default and catch accept a factory form", () => {
   expect(p.integer().default(() => 1)).type.not.toRaiseError();
   expect(p.integer().catch(() => 0)).type.not.toRaiseError();
@@ -87,6 +91,21 @@ test("search input side: defaulted and optional keys may be omitted", () => {
     InferSearchInput<typeof config>
   >();
   expect<{ page: number }>().type.not.toBeAssignableTo<
+    InferSearchInput<typeof config>
+  >();
+});
+
+test("array codecs: output key always present as an array", () => {
+  const config = { tags: p.stringArray() };
+  expect<InferSearchOutput<typeof config>>().type.toBe<{ tags: string[] }>();
+});
+
+test("array codecs: input key may be omitted (absent ≡ [])", () => {
+  const config = { q: p.string(), tags: p.stringArray() };
+  expect<{ q: string }>().type.toBeAssignableTo<
+    InferSearchInput<typeof config>
+  >();
+  expect<{ q: string; tags: string[] }>().type.toBeAssignableTo<
     InferSearchInput<typeof config>
   >();
 });

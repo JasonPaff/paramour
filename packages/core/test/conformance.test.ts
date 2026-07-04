@@ -6,6 +6,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import type { Codec } from "../src/codec.js";
+
 import {
   ParamourError,
   SearchDecodeError,
@@ -128,6 +130,10 @@ describe("arrays (repeated keys)", () => {
   it("C15: serializing [] emits nothing", () => {
     expect(searchToString({ tag: p.stringArray() }, { tag: [] })).toBe("");
   });
+
+  it("S6: an omitted array key encodes to nothing (absent ≡ [])", () => {
+    expect(searchToString({ tag: p.stringArray() }, {})).toBe("");
+  });
 });
 
 describe("byte-layer serialization", () => {
@@ -185,6 +191,16 @@ describe("determinism and elision", () => {
       decodeSearch({ page: p.integer().default(1) }, { page: "1" }),
     ).toEqual({ page: 1 });
   });
+
+  it("a schema-invalid value default throws at .default() time, not per encode", () => {
+    expect(() => p.integer(z.number().max(5)).default(10)).toThrow(
+      SerializeError,
+    );
+    // A valid config still encodes valid explicit values (and elides the default).
+    const config = { page: p.integer(z.number().max(5)).default(3) };
+    expect(searchToString(config, { page: 4 })).toBe("?page=4");
+    expect(searchToString(config, { page: 3 })).toBe("");
+  });
 });
 
 describe("decode-side hygiene", () => {
@@ -192,6 +208,32 @@ describe("decode-side hygiene", () => {
     expect(decodeSearch({ q: p.string() }, { other: "x", q: "hi" })).toEqual({
       q: "hi",
     });
+  });
+
+  it("P8: malformed values under unknown keys are ignored, not validated", () => {
+    // Real-world sources (Express + qs) put numbers and nested objects under
+    // keys paramour doesn't own; those must never fail a decode.
+    const source = { filter: { x: "1" }, junk: 42, q: "ok" };
+    expect(
+      decodeSearch(
+        { q: p.string() },
+        source as unknown as Record<string, string>,
+      ),
+    ).toEqual({ q: "ok" });
+  });
+
+  it("non-string array elements under a declared key are a ParamourError", () => {
+    expect(() =>
+      decodeSearch({ q: p.string() }, { q: [5] } as unknown as Record<
+        string,
+        string[]
+      >),
+    ).toThrow(ParamourError);
+    expect(() =>
+      decodeSearch({ tag: p.stringArray() }, {
+        tag: [5, true],
+      } as unknown as Record<string, string[]>),
+    ).toThrow(ParamourError);
   });
 
   it("issues aggregate across keys", () => {
@@ -265,6 +307,48 @@ describe("error contract — every throw is a ParamourError", () => {
       SearchDecodeError,
     );
   });
+
+  it("a custom codec throwing a plain Error at serialize is a SerializeError", () => {
+    const codec = p.custom<string>({
+      parse: (raw) => raw,
+      serialize() {
+        throw new RangeError("Invalid time value");
+      },
+    });
+    expect(() => encodeSearch({ x: codec }, { x: "v" })).toThrow(
+      SerializeError,
+    );
+    expect(() => encodeSearch({ x: codec }, { x: "v" })).toThrow(
+      "Invalid time value",
+    );
+  });
+
+  it("a ParamourError from a custom parse stays loud through .catch()", () => {
+    const codec = p
+      .custom<string>({
+        parse() {
+          throw new ParamourError("config-level failure");
+        },
+        serialize: (value) => value,
+      })
+      .catch("fallback");
+    expect(() => decodeSearch({ x: codec }, { x: "v" })).toThrow(
+      "config-level failure",
+    );
+  });
+
+  it("null-prototype values fail serialize with SerializeError, not a raw TypeError", () => {
+    const nullProto: unknown = Object.create(null);
+    expect(() =>
+      encodeSearch({ flag: p.boolean() }, { flag: nullProto as boolean }),
+    ).toThrow(SerializeError);
+    expect(() =>
+      encodeSearch({ sort: p.enum(["a", "b"]) }, { sort: nullProto as "a" }),
+    ).toThrow(SerializeError);
+    expect(() =>
+      encodeSearch({ page: p.number() }, { page: nullProto as number }),
+    ).toThrow(SerializeError);
+  });
 });
 
 describe("prototype-chain hygiene", () => {
@@ -284,6 +368,26 @@ describe("prototype-chain hygiene", () => {
     ).toEqual([]);
   });
 
+  it("class instances exposing values via prototype getters encode", () => {
+    const config = { page: p.integer(), q: p.string().optional() };
+    // Literal getters, not readonly fields: values living on the class
+    // PROTOTYPE (not as own properties) are exactly what this test pins.
+    /* eslint-disable @typescript-eslint/class-literal-property-style */
+    class Filters {
+      get page() {
+        return 3;
+      }
+      get q() {
+        return "hi";
+      }
+    }
+    /* eslint-enable @typescript-eslint/class-literal-property-style */
+    expect(encodeSearch(config, new Filters())).toEqual([
+      ["page", "3"],
+      ["q", "hi"],
+    ]);
+  });
+
   it("a __proto__ config key decodes to an own property", () => {
     const config = { ["__proto__"]: p.string() };
     const result = decodeSearch(config, new URLSearchParams("__proto__=x"));
@@ -292,6 +396,27 @@ describe("prototype-chain hygiene", () => {
       "x",
     );
     expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+  });
+});
+
+describe("output-shape invariants (D4)", () => {
+  it("a structurally-built defaulted codec without a default value still yields its key", () => {
+    // Unreachable via the public builders (.default() always stores a thunk),
+    // but the exported Codec interface type-permits the combination; the
+    // every-declared-key-present promise must hold regardless.
+    const codec = {
+      "~arity": "single",
+      "~catchValue": undefined,
+      "~caught": false,
+      "~defaultSerialized": undefined,
+      "~defaultValue": undefined,
+      "~parseElement": (raw: string) => raw,
+      "~presence": "defaulted",
+      "~serializeElement": (value: unknown) => String(value),
+    } as unknown as Codec<string, "defaulted">;
+    const result = decodeSearch({ k: codec }, {});
+    expect(Object.hasOwn(result, "k")).toBe(true);
+    expect(result.k).toBeUndefined();
   });
 });
 
@@ -312,11 +437,41 @@ describe("default and catch value isolation", () => {
     expect(decodeSearch(config, { page: "x" })).toEqual({ page: 1 });
   });
 
-  it("factory defaults participate in D8 elision at encode time", () => {
+  it("factory defaults are excluded from D8 elision (a time-varying factory must not swallow explicit values)", () => {
     const config = { page: p.integer().default(() => 1) };
-    expect(searchToString(config, { page: 1 })).toBe("");
+    expect(searchToString(config, { page: 1 })).toBe("?page=1");
     expect(searchToString(config, { page: 2 })).toBe("?page=2");
     expect(searchToString(config, {})).toBe("");
+  });
+
+  it("encode output is deterministic under a time-varying factory default", () => {
+    let n = 1;
+    const config = { page: p.integer().default(() => ++n) };
+    expect(searchToString(config, { page: 2 })).toBe("?page=2");
+    expect(searchToString(config, { page: 2 })).toBe("?page=2");
+  });
+
+  it("a throwing .default() factory surfaces as a ParamourError", () => {
+    const config = {
+      page: p.integer().default((): number => {
+        throw new Error("boom");
+      }),
+    };
+    expect(() => decodeSearch(config, {})).toThrow(ParamourError);
+    expect(() => decodeSearch(config, {})).toThrow(
+      /\.default\(\) factory threw/,
+    );
+  });
+
+  it("a throwing .catch() factory surfaces as a ParamourError", () => {
+    const config = {
+      page: p.integer().catch((): number => {
+        throw new Error("boom");
+      }),
+    };
+    expect(() => decodeSearch(config, { page: "x" })).toThrow(
+      /\.catch\(\) factory threw/,
+    );
   });
 });
 

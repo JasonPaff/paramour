@@ -49,9 +49,17 @@ export interface Codec<
       : never
     : never;
   readonly "~arity": A;
-  readonly "~catchValue": undefined | { readonly value: (() => Out) | Out };
+  /** Stored as a thunk regardless of the form passed to `.catch()`. */
+  readonly "~catchValue": (() => Out) | undefined;
   readonly "~caught": C;
-  readonly "~defaultValue": undefined | { readonly value: (() => Out) | Out };
+  /**
+   * Wire form of a value-form `.default()`, serialized once at build time.
+   * `undefined` for factory defaults — those are excluded from D8 elision
+   * because a time-varying factory would elide values that decode differently.
+   */
+  readonly "~defaultSerialized": string | undefined;
+  /** Stored as a thunk regardless of the form passed to `.default()`. */
+  readonly "~defaultValue": (() => Out) | undefined;
   /** phantom — carries `Out` for inference; never set at runtime */
   readonly "~out": Out;
 
@@ -76,8 +84,9 @@ export type PresenceOf<C extends AnyCodec> = C["~presence"];
 
 interface CodecState<Out> {
   readonly arity: Arity;
-  readonly catchValue: undefined | { readonly value: (() => Out) | Out };
-  readonly defaultValue: undefined | { readonly value: (() => Out) | Out };
+  readonly catchValue: (() => Out) | undefined;
+  readonly defaultSerialized: string | undefined;
+  readonly defaultValue: (() => Out) | undefined;
   readonly parseElement: (raw: string) => unknown;
   readonly presence: Presence;
   readonly serializeElement: (value: unknown) => string;
@@ -92,20 +101,12 @@ export function createCodec<Out, A extends Arity = "single">(impl: {
   return build<Out>({
     arity: impl.arity ?? "single",
     catchValue: undefined,
+    defaultSerialized: undefined,
     defaultValue: undefined,
     parseElement: impl.parseElement,
     presence: "required",
     serializeElement: impl.serializeElement,
   }) as unknown as Codec<Out, "required", false, A>;
-}
-
-/**
- * Resolves a stored `.default()`/`.catch()` value: factories are invoked per
- * call so each decode gets a fresh value. (An `Out` that is itself a function
- * is indistinguishable from a factory — such values can't serialize anyway.)
- */
-export function resolveCodecValue<Out>(stored: (() => Out) | Out): Out {
-  return typeof stored === "function" ? (stored as () => Out)() : stored;
 }
 
 function build<Out>(state: CodecState<Out>): Codec<Out> {
@@ -115,7 +116,7 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
       if (state.catchValue !== undefined) {
         throw new ParamourError(".catch() may only be applied once");
       }
-      return build({ ...state, catchValue: { value: fallback } });
+      return build({ ...state, catchValue: toThunk(fallback, "catch") });
     },
     default(value: (() => Out) | Out) {
       if (state.arity === "many") {
@@ -130,7 +131,14 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
       }
       return build({
         ...state,
-        defaultValue: { value },
+        // Value-form defaults are serialized once, here, so a schema-invalid
+        // or unserializable default fails at config-definition time — not on
+        // every subsequent encode. Factory defaults can't be pre-validated.
+        defaultSerialized:
+          typeof value === "function"
+            ? undefined
+            : serializeDefault(state.serializeElement, value),
+        defaultValue: toThunk(value, "default"),
         presence: "defaulted",
       });
     },
@@ -150,6 +158,7 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
     "~arity": state.arity,
     "~catchValue": state.catchValue,
     "~caught": state.catchValue !== undefined,
+    "~defaultSerialized": state.defaultSerialized,
     "~defaultValue": state.defaultValue,
 
     "~parseElement": state.parseElement,
@@ -159,4 +168,45 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
   // The cast erases the runtime shape into the type-stated interface; the
   // "~out" phantom is intentionally absent at runtime.
   return codec as unknown as Codec<Out>;
+}
+
+function serializeDefault(
+  serializeElement: (value: unknown) => string,
+  value: unknown,
+): string {
+  try {
+    return serializeElement(value);
+  } catch (error) {
+    if (error instanceof ParamourError) throw error;
+    throw new ParamourError(
+      ".default() value is not serializable by this codec",
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * Normalizes a `.default()`/`.catch()` argument to a thunk. Factories are
+ * invoked per decode/encode so each call gets a fresh value; the wrapper is
+ * the one chokepoint where a throwing user factory is branded ParamourError.
+ * (An `Out` that is itself a function is indistinguishable from a factory —
+ * such values can't serialize anyway.)
+ */
+function toThunk<Out>(
+  stored: (() => Out) | Out,
+  what: "catch" | "default",
+): () => Out {
+  if (typeof stored !== "function") return () => stored;
+  const factory = stored as () => Out;
+  return () => {
+    try {
+      return factory();
+    } catch (error) {
+      if (error instanceof ParamourError) throw error;
+      throw new ParamourError(
+        `.${what}() factory threw: ${error instanceof Error ? error.message : typeof error}`,
+        { cause: error },
+      );
+    }
+  };
 }
