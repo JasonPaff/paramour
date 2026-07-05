@@ -133,14 +133,18 @@ describe("watchAppDir (TR5)", { retry: 2 }, () => {
     expect(onRescan).not.toHaveBeenCalled();
   });
 
-  it("treats startup failure as non-fatal: onError fires, no throw", () => {
+  it("treats startup failure as non-fatal: onError fires, no throw", async () => {
     const appDir = join(makeTempDir(), "does-not-exist");
     const onError = vi.fn();
     const onRescan = vi.fn();
     const watcher = watchAppDir(appDir, { onError, onRescan });
     watchers.push(watcher);
-    expect(onError).toHaveBeenCalledTimes(1);
-    // The no-op handle is still closeable.
+    // Sync on Windows/macOS (native watcher throws ENOENT), async on Linux
+    // (userland recursive watcher emits an 'error' event instead).
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledTimes(1);
+    }, 5000);
+    // The handle is still closeable.
     watcher.close();
   });
 
