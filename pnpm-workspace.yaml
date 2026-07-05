@@ -2,3 +2,8 @@ packages:
   - packages/*
   - examples/*
   - docs
+
+# @paramour-js/next declares `next` as a peer only — the package is hermetic
+# by design (design-05 TR4): auto-installing the peer would materialize all
+# of Next (and sharp's build scripts) into the workspace.
+autoInstallPeers: false
