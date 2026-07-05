@@ -5,6 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+    "paramour": "paramour generate",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
