@@ -91,7 +91,8 @@ export function decodeParams<R extends AnyRoute>(
       `params source must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
     );
   }
-  const config = route["~params"] as Record<string, AnyCodec | undefined>;
+  const config = route["~params"] as
+    Record<string, AnyCodec | undefined> | undefined;
   const issues: Issue[] = [];
   // Built as entries so keys like "__proto__" become ordinary own properties
   // of the result (Object.fromEntries uses define, not set, semantics).
@@ -232,7 +233,8 @@ export function encodeParams<R extends AnyRoute>(
     );
   }
   const values = untrusted as Record<string, unknown>;
-  const config = route["~params"] as Record<string, AnyCodec | undefined>;
+  const config = route["~params"] as
+    Record<string, AnyCodec | undefined> | undefined;
   const segments: string[] = [];
 
   for (const segment of tokenizePath(route.path)) {
@@ -395,14 +397,15 @@ function encodeSegmentValue(
 
 /**
  * Unreachable through defineRoute's typed config; a plain-JS caller can omit
- * a param codec, which is a config-contract failure, not a decode issue.
+ * a param codec — or a hand-built route can lack `~params` entirely — which
+ * is a config-contract failure, not a decode issue.
  */
 function requireCodec(
-  config: Record<string, AnyCodec | undefined>,
+  config: Record<string, AnyCodec | undefined> | undefined,
   name: string,
   path: string,
 ): AnyCodec {
-  const codec = config[name];
+  const codec = config?.[name];
   if (codec === undefined) {
     throw new ParamourError(
       `route "${path}" declares no codec for param "${name}"`,

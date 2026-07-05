@@ -76,6 +76,7 @@ export function decodeSearch<S extends SearchConfig>(
   config: S,
   source: SearchSource,
 ): InferSearchOutput<S> {
+  requireSearchConfig(config);
   const issues: Issue[] = [];
   // Built as entries so keys like "__proto__" become ordinary own properties
   // of the result (Object.fromEntries uses define, not set, semantics).
@@ -191,6 +192,7 @@ export function encodeSearch<S extends SearchConfig>(
   config: S,
   input: InferSearchInput<S>,
 ): [string, string][] {
+  requireSearchConfig(config);
   // The TS contract forbids non-object inputs, but plain-JS callers reach
   // here; a null input must fail loud, not read as every-key-absent.
   const untrusted: unknown = input;
@@ -383,6 +385,22 @@ function readThroughReceiver(
         { cause: error },
       ),
   );
+}
+
+/**
+ * The TS contract makes a non-object config unrepresentable, but a
+ * hand-built route missing `~search` reaches both codecs' entry points via
+ * href/parseSearch in plain JS; fail branded — a missing config is a
+ * config-contract violation (requireCodec's precedent), never a raw
+ * TypeError out of Object.entries/Object.keys.
+ */
+function requireSearchConfig(config: SearchConfig): void {
+  const untrusted: unknown = config;
+  if (typeof untrusted !== "object" || untrusted === null) {
+    throw new ParamourError(
+      `search config must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+    );
+  }
 }
 
 /**

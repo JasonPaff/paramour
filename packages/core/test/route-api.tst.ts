@@ -261,3 +261,30 @@ test("href: search property required iff a required key exists (RL4/D4)", () => 
   expect(href).type.toBeCallableWith(lax, { search: {} });
   expect(href).type.toBeCallableWith(lax, { search: { page: 2 } });
 });
+
+test("href: an empty-input half bans its property outright (2026-07-04 ruling)", () => {
+  // The bare Partial<Record<Key, {}>> form would accept arbitrary junk on
+  // static/empty-config routes — the empty object type is exempt from
+  // excess-property checking — and silently drop it from the link.
+  const about = defineRoute("/about", {});
+  expect(href).type.toBeCallableWith(about);
+  expect(href).type.toBeCallableWith(about, {});
+  expect(href).type.toBeCallableWith(about, { hash: "top" });
+  expect(href).type.not.toBeCallableWith(about, { search: { q: "x" } });
+  expect(href).type.not.toBeCallableWith(about, { params: { id: 42 } });
+  // ?: never mirrors RouteConfig's static-path stance: present-but-empty is
+  // rejected too, and so are non-fresh objects (no excess-property reliance).
+  expect(href).type.not.toBeCallableWith(about, { params: {} });
+  expect(href).type.not.toBeCallableWith(about, { search: {} });
+  const junk = { q: "x" };
+  expect(href).type.not.toBeCallableWith(about, { search: junk });
+
+  // A dynamic route with no search config bans the search half the same way.
+  const product = defineRoute("/product/[id]", {
+    params: { id: p.integer() },
+  });
+  expect(href).type.not.toBeCallableWith(product, {
+    params: { id: 1 },
+    search: { q: "x" },
+  });
+});

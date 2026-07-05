@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defineRoute, href, p, SerializeError } from "../src";
+import { defineRoute, href, p, ParamourError, SerializeError } from "../src";
 
 describe("href assembly (RL4)", () => {
   it("assembles path, ?query, #hash in fixed order", () => {
@@ -54,6 +54,17 @@ describe("href assembly (RL4)", () => {
     );
     expect(() => (href as (r: unknown) => string)(route)).toThrow(
       /required search param "q" is missing/,
+    );
+  });
+
+  it("a hand-built route missing ~search fails branded, not with a TypeError", () => {
+    // A static path sails through buildPath (no codec lookups), so the
+    // missing-config chokepoint is encodeSearch's own guard.
+    expect(() => (href as (r: unknown) => string)({ path: "/about" })).toThrow(
+      ParamourError,
+    );
+    expect(() => (href as (r: unknown) => string)({ path: "/about" })).toThrow(
+      /search config must be an object, got undefined/,
     );
   });
 });

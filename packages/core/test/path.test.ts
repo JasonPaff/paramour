@@ -128,6 +128,12 @@ describe("encodeParams / buildPath (RL5)", () => {
     const route = defineRoute("/x/[id]", {} as never);
     expect(() => buildPath(route, { id: "1" })).toThrow(/declares no codec/);
   });
+
+  it("a hand-built route lacking ~params entirely fails the same way", () => {
+    const route = { path: "/x/[id]" } as never;
+    expect(() => buildPath(route, { id: "1" })).toThrow(/declares no codec/);
+    expect(() => decodeParams(route, { id: "1" })).toThrow(/declares no codec/);
+  });
 });
 
 describe("decodeParams (RL7)", () => {
