@@ -6,6 +6,13 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "paramour": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^6.0.3"
+  },
   "description": "Next.js integration for paramour: withTypedRoutes, client hooks, PageProps glue, and the codegen CLI.",
   "author": "Jason Paff <jasonpaff@gmail.com>",
   "license": "MIT",

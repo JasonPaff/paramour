@@ -1,2 +1,6 @@
-// Placeholder module — real exports land with the library implementation.
-export {};
+export {
+  emitArtifact,
+  writeIfChanged,
+  type WriteIfChangedResult,
+} from "./emit.js";
+export { DEFAULT_PAGE_EXTENSIONS, resolveAppDir, scanRoutes } from "./scan.js";
