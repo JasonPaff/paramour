@@ -49,7 +49,7 @@ test("href narrows its brand to the registered literal (RL4)", () => {
   >();
   // Optional-catch-all-only routes stay bare-callable post-generation.
   const docs = defineRoute("/docs/[[...slug]]", {
-    params: { path: p.string() },
+    params: { slug: p.string() },
   });
   expect(href(docs)).type.toBe<Href<"/docs/[[...slug]]">>();
 });

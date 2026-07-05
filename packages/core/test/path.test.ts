@@ -55,11 +55,11 @@ describe("encodeParams / buildPath (RL5)", () => {
 
   it("R3: an optional catch-all given [] or absent vanishes with its slash", () => {
     const route = defineRoute("/docs/[[...slug]]", {
-      params: { path: p.string() },
+      params: { slug: p.string() },
     });
     expect(buildPath(route, {})).toBe("/docs");
-    expect(buildPath(route, { path: [] })).toBe("/docs");
-    expect(buildPath(route, { path: ["a", "b"] })).toBe("/docs/a/b");
+    expect(buildPath(route, { slug: [] })).toBe("/docs");
+    expect(buildPath(route, { slug: ["a", "b"] })).toBe("/docs/a/b");
   });
 
   it("R3: a fully-elided root optional catch-all yields /", () => {
@@ -158,9 +158,9 @@ describe("decodeParams (RL7)", () => {
 
   it("an absent optional catch-all normalizes to [] (D6)", () => {
     const route = defineRoute("/docs/[[...slug]]", {
-      params: { path: p.string() },
+      params: { slug: p.string() },
     });
-    expect(decodeParams(route, {})).toEqual({ path: [] });
+    expect(decodeParams(route, {})).toEqual({ slug: [] });
   });
 
   it("a static route decodes to {} whatever the source contains", () => {

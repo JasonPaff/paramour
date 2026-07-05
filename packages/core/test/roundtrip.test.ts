@@ -153,15 +153,15 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
 
   it("optional catch-all: [] elides and comes back as [] (§6.2 analog)", () => {
     const route = defineRoute("/docs/[[...slug]]", {
-      params: { path: p.string() },
+      params: { slug: p.string() },
     });
     fc.assert(
       fc.property(fc.array(segmentString), (values) => {
-        const segments = simulateNextDecode(buildPath(route, { path: values }));
+        const segments = simulateNextDecode(buildPath(route, { slug: values }));
         // At the base path Next omits the key entirely — [] is the
         // canonical representative on the way back (D6).
-        const source = segments.length > 1 ? { path: segments.slice(1) } : {};
-        expect(decodeParams(route, source)).toStrictEqual({ path: values });
+        const source = segments.length > 1 ? { slug: segments.slice(1) } : {};
+        expect(decodeParams(route, source)).toStrictEqual({ slug: values });
       }),
     );
   });

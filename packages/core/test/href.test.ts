@@ -29,10 +29,10 @@ describe("href assembly (RL4)", () => {
 
   it("an optional-catch-all-only route is bare-callable (presence ruling)", () => {
     const docs = defineRoute("/docs/[[...slug]]", {
-      params: { path: p.string() },
+      params: { slug: p.string() },
     });
     expect(href(docs)).toBe("/docs");
-    expect(href(docs, { params: { path: ["a", "b"] } })).toBe("/docs/a/b");
+    expect(href(docs, { params: { slug: ["a", "b"] } })).toBe("/docs/a/b");
   });
 
   it("returns a primitive string — the brand is type-only", () => {

@@ -37,11 +37,11 @@ test("segment extraction: catch-all decodes element-wise to an array (RL3/D6)", 
 
 test("segment extraction: optional catch-all output key is REQUIRED (RL3 ruling)", () => {
   // Absent normalizes to [] at decode time (D6), so the output side has no
-  // `?:` split — a regression to `{ path?: string[] }` must fail toBe here.
+  // `?:` split — a regression to `{ slug?: string[] }` must fail toBe here.
   const route = defineRoute("/docs/[[...slug]]", {
-    params: { path: p.string() },
+    params: { slug: p.string() },
   });
-  expect<InferRouteParams<typeof route>>().type.toBe<{ path: string[] }>();
+  expect<InferRouteParams<typeof route>>().type.toBe<{ slug: string[] }>();
 });
 
 test("segment extraction: static path has no params", () => {
@@ -236,11 +236,11 @@ test("href: params omission is presence-driven (2026-07-04 ruling)", () => {
   // An optional-catch-all-only route has no required param key, so the
   // params property — and the whole options argument — may be omitted.
   const docs = defineRoute("/docs/[[...slug]]", {
-    params: { path: p.string() },
+    params: { slug: p.string() },
   });
   expect(href).type.toBeCallableWith(docs);
   expect(href).type.toBeCallableWith(docs, { params: {} });
-  expect(href).type.toBeCallableWith(docs, { params: { path: ["a"] } });
+  expect(href).type.toBeCallableWith(docs, { params: { slug: ["a"] } });
 
   // A required catch-all keeps params required.
   const files = defineRoute("/files/[...seg]", {
