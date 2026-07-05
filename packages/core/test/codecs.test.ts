@@ -3,8 +3,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ParamourError, ParseError, SerializeError } from "../src/errors.js";
-import { p } from "../src/p.js";
+import { p, ParamourError, ParseError, SerializeError } from "../src";
 
 const parse = (
   codec: { "~parseElement": (raw: string) => unknown },

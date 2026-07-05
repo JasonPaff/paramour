@@ -7,22 +7,19 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import type { Codec } from "../src/codec.js";
+import type { Codec, InferSearchInput } from "../src";
 
-import {
-  ParamourError,
-  ParseError,
-  SearchDecodeError,
-  SerializeError,
-} from "../src/errors.js";
-import { p } from "../src/p.js";
 import {
   buildSearchString,
   decodeSearch,
   encodeSearch,
-  type InferSearchInput,
+  p,
+  ParamourError,
+  ParseError,
+  SearchDecodeError,
   searchToString,
-} from "../src/search.js";
+  SerializeError,
+} from "../src";
 
 describe("empty string vs absent", () => {
   it("C1: q= decodes to the empty string for p.string()", () => {

@@ -5,8 +5,8 @@
 import { expect, test } from "tstyche";
 import { z } from "zod";
 
-import { p } from "../src/p.js";
-import type { InferSearchInput, InferSearchOutput } from "../src/search.js";
+import { p } from "../src";
+import type { InferSearchInput, InferSearchOutput } from "../src";
 
 test("base builders carry their output types", () => {
   expect(p.string()["~out"]).type.toBe<string>();
@@ -29,22 +29,23 @@ test("modifiers update presence type-state", () => {
 });
 
 test("modifier arguments are typed", () => {
-  expect(p.integer().default(1)).type.not.toRaiseError();
-  expect(p.integer().default("x")).type.toRaiseError();
-  expect(p.enum(["a", "b"]).catch("c")).type.toRaiseError();
+  expect(p.integer().default).type.toBeCallableWith(1);
+  expect(p.integer().default).type.not.toBeCallableWith("x");
+  expect(p.enum(["a", "b"]).catch).type.not.toBeCallableWith("c");
 });
 
 test("illegal chains are not callable", () => {
-  expect(p.string().optional().default("a")).type.toRaiseError();
-  expect(p.string().default("a").optional()).type.toRaiseError();
-  expect(p.integer().catch(0).catch(1)).type.toRaiseError();
-  expect(p.string().optional().optional()).type.toRaiseError();
+  // Type-state disables illegal modifiers by collapsing them to `never`.
+  expect(p.string().optional().default).type.toBe<never>();
+  expect(p.string().default("a").optional).type.toBe<never>();
+  expect(p.integer().catch(0).catch).type.toBe<never>();
+  expect(p.string().optional().optional).type.toBe<never>();
 });
 
 test("array codecs reject presence modifiers; catch stays legal", () => {
-  expect(p.stringArray().default([])).type.toRaiseError();
-  expect(p.stringArray().optional()).type.toRaiseError();
-  expect(p.stringArray().catch(["a"])).type.not.toRaiseError();
+  expect(p.stringArray().default).type.toBe<never>();
+  expect(p.stringArray().optional).type.toBe<never>();
+  expect(p.stringArray().catch).type.toBeCallableWith(["a"]);
 });
 
 test("catch preserves 'many' arity", () => {
@@ -52,9 +53,9 @@ test("catch preserves 'many' arity", () => {
 });
 
 test("default and catch accept a factory form", () => {
-  expect(p.integer().default(() => 1)).type.not.toRaiseError();
-  expect(p.integer().catch(() => 0)).type.not.toRaiseError();
-  expect(p.integer().default(() => "x")).type.toRaiseError();
+  expect(p.integer().default).type.toBeCallableWith(() => 1);
+  expect(p.integer().catch).type.toBeCallableWith(() => 0);
+  expect(p.integer().default).type.not.toBeCallableWith(() => "x");
 });
 
 test("Standard Schema refinements carry the schema output type", () => {
