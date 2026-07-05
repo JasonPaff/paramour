@@ -16,6 +16,7 @@ export {
   SearchDecodeError,
   SerializeError,
 } from "./errors.js";
+export { href, type Href, type InferHrefInput } from "./href.js";
 export { p } from "./p.js";
 export { buildPath, decodeParams, encodeParams } from "./path.js";
 export {

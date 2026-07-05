@@ -12,13 +12,14 @@ pnpm monorepo (pnpm 11, Node >= 24.18). Run from the repo root:
 
 - `pnpm test` — runtime tests (vitest, matches `packages/*/test/**/*.test.ts`)
 - `pnpm test packages/core/test/codecs.test.ts` — single test file; add `-t "name"` to filter by test name
-- `pnpm test:types` — type tests (tstyche, matches `packages/core/**/*.tst.*`); pass a path fragment to filter, e.g. `pnpm test:types codec-api`
+- `pnpm test:types` — type tests (tstyche, matches `packages/core/test/**/*.tst.*`); pass a path fragment to filter, e.g. `pnpm test:types codec-api`
+- `pnpm test:types:registry` — world-B type tests (`packages/core/test-registry/`, its own tstyche/tsconfig pair): post-generation registry behavior via a hand-authored `declare module "paramour"` augmentation. A separate compilation unit on purpose — module augmentation is program-global, so these files must never move into `test/`
 - `pnpm typecheck` — `tsc --noEmit` in every package
 - `pnpm lint` — ESLint (type-checked rules; slow-ish)
 - `pnpm format` / `pnpm format:check` — Prettier
 - `pnpm changeset` — add a changeset (changesets is the release mechanism)
 
-CI runs, in order: `format:check`, `lint`, `typecheck`, `test`, `test:types`. All five must pass.
+CI runs, in order: `format:check`, `lint`, `typecheck`, `test`, `test:types`, `test:types:registry`. All six must pass.
 
 ## Two kinds of tests
 

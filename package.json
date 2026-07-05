@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:types": "tstyche",
+    "test:types:registry": "tstyche --config ./tstyche.registry.json",
     "typecheck": "pnpm -r run typecheck"
   },
   "author": "Jason Paff <jasonpaff@gmail.com>",

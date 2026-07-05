@@ -7,9 +7,10 @@
  */
 import { expect, test } from "tstyche";
 
-import { defineRoute, p } from "../src";
+import { defineRoute, href, p } from "../src";
 import type {
   AnyRoute,
+  Href,
   InferRouteParams,
   ParamsProps,
   RouteDecodeError,
@@ -204,4 +205,59 @@ test("SafeResult: if (result.error) narrows both arms (RL6)", () => {
   } else {
     expect(result.data).type.toBe<{ id: number }>();
   }
+});
+
+test("href: branded return — assignable to string, never from it (RL4)", () => {
+  const about = defineRoute("/about", {});
+  expect(href(about)).type.toBe<Href<"/about">>();
+  expect<Href<"/about">>().type.toBeAssignableTo<string>();
+  expect<string>().type.not.toBeAssignableTo<Href>();
+  // Route-narrowed acceptance (RL10.6 substrate): brands don't cross paths.
+  expect<Href<"/a">>().type.not.toBeAssignableTo<Href<"/b">>();
+});
+
+test("href: the whole options argument is omittable only when nothing is required (RL4)", () => {
+  const about = defineRoute("/about", {});
+  expect(href).type.toBeCallableWith(about);
+  expect(href).type.toBeCallableWith(about, {});
+  expect(href).type.toBeCallableWith(about, { hash: "top" });
+
+  const product = defineRoute("/product/[id]", {
+    params: { id: p.integer() },
+  });
+  expect(href).type.not.toBeCallableWith(product);
+  expect(href).type.not.toBeCallableWith(product, {});
+  expect(href).type.toBeCallableWith(product, { params: { id: 1 } });
+  // The input side is the codec's Out type — no stringly-typed params.
+  expect(href).type.not.toBeCallableWith(product, { params: { id: "1" } });
+});
+
+test("href: params omission is presence-driven (2026-07-04 ruling)", () => {
+  // An optional-catch-all-only route has no required param key, so the
+  // params property — and the whole options argument — may be omitted.
+  const docs = defineRoute("/docs/[[...path]]", {
+    params: { path: p.string() },
+  });
+  expect(href).type.toBeCallableWith(docs);
+  expect(href).type.toBeCallableWith(docs, { params: {} });
+  expect(href).type.toBeCallableWith(docs, { params: { path: ["a"] } });
+
+  // A required catch-all keeps params required.
+  const files = defineRoute("/files/[...seg]", {
+    params: { seg: p.string() },
+  });
+  expect(href).type.not.toBeCallableWith(files);
+  expect(href).type.toBeCallableWith(files, { params: { seg: ["a"] } });
+});
+
+test("href: search property required iff a required key exists (RL4/D4)", () => {
+  const strict = defineRoute("/s", { search: { q: p.string() } });
+  expect(href).type.not.toBeCallableWith(strict);
+  expect(href).type.not.toBeCallableWith(strict, {});
+  expect(href).type.toBeCallableWith(strict, { search: { q: "x" } });
+
+  const lax = defineRoute("/l", { search: { page: p.integer().default(1) } });
+  expect(href).type.toBeCallableWith(lax);
+  expect(href).type.toBeCallableWith(lax, { search: {} });
+  expect(href).type.toBeCallableWith(lax, { search: { page: 2 } });
 });
