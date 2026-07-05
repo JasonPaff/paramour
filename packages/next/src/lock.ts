@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 /** Result of {@link acquireWatcherLock}. */
 export interface AcquireLockResult {
@@ -70,6 +70,20 @@ export function acquireWatcherLock(lockPath: string): AcquireLockResult {
   process.once("SIGINT", onSigint);
   process.once("SIGTERM", onSigterm);
   return { acquired: true, release };
+}
+
+/**
+ * The one canonical pidfile location (TR6): CLI-vs-wrapper dedupe only works
+ * because both paths compute the lock from the same project root.
+ */
+export function watcherLockPath(projectRoot: string): string {
+  return join(
+    projectRoot,
+    "node_modules",
+    ".cache",
+    "paramour",
+    "watcher.lock",
+  );
 }
 
 /** `true` when `pid` is a live process (TR6 liveness probe). */

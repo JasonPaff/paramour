@@ -3,10 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "paramour": "./dist/cli.js"
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "dependencies": {
+    "jiti": "^2.7.0",
     "paramour": "workspace:*"
   },
   "peerDependencies": {
@@ -28,5 +36,7 @@
   "bugs": {
     "url": "https://github.com/JasonPaff/paramour/issues"
   },
-  "files": []
+  "files": [
+    "dist"
+  ]
 }

@@ -1,3 +1,4 @@
+export { type ParamourConfig } from "./config.js";
 export {
   emitArtifact,
   writeIfChanged,
