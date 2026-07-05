@@ -11,3 +11,7 @@ export {
   watchAppDir,
   type WatchAppDirOptions,
 } from "./watch.js";
+export {
+  withTypedRoutes,
+  type WithTypedRoutesOptions,
+} from "./with-typed-routes.js";

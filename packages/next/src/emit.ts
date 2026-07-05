@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 /** Result of {@link writeIfChanged}. */
 export interface WriteIfChangedResult {
@@ -72,6 +73,8 @@ export function writeIfChanged(
     ? readFileSync(filePath, "utf8")
     : null;
   if (previousContent === content) return { previousContent, written: false };
+  // TR3's outFile escape hatch may point into a not-yet-existing directory.
+  mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, content);
   return { previousContent, written: true };
 }
