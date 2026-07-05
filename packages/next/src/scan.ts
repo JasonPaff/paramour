@@ -73,7 +73,7 @@ function walk(
       walk(join(dir, name), urlSegments, pageFileNames, out);
       continue;
     }
-    // Dynamic segments `[id]` / `[...slug]` / `[[...path]]` pass through
+    // Dynamic segments `[id]` / `[...slug]` / `[[...slug]]` pass through
     // verbatim (TR2, RL2 URL-shaped literals).
     walk(join(dir, name), [...urlSegments, name], pageFileNames, out);
   }

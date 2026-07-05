@@ -7,3 +7,11 @@ packages:
 # by design (design-05 TR4): auto-installing the peer would materialize all
 # of Next (and sharp's build scripts) into the workspace.
 autoInstallPeers: false
+
+# sharp (via examples/basic → next) ships prebuilt binaries as @img/sharp-*
+# optional deps; its lifecycle script is only the source-build fallback. The
+# example never exercises next/image optimization, so the script never needs
+# to run — `false` records the decision and keeps
+# `pnpm install --frozen-lockfile` non-interactive in CI.
+allowBuilds:
+  sharp: false

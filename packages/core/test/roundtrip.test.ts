@@ -152,7 +152,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
   });
 
   it("optional catch-all: [] elides and comes back as [] (§6.2 analog)", () => {
-    const route = defineRoute("/docs/[[...path]]", {
+    const route = defineRoute("/docs/[[...slug]]", {
       params: { path: p.string() },
     });
     fc.assert(

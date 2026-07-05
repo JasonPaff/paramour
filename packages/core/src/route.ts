@@ -99,7 +99,7 @@ export type ParamsConfig<Path extends string> = Readonly<
 
 /**
  * Parse-output shape (RL3): `[id]` → `Out`, `[...slug]` → `Out[]`,
- * `[[...path]]` → `Out[]` — every key REQUIRED on the output side; an absent
+ * `[[...slug]]` → `Out[]` — every key REQUIRED on the output side; an absent
  * optional catch-all normalizes to `[]` at decode time (D6), so no `?:`
  * split exists here (that split is the href-input side's concern). Keyed by
  * `Path`/`PC` so the Route interface can name its own method return types;

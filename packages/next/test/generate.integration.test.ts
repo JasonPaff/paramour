@@ -21,9 +21,9 @@ import { makeTempDir, makeTree } from "./helpers.js";
  * literals fail at `defineRoute`).
  */
 
-// Core publishes no build output; the "paramour" specifier must resolve to
-// src — the same module identity core's tsconfig.tstyche.registry.json maps
-// and registry-target.test.ts tripwires.
+// The "paramour" specifier is paths-mapped to src (winning over core's
+// exports map) — the same module identity core's tsconfig.tstyche.registry
+// config maps and registry-target.test.ts tripwires.
 const coreIndex = fileURLToPath(
   new URL("../../core/src/index.ts", import.meta.url),
 );

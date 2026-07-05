@@ -24,8 +24,10 @@ jobs:
 
       - run: pnpm format:check
       - run: pnpm lint
-      - run: pnpm typecheck
+      # build before typecheck: examples resolve the packages' dist types,
+      # and pnpm's topological order builds core → next → example-basic.
       - run: pnpm build
+      - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:types
       - run: pnpm test:types:registry

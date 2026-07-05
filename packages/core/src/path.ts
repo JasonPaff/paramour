@@ -20,7 +20,7 @@ import { encodeComponent, readInputValue } from "./search.js";
 /**
  * Encode-input side of a route's params (RL3's href-input column): `[id]` →
  * `Out` (required), `[...slug]` → `Out[]` (required — `[]` is an R3
- * serialization error), `[[...path]]` → `Out[]` with an OPTIONAL key, per
+ * serialization error), `[[...slug]]` → `Out[]` with an OPTIONAL key, per
  * the spike-01 follow-up under exactOptionalPropertyTypes. Module-level
  * export only; Block 3's `InferHrefInput` builds on it.
  */

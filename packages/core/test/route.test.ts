@@ -92,7 +92,7 @@ describe("defineRoute define-time validation (RL1/RL2)", () => {
       defineRoute("/blog/[...slug]", { params: { slug: p.string() } }),
     ).not.toThrow();
     expect(() =>
-      defineRoute("/docs/[[...path]]", { params: { path: p.string() } }),
+      defineRoute("/docs/[[...slug]]", { params: { path: p.string() } }),
     ).not.toThrow();
   });
 });

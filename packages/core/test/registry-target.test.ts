@@ -4,26 +4,17 @@ import { describe, expect, it } from "vitest";
 /**
  * Tripwire for the world-B registry suite's module-identity assumption.
  *
- * tsconfig.tstyche.registry.json paths-maps "paramour" to ./src/index.ts, so
+ * tsconfig.tstyche.registry.json paths-maps "paramour" to ./dist/index.d.ts
+ * — the same file package.json's exports publishes as the types entry — so
  * `pnpm test:types:registry` certifies the `declare module "paramour"`
- * augmentation against SOURCE — not against whatever a future build step
- * publishes as the types entry. A declaration bundler that renames, inlines,
- * or drops the empty `ParamourRegister` interface would break consumer
- * augmentation while the registry suite stays green, because its paths
- * override keeps resolving to src.
- *
- * This test fails the moment package.json gains a published types surface or
- * a build script, forcing the retarget decision to be made explicitly. When
- * that happens: point the registry tsconfig's paths mapping at the BUILT
- * types entry (or add a second registry run against it), then update or
- * delete this guard.
+ * augmentation against what real consumers see. If the published types path
+ * and the registry mapping ever diverge (a d.ts bundler, a new entry point),
+ * a build could break ParamourRegister augmentation while the suite stays
+ * green against the stale target. These tests pin the two together.
  */
 
 interface PackageManifest {
-  exports?: unknown;
-  main?: unknown;
-  scripts?: Record<string, string>;
-  types?: unknown;
+  exports?: Record<string, { types?: string }>;
 }
 
 const packageManifest = JSON.parse(
@@ -36,25 +27,21 @@ const registryTsconfig = readFileSync(
 );
 
 describe("registry suite targets the real module identity", () => {
-  it("still paths-maps paramour to src (otherwise update this guard)", () => {
+  it("paths-maps paramour to the built types entry", () => {
     expect(
       registryTsconfig,
-      "tsconfig.tstyche.registry.json no longer maps paramour to ./src/index.ts — " +
-        "if it now targets the built types entry, update or delete this guard",
-    ).toContain('"paramour": ["./src/index.ts"]');
+      "tsconfig.tstyche.registry.json no longer maps paramour to " +
+        "./dist/index.d.ts — retarget the registry suite at whatever " +
+        "package.json exports as types, then update this guard",
+    ).toContain('"paramour": ["./dist/index.d.ts"]');
   });
 
-  it("package.json declares no built types surface the suite would miss", () => {
-    const divergenceMessage =
-      "packages/core now publishes a types surface, but the registry suite " +
-      "still certifies the augmentation against src/index.ts via the paths " +
-      "mapping in tsconfig.tstyche.registry.json. Retarget it at the built " +
-      "types entry so d.ts bundling cannot silently break ParamourRegister " +
-      "augmentation, then update this test.";
-
-    expect(packageManifest.exports, divergenceMessage).toBeUndefined();
-    expect(packageManifest.main, divergenceMessage).toBeUndefined();
-    expect(packageManifest.types, divergenceMessage).toBeUndefined();
-    expect(packageManifest.scripts?.build, divergenceMessage).toBeUndefined();
+  it("the published types entry is the file the suite certifies", () => {
+    expect(
+      packageManifest.exports?.["."]?.types,
+      "package.json's exported types entry moved — retarget " +
+        "tsconfig.tstyche.registry.json's paths mapping to match, then " +
+        "update this guard",
+    ).toBe("./dist/index.d.ts");
   });
 });

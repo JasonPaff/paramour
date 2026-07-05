@@ -38,7 +38,7 @@ test("segment extraction: catch-all decodes element-wise to an array (RL3/D6)", 
 test("segment extraction: optional catch-all output key is REQUIRED (RL3 ruling)", () => {
   // Absent normalizes to [] at decode time (D6), so the output side has no
   // `?:` split — a regression to `{ path?: string[] }` must fail toBe here.
-  const route = defineRoute("/docs/[[...path]]", {
+  const route = defineRoute("/docs/[[...slug]]", {
     params: { path: p.string() },
   });
   expect<InferRouteParams<typeof route>>().type.toBe<{ path: string[] }>();
@@ -235,7 +235,7 @@ test("href: the whole options argument is omittable only when nothing is require
 test("href: params omission is presence-driven (2026-07-04 ruling)", () => {
   // An optional-catch-all-only route has no required param key, so the
   // params property — and the whole options argument — may be omitted.
-  const docs = defineRoute("/docs/[[...path]]", {
+  const docs = defineRoute("/docs/[[...slug]]", {
     params: { path: p.string() },
   });
   expect(href).type.toBeCallableWith(docs);

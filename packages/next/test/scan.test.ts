@@ -78,9 +78,9 @@ describe("scanRoutes: dynamic segments verbatim (TR2/RL2)", () => {
     expect(scanTree(["docs/[...slug]/page.tsx"])).toEqual(["/docs/[...slug]"]);
   });
 
-  it("preserves [[...path]]", () => {
-    expect(scanTree(["docs/[[...path]]/page.tsx"])).toEqual([
-      "/docs/[[...path]]",
+  it("preserves [[...slug]]", () => {
+    expect(scanTree(["docs/[[...slug]]/page.tsx"])).toEqual([
+      "/docs/[[...slug]]",
     ]);
   });
 });

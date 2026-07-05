@@ -2,11 +2,14 @@
   // World-B (post-generation) tstyche config: module augmentation is
   // program-global, so the registry tests live in their own compilation
   // unit (design-03 testing plan). The paths mapping lets them import the
-  // real "paramour" specifier — the hand-authored augmentation then targets
-  // exactly the module identity the generated .d.ts will.
+  // real "paramour" specifier — resolved to the BUILT types entry (the same
+  // file package.json's exports publishes), so the suite certifies that
+  // declaration emit preserves ParamourRegister augmentation for real
+  // consumers. Requires `pnpm build` first; registry-target.test.ts guards
+  // this mapping against drifting from the published exports.
   "extends": "./tsconfig.tstyche.json",
   "compilerOptions": {
-    "paths": { "paramour": ["./src/index.ts"] }
+    "paths": { "paramour": ["./dist/index.d.ts"] }
   },
-  "include": ["src", "test-registry"]
+  "include": ["test-registry"]
 }

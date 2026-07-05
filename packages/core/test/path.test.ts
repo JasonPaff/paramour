@@ -54,7 +54,7 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("R3: an optional catch-all given [] or absent vanishes with its slash", () => {
-    const route = defineRoute("/docs/[[...path]]", {
+    const route = defineRoute("/docs/[[...slug]]", {
       params: { path: p.string() },
     });
     expect(buildPath(route, {})).toBe("/docs");
@@ -157,7 +157,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("an absent optional catch-all normalizes to [] (D6)", () => {
-    const route = defineRoute("/docs/[[...path]]", {
+    const route = defineRoute("/docs/[[...slug]]", {
       params: { path: p.string() },
     });
     expect(decodeParams(route, {})).toEqual({ path: [] });

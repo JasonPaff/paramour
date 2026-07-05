@@ -28,7 +28,7 @@ describe("href assembly (RL4)", () => {
   });
 
   it("an optional-catch-all-only route is bare-callable (presence ruling)", () => {
-    const docs = defineRoute("/docs/[[...path]]", {
+    const docs = defineRoute("/docs/[[...slug]]", {
       params: { path: p.string() },
     });
     expect(href(docs)).toBe("/docs");
