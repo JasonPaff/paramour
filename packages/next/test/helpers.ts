@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach } from "vitest";
@@ -18,7 +24,12 @@ afterEach(() => {
  * need prettier/eslint/tsconfig ignore carve-outs.
  */
 export function makeTempDir(): string {
-  const root = mkdtempSync(join(tmpdir(), "paramour-next-"));
+  // realpathSync.native canonicalizes Windows 8.3 short paths (TEMP is often
+  // `C:\Users\SOMEUS~1\...`): fs.watch on a short-form dir crashes libuv's
+  // long-form prefix assertion (fs-event.c) when events arrive.
+  const root = realpathSync.native(
+    mkdtempSync(join(tmpdir(), "paramour-next-")),
+  );
   roots.push(root);
   return root;
 }
