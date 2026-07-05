@@ -8,7 +8,15 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import { buildPath, decodeParams, defineRoute, href, p } from "../src";
+import {
+  buildPath,
+  type Codec,
+  decodeParams,
+  defineRoute,
+  href,
+  p,
+  type Route,
+} from "../src";
 
 // Serialize-side Date range (N8): years 0000–9999 only.
 const dateArb = fc.date({
@@ -51,15 +59,21 @@ const simulateNextDecode = (builtPath: string): string[] =>
     ? []
     : builtPath.slice(1).split("/").map(decodeURIComponent);
 
+/** decodeParams ∘ platform ∘ buildPath for the single-`[v]` routes. */
+const roundtripV = <Out>(
+  route: Route<"/x/[v]", { readonly v: Codec<Out> }, Record<never, never>>,
+  value: Out,
+): Out => {
+  const [, segment] = simulateNextDecode(buildPath(route, { v: value }));
+  return decodeParams(route, { v: segment ?? "" }).v;
+};
+
 describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id", () => {
   it("p.string() through [v] (unicode, spaces, slashes)", () => {
     const route = defineRoute("/x/[v]", { params: { v: p.string() } });
     fc.assert(
       fc.property(segmentString, (value) => {
-        const [, segment] = simulateNextDecode(buildPath(route, { v: value }));
-        expect(decodeParams(route, { v: segment ?? "" })).toStrictEqual({
-          v: value,
-        });
+        expect(roundtripV(route, value)).toBe(value);
       }),
     );
   });
@@ -68,8 +82,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     const route = defineRoute("/x/[v]", { params: { v: p.integer() } });
     fc.assert(
       fc.property(integerArb, (value) => {
-        const [, segment] = simulateNextDecode(buildPath(route, { v: value }));
-        expect(decodeParams(route, { v: segment ?? "" }).v).toBe(value);
+        expect(roundtripV(route, value)).toBe(value);
       }),
     );
   });
@@ -81,10 +94,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
         fc.double({ noDefaultInfinity: true, noNaN: true }),
         (value) => {
           const expected = Object.is(value, -0) ? 0 : value;
-          const [, segment] = simulateNextDecode(
-            buildPath(route, { v: value }),
-          );
-          expect(decodeParams(route, { v: segment ?? "" }).v).toBe(expected);
+          expect(roundtripV(route, value)).toBe(expected);
         },
       ),
     );
@@ -94,8 +104,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     const flags = defineRoute("/x/[v]", { params: { v: p.boolean() } });
     fc.assert(
       fc.property(fc.boolean(), (value) => {
-        const [, segment] = simulateNextDecode(buildPath(flags, { v: value }));
-        expect(decodeParams(flags, { v: segment ?? "" }).v).toBe(value);
+        expect(roundtripV(flags, value)).toBe(value);
       }),
     );
     const sorts = defineRoute("/x/[v]", {
@@ -103,8 +112,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     });
     fc.assert(
       fc.property(fc.constantFrom("price", "rating"), (value) => {
-        const [, segment] = simulateNextDecode(buildPath(sorts, { v: value }));
-        expect(decodeParams(sorts, { v: segment ?? "" }).v).toBe(value);
+        expect(roundtripV(sorts, value)).toBe(value);
       }),
     );
   });
@@ -113,10 +121,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     const route = defineRoute("/x/[v]", { params: { v: p.timestamp() } });
     fc.assert(
       fc.property(dateArb, (value) => {
-        const [, segment] = simulateNextDecode(buildPath(route, { v: value }));
-        expect(decodeParams(route, { v: segment ?? "" }).v.getTime()).toBe(
-          value.getTime(),
-        );
+        expect(roundtripV(route, value).getTime()).toBe(value.getTime());
       }),
     );
   });
@@ -125,12 +130,9 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     const route = defineRoute("/x/[v]", { params: { v: p.isoDate() } });
     fc.assert(
       fc.property(dateArb, (value) => {
-        const [, segment] = simulateNextDecode(buildPath(route, { v: value }));
-        expect(
-          decodeParams(route, { v: segment ?? "" })
-            .v.toISOString()
-            .slice(0, 10),
-        ).toBe(value.toISOString().slice(0, 10));
+        expect(roundtripV(route, value).toISOString().slice(0, 10)).toBe(
+          value.toISOString().slice(0, 10),
+        );
       }),
     );
   });
