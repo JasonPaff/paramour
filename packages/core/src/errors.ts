@@ -1,13 +1,63 @@
-export interface SearchIssue {
+/** One failed key in an aggregate decode error (shared by both surfaces, RL6). */
+export interface Issue {
   readonly key: string;
   readonly message: string;
 }
 
+/** The single error type surfaced by a full route parse failure (RL6). */
+export type RouteDecodeError = ParamsDecodeError | SearchDecodeError;
+
+/**
+ * Cross-copy identity brands (RL6). `Symbol.for()` keys resolve in the
+ * realm-global symbol registry, so a second physical copy of this module
+ * (dual-package hazard, bundler duplication) mints the SAME symbols:
+ * `instanceof` recognizes instances across copies, while a structurally
+ * identical foreign class lacks the brands entirely. Brands sit on the
+ * prototype (non-enumerable), so an instance carries every brand in its
+ * chain and subclass/base checks stay hierarchy-correct across copies.
+ */
+const paramourErrorBrand = Symbol.for("paramour.errors.ParamourError");
+const paramsDecodeErrorBrand = Symbol.for("paramour.errors.ParamsDecodeError");
+const parseErrorBrand = Symbol.for("paramour.errors.ParseError");
+const searchDecodeErrorBrand = Symbol.for("paramour.errors.SearchDecodeError");
+const serializeErrorBrand = Symbol.for("paramour.errors.SerializeError");
+
 /** Base class for every error paramour throws. */
 export class ParamourError extends Error {
+  static {
+    brandPrototype(this, paramourErrorBrand);
+  }
+
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
     this.name = new.target.name;
+  }
+
+  // Each class checks its OWN brand: an inherited base check would make
+  // every ParamourError pass `instanceof ParseError`. The type-predicate
+  // signature is load-bearing — TS narrows `instanceof` from it.
+  static override [Symbol.hasInstance](value: unknown): value is ParamourError {
+    return hasBrand(value, paramourErrorBrand);
+  }
+}
+
+/** Aggregate failure for a whole route-params decode (RL6). */
+export class ParamsDecodeError extends ParamourError {
+  static {
+    brandPrototype(this, paramsDecodeErrorBrand);
+  }
+
+  readonly issues: readonly Issue[];
+
+  constructor(issues: readonly Issue[]) {
+    super(`Failed to decode route params: ${formatIssues(issues)}`);
+    this.issues = issues;
+  }
+
+  static override [Symbol.hasInstance](
+    value: unknown,
+  ): value is ParamsDecodeError {
+    return hasBrand(value, paramsDecodeErrorBrand);
   }
 }
 
@@ -15,24 +65,48 @@ export class ParamourError extends Error {
  * A single wire value failed its codec grammar or schema validation.
  * Thrown by element-level parsing; recoverable via `.catch()`.
  */
-export class ParseError extends ParamourError {}
+export class ParseError extends ParamourError {
+  static {
+    brandPrototype(this, parseErrorBrand);
+  }
+
+  static override [Symbol.hasInstance](value: unknown): value is ParseError {
+    return hasBrand(value, parseErrorBrand);
+  }
+}
 
 /** Aggregate failure for a whole search-params decode. */
 export class SearchDecodeError extends ParamourError {
-  readonly issues: readonly SearchIssue[];
+  static {
+    brandPrototype(this, searchDecodeErrorBrand);
+  }
 
-  constructor(issues: readonly SearchIssue[]) {
-    super(
-      `Failed to decode search params: ${issues
-        .map((issue) => `[${issue.key}] ${issue.message}`)
-        .join("; ")}`,
-    );
+  readonly issues: readonly Issue[];
+
+  constructor(issues: readonly Issue[]) {
+    super(`Failed to decode search params: ${formatIssues(issues)}`);
     this.issues = issues;
+  }
+
+  static override [Symbol.hasInstance](
+    value: unknown,
+  ): value is SearchDecodeError {
+    return hasBrand(value, searchDecodeErrorBrand);
   }
 }
 
 /** A value could not be serialized to the wire (bad type, non-finite, etc.). */
-export class SerializeError extends ParamourError {}
+export class SerializeError extends ParamourError {
+  static {
+    brandPrototype(this, serializeErrorBrand);
+  }
+
+  static override [Symbol.hasInstance](
+    value: unknown,
+  ): value is SerializeError {
+    return hasBrand(value, serializeErrorBrand);
+  }
+}
 
 /**
  * Best-effort human-readable message for a foreign (non-paramour) throw.
@@ -71,4 +145,19 @@ export function showValue(value: unknown): string {
   } catch {
     return `[unstringifiable ${typeof value}]`;
   }
+}
+
+function brandPrototype(ctor: { prototype: object }, brand: symbol): void {
+  // defineProperty defaults: non-enumerable, non-writable, non-configurable —
+  // the brand never leaks into JSON/spread and can't be reassigned.
+  Object.defineProperty(ctor.prototype, brand, { value: true });
+}
+
+function formatIssues(issues: readonly Issue[]): string {
+  return issues.map((issue) => `[${issue.key}] ${issue.message}`).join("; ");
+}
+
+function hasBrand(value: unknown, brand: symbol): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  return (value as Record<symbol, unknown>)[brand] === true;
 }

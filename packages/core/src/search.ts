@@ -2,11 +2,11 @@ import type { AnyCodec, OutputOf, PresenceOf } from "./codec.js";
 
 import {
   foreignMessage,
+  type Issue,
   ParamourError,
   ParseError,
   rebrandForeign,
   SearchDecodeError,
-  type SearchIssue,
   SerializeError,
 } from "./errors.js";
 
@@ -76,7 +76,7 @@ export function decodeSearch<S extends SearchConfig>(
   config: S,
   source: SearchSource,
 ): InferSearchOutput<S> {
-  const issues: SearchIssue[] = [];
+  const issues: Issue[] = [];
   // Built as entries so keys like "__proto__" become ordinary own properties
   // of the result (Object.fromEntries uses define, not set, semantics).
   const entries: [string, unknown][] = [];
