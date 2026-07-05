@@ -1,4 +1,4 @@
-import { type FSWatcher, watch } from "node:fs";
+import { type FSWatcher, statSync, watch } from "node:fs";
 import { resolve } from "node:path";
 
 /** Handle returned by {@link watchAppDir}. */
@@ -69,6 +69,12 @@ export function watchAppDir(
 
   let watcher: FSWatcher;
   try {
+    // Linux's userland recursive watcher (Node <= 24.18.0,
+    // internal/fs/recursive_watch.js) swallows ENOENT under the default
+    // throwIfNoEntry — a missing dir silently never watches, with no throw
+    // and no 'error' event. Stat first so startup failure is synchronous on
+    // every platform.
+    statSync(appDir);
     watcher = watch(appDir, { recursive: true }, (_eventType, filename) => {
       // `filename` can be null (platform-dependent); with nothing to filter
       // on, err toward rescanning — a spurious pass is a no-op write (TR3).
