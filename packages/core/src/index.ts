@@ -17,14 +17,19 @@ export {
   SerializeError,
 } from "./errors.js";
 export { p } from "./p.js";
+export { buildPath, decodeParams, encodeParams } from "./path.js";
 export {
   type AnyRoute,
   defineRoute,
   type InferRouteParams,
   type ParamourRegister,
   type ParamsConfig,
+  type ParamsProps,
   type RegisteredRoutePaths,
   type Route,
+  type RouteProps,
+  type SafeResult,
+  type SearchProps,
 } from "./route.js";
 export {
   buildSearchString,

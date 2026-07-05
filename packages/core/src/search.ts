@@ -157,6 +157,23 @@ export function decodeSearch<S extends SearchConfig>(
 }
 
 /**
+ * encodeURIComponent throws a raw URIError on lone surrogates; wrap it so
+ * the documented "every error is a ParamourError" contract holds (S7).
+ * Exported for path.ts (the byte-layer chokepoint is shared with RL5's
+ * segment encoding), not from the package barrel.
+ */
+export function encodeComponent(text: string): string {
+  return rebrandForeign(
+    () => encodeURIComponent(text),
+    (error) =>
+      new SerializeError(
+        `text is not encodable as a URL component: ${foreignMessage(error)}`,
+        { cause: error },
+      ),
+  );
+}
+
+/**
  * Encodes an input object to ordered wire pairs (decoded value layer).
  * Deterministic: config declaration order, array elements in order (S5).
  * Caveat: JS property enumeration puts integer-like keys ("0", "42") first
@@ -232,27 +249,44 @@ export function encodeSearch<S extends SearchConfig>(
   return pairs;
 }
 
+/**
+ * Reads one input property for {@link encodeSearch} (and path.ts's
+ * encodeParams — exported for it, not from the package barrel). Not a bare
+ * `values[key]` read: keys like "constructor" must not pick up inherited
+ * Object.prototype members as present values. Not plain `Object.hasOwn`
+ * either: class instances expose their values through prototype getters. So:
+ * own properties always count; prototype levels count only accessors (a data
+ * property there is a class method or `constructor`, not a value); and the
+ * walk stops before the terminal prototype by chain position, not identity,
+ * so cross-realm inputs (vm, jsdom, iframes) exclude THEIR Object.prototype
+ * members too.
+ */
+export function readInputValue(
+  values: Record<string, unknown>,
+  key: string,
+): unknown {
+  if (Object.hasOwn(values, key)) return readThroughReceiver(values, key);
+  let current = Object.getPrototypeOf(values) as null | object;
+  while (current !== null && Object.getPrototypeOf(current) !== null) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, key);
+    if (descriptor !== undefined) {
+      // Nearest declaration wins: a data property here shadows anything
+      // deeper and is not a value.
+      return descriptor.get === undefined
+        ? undefined
+        : readThroughReceiver(values, key);
+    }
+    current = Object.getPrototypeOf(current) as null | object;
+  }
+  return undefined;
+}
+
 /** Convenience: encode + build in one step. */
 export function searchToString<S extends SearchConfig>(
   config: S,
   input: InferSearchInput<S>,
 ): string {
   return buildSearchString(encodeSearch(config, input));
-}
-
-/**
- * encodeURIComponent throws a raw URIError on lone surrogates; wrap it so
- * the documented "every error is a ParamourError" contract holds (S7).
- */
-function encodeComponent(text: string): string {
-  return rebrandForeign(
-    () => encodeURIComponent(text),
-    (error) =>
-      new SerializeError(
-        `text is not encodable as a URL component: ${foreignMessage(error)}`,
-        { cause: error },
-      ),
-  );
 }
 
 /**
@@ -301,34 +335,6 @@ function readDeclaredValues(
 }
 
 /**
- * Reads one input property for {@link encodeSearch}. Not a bare `values[key]`
- * read: keys like "constructor" must not pick up inherited Object.prototype
- * members as present values. Not plain `Object.hasOwn` either: class
- * instances expose their values through prototype getters. So: own
- * properties always count; prototype levels count only accessors (a data
- * property there is a class method or `constructor`, not a value); and the
- * walk stops before the terminal prototype by chain position, not identity,
- * so cross-realm inputs (vm, jsdom, iframes) exclude THEIR Object.prototype
- * members too.
- */
-function readInputValue(values: Record<string, unknown>, key: string): unknown {
-  if (Object.hasOwn(values, key)) return readThroughReceiver(values, key);
-  let current = Object.getPrototypeOf(values) as null | object;
-  while (current !== null && Object.getPrototypeOf(current) !== null) {
-    const descriptor = Object.getOwnPropertyDescriptor(current, key);
-    if (descriptor !== undefined) {
-      // Nearest declaration wins: a data property here shadows anything
-      // deeper and is not a value.
-      return descriptor.get === undefined
-        ? undefined
-        : readThroughReceiver(values, key);
-    }
-    current = Object.getPrototypeOf(current) as null | object;
-  }
-  return undefined;
-}
-
-/**
  * Record-source twin of the URLSearchParams branch in
  * {@link readDeclaredValues}.
  */
@@ -373,7 +379,7 @@ function readThroughReceiver(
     () => values[key],
     (error) =>
       new SerializeError(
-        `reading search input "${key}" threw: ${foreignMessage(error)}`,
+        `reading input "${key}" threw: ${foreignMessage(error)}`,
         { cause: error },
       ),
   );

@@ -1,7 +1,18 @@
 import type { AnyCodec, OutputOf, ParamCodec } from "./codec.js";
-import type { SearchConfig } from "./search.js";
 
-import { ParamourError } from "./errors.js";
+import {
+  foreignMessage,
+  ParamourError,
+  ParamsDecodeError,
+  type RouteDecodeError,
+  SearchDecodeError,
+} from "./errors.js";
+import { decodeParams, type ParamsSource, tokenizePath } from "./path.js";
+import {
+  decodeSearch,
+  type InferSearchOutput,
+  type SearchConfig,
+} from "./search.js";
 
 /**
  * `any` is deliberate (RL4, same variance gotcha as AnyCodec): codec configs
@@ -27,18 +38,14 @@ export type CatchAllNames<Path extends string> =
 export type ConformParams<Path extends string, PC> = PC &
   Record<Exclude<keyof PC, PathParamNames<Path>>, never>;
 
-/**
- * Parse-output shape (RL3): `[id]` → `Out`, `[...slug]` → `Out[]`,
- * `[[...path]]` → `Out[]` — every key REQUIRED on the output side; an absent
- * optional catch-all normalizes to `[]` at decode time (D6), so no `?:`
- * split exists here (that split is the href-input side's concern).
- */
-export type InferRouteParams<R extends AnyRoute> = {
-  [K in PathParamNames<R["path"]>]: K extends
-    CatchAllNames<R["path"]> | OptionalCatchAllNames<R["path"]>
-    ? ParamOutput<R["~params"], K>[]
-    : ParamOutput<R["~params"], K>;
-};
+/** Decoded params object type for a route (RL3); see {@link ParamsOutput}. */
+export type InferRouteParams<R extends AnyRoute> = ParamsOutput<
+  R["path"],
+  R["~params"]
+>;
+
+/** Accepts Next 15/16's promised props and plain objects alike (RL6). */
+export type MaybePromise<T> = Promise<T> | T;
 
 /**
  * RL3: an empty name (`[]`, `[...]`, `[[...]]`) is not a token — it falls
@@ -77,24 +84,43 @@ export type ParamOutput<PC, K extends PropertyKey> = K extends keyof PC
  * Params schema shape for a path: one codec per dynamic segment name. The
  * codec describes ONE segment element (design-02 D5/D6) — arrays come from
  * the segment kind, and presence modifiers are compile errors (`ParamCodec`).
- * RL9 assigns this to path.ts; it lives here until that module lands.
+ * RL9 assigned this to path.ts; it stays here instead so the whole path
+ * grammar lives in one module — path.ts consumes it via type-only imports,
+ * keeping runtime imports one-directional (route.ts → path.ts).
  */
 export type ParamsConfig<Path extends string> = Readonly<
   Record<PathParamNames<Path>, ParamCodec>
 >;
 
+/**
+ * Parse-output shape (RL3): `[id]` → `Out`, `[...slug]` → `Out[]`,
+ * `[[...path]]` → `Out[]` — every key REQUIRED on the output side; an absent
+ * optional catch-all normalizes to `[]` at decode time (D6), so no `?:`
+ * split exists here (that split is the href-input side's concern). Keyed by
+ * `Path`/`PC` so the Route interface can name its own method return types;
+ * {@link InferRouteParams} is the route-object-facing alias.
+ */
+export type ParamsOutput<Path extends string, PC> = {
+  [K in PathParamNames<Path>]: K extends
+    CatchAllNames<Path> | OptionalCatchAllNames<Path>
+    ? ParamOutput<PC, K>[]
+    : ParamOutput<PC, K>;
+};
+
+/**
+ * Structural props contract for the params half (RL6): layout props are
+ * assignable, and a missing member decodes like an empty source
+ * (required-missing issues, never a crash). Deliberately NOT Next's
+ * generated `PageProps` global — core stays framework-agnostic, and that
+ * global doesn't exist in fresh clones before `next dev` first runs.
+ */
+export interface ParamsProps {
+  readonly params?: MaybePromise<ParamsSource>;
+}
+
 /** Every dynamic segment name in the path literal (RL3). */
 export type PathParamNames<Path extends string> =
   CatchAllNames<Path> | OptionalCatchAllNames<Path> | SingleParamNames<Path>;
-
-/** One parsed path segment. Consumed by defineRoute now, path.ts (RL5) later. */
-export type PathSegment =
-  | {
-      readonly kind: "catchall" | "optional-catchall" | "single";
-      readonly name: string;
-      readonly raw: string;
-    }
-  | { readonly kind: "static"; readonly raw: string };
 
 /**
  * Pre-generation: ParamourRegister has no `routes` member, so this resolves
@@ -108,17 +134,42 @@ export type RegisteredRoutePaths = ParamourRegister extends {
   : string;
 
 /**
- * A defined route: data plus (in later milestones) parse methods (RL1).
- * `~`-prefixed configs are runtime-internal, not public API — same
- * convention as codecs; `@paramour/next` is a blessed consumer, user code
- * is not.
+ * A defined route: data plus the six parse methods (RL1/RL6 — three surfaces
+ * × throwing/safe). `~`-prefixed configs are runtime-internal, not public
+ * API — same convention as codecs; `@paramour/next` is a blessed consumer,
+ * user code is not.
  */
 export interface Route<
   Path extends string,
   PC extends ParamsConfig<Path>,
   SC extends SearchConfig,
 > {
+  /**
+   * Decodes both props members. Awaits BOTH up front, then decodes params
+   * FIRST — a params grammar failure means the URL doesn't denote this
+   * route at all (morally a 404), so it throws before search is decoded.
+   */
+  parse(props: RouteProps): Promise<{
+    params: ParamsOutput<Path, PC>;
+    search: InferSearchOutput<SC>;
+  }>;
+  /** Bare params object (RL6) — layout props are structurally assignable. */
+  parseParams(props: ParamsProps): Promise<ParamsOutput<Path, PC>>;
+  /** Bare search object (RL6) — the search half alone. */
+  parseSearch(props: SearchProps): Promise<InferSearchOutput<SC>>;
   readonly path: Path;
+  safeParse(props: RouteProps): Promise<
+    SafeResult<{
+      params: ParamsOutput<Path, PC>;
+      search: InferSearchOutput<SC>;
+    }>
+  >;
+  safeParseParams(
+    props: ParamsProps,
+  ): Promise<SafeResult<ParamsOutput<Path, PC>>>;
+  safeParseSearch(
+    props: SearchProps,
+  ): Promise<SafeResult<InferSearchOutput<SC>>>;
   readonly "~params": PC;
   readonly "~search": SC;
 }
@@ -136,6 +187,25 @@ export type RouteConfig<
 > = [PathParamNames<Path>] extends [never]
   ? { readonly params?: never; readonly search?: SC }
   : { readonly params: ConformParams<Path, PC>; readonly search?: SC };
+
+/** Full page-props contract (RL6): Next's `PageProps` is structurally assignable. */
+export interface RouteProps extends ParamsProps, SearchProps {}
+
+/**
+ * Data-xor-error result shape (RL6, DESIGN §9 — not zod's `success` flag):
+ * `if (result.error)` narrows both arms, because the error is always an
+ * Error instance and hence truthy.
+ */
+export type SafeResult<T> =
+  { data: T; error?: never } | { data?: never; error: RouteDecodeError };
+
+/**
+ * Structural props contract for the search half (RL6). The wire record
+ * shape is the same as the params side's, hence the shared source type.
+ */
+export interface SearchProps {
+  readonly searchParams?: MaybePromise<ParamsSource>;
+}
 
 /**
  * Distributes a path literal into the union of its `/`-separated segment
@@ -162,14 +232,6 @@ export type SingleParamNames<Path extends string> =
           : never
     : never;
 
-// Anchored per the wire-format spec's regex ethos; name charset excludes
-// brackets so nesting can't smuggle through. Match order mirrors the type
-// grammar: `[[...` before `[...` before `[`.
-const OPTIONAL_CATCHALL_TOKEN = /^\[\[\.\.\.([^\][]+)\]\]$/;
-const CATCHALL_TOKEN = /^\[\.\.\.([^\][]+)\]$/;
-const SINGLE_TOKEN = /^\[([^\][]+)\]$/;
-const GROUP_SEGMENT = /^\(.*\)$/;
-
 /**
  * Defines a route: the URL-shaped path literal (RL2) plus its param/search
  * codec configs. Validates the literal eagerly (RL1 — fail-fast at config
@@ -189,111 +251,91 @@ export function defineRoute<
   // The conditional RouteConfig is unresolved inside the generic body; this
   // cast is the one place its two branches are unified.
   const { params, search } = config as { params?: PC; search?: SC };
-  return {
+  const route: Route<Path, PC, SC> = {
+    async parse(props: RouteProps) {
+      const [paramsSource, searchSource] = await awaitProps(props);
+      // RL6: params first — a params failure throws before search decodes.
+      const decodedParams = decodeParams(route, paramsSource ?? {});
+      return {
+        params: decodedParams,
+        search: decodeSearch(route["~search"], searchSource ?? {}),
+      };
+    },
+    async parseParams(props: ParamsProps) {
+      const source = await awaitProp(props.params);
+      return decodeParams(route, source ?? {});
+    },
+    async parseSearch(props: SearchProps) {
+      const source = await awaitProp(props.searchParams);
+      return decodeSearch(route["~search"], source ?? {});
+    },
     path,
+    safeParse(props: RouteProps) {
+      return safely(() => route.parse(props));
+    },
+    safeParseParams(props: ParamsProps) {
+      return safely(() => route.parseParams(props));
+    },
+    safeParseSearch(props: SearchProps) {
+      return safely(() => route.parseSearch(props));
+    },
     "~params": params ?? ({} as PC),
     "~search": search ?? ({} as SC),
   };
+  return route;
+}
+
+/** Single-member twin of {@link awaitProps}, for the bare-surface methods. */
+function awaitProp(
+  value: MaybePromise<ParamsSource> | undefined,
+): Promise<ParamsSource | undefined> {
+  return rebrandRejection(Promise.resolve(value));
 }
 
 /**
- * Tokenizes a path literal into segments, throwing ParamourError on every
- * RL1 rejection. Shared by defineRoute now and path.ts (RL5) later, so
- * encode/decode never re-derive segment kinds.
+ * Awaits BOTH props members before any decode runs (RL6): the
+ * params-before-search rule is about *decode* order, not await order —
+ * throwing while the searchParams promise is still pending would turn a
+ * rejecting props promise into an unhandled rejection.
  */
-export function tokenizePath(path: string): PathSegment[] {
-  // RL1: either would corrupt href's fixed path–query–fragment assembly (RL4).
-  if (path.includes("?")) {
-    throw new ParamourError(
-      `route path must not contain "?": "${path}" (declare search params in the search config)`,
-    );
-  }
-  if (path.includes("#")) {
-    throw new ParamourError(
-      `route path must not contain "#": "${path}" (pass fragments to href() via its hash option)`,
-    );
-  }
-  if (!path.startsWith("/")) {
-    throw new ParamourError(`route path must start with "/": "${path}"`);
-  }
-  if (path !== "/" && path.endsWith("/")) {
-    throw new ParamourError(`route path must not end with "/": "${path}"`);
-  }
-  if (path === "/") return [];
-
-  const segments: PathSegment[] = [];
-  const seen = new Set<string>();
-  for (const raw of path.slice(1).split("/")) {
-    if (raw === "") {
-      throw new ParamourError(
-        `route path contains an empty segment: "${path}"`,
-      );
-    }
-    // RL2: path literals are URL-shaped, so group/slot spellings are
-    // filesystem paths by definition — the most likely migration mistake.
-    if (GROUP_SEGMENT.test(raw)) {
-      throw new ParamourError(
-        `route paths are URL-shaped: "${raw}" in "${path}" is a route-group folder name; use the URL path without it`,
-      );
-    }
-    if (raw.startsWith("@")) {
-      throw new ParamourError(
-        `route paths are URL-shaped: "${raw}" in "${path}" is a parallel-route slot; define the parent route instead`,
-      );
-    }
-    const segment = tokenizeSegment(raw, path);
-    if (segment.kind !== "static") {
-      // RL1: not expressible as a compile error — the mapped type silently
-      // collapses duplicate keys.
-      if (seen.has(segment.name)) {
-        throw new ParamourError(
-          `route path declares param "${segment.name}" more than once: "${path}"`,
-        );
-      }
-      seen.add(segment.name);
-    }
-    segments.push(segment);
-  }
-
-  segments.forEach((segment, index) => {
-    // RL1: Next itself requires catch-alls to be final.
-    if (
-      (segment.kind === "catchall" || segment.kind === "optional-catchall") &&
-      index < segments.length - 1
-    ) {
-      throw new ParamourError(
-        `catch-all segment "${segment.raw}" must be the final segment: "${path}"`,
-      );
-    }
-  });
-
-  return segments;
+function awaitProps(
+  props: RouteProps,
+): Promise<[ParamsSource | undefined, ParamsSource | undefined]> {
+  return rebrandRejection(Promise.all([props.params, props.searchParams]));
 }
 
-function tokenizeSegment(raw: string, path: string): PathSegment {
-  const optionalCatchAll = OPTIONAL_CATCHALL_TOKEN.exec(raw);
-  if (optionalCatchAll?.[1] !== undefined) {
-    return { kind: "optional-catchall", name: optionalCatchAll[1], raw };
-  }
-  const catchAll = CATCHALL_TOKEN.exec(raw);
-  if (catchAll?.[1] !== undefined) {
-    return { kind: "catchall", name: catchAll[1], raw };
-  }
-  // Mirrors SingleParamNames' catch-all exclusion: a `[...`-prefixed segment
-  // that failed the catch-all regex (only `[...]`, since the name charset
-  // already bans brackets) must fall through to malformed, or the runtime
-  // would mint a single param named "..." where the type layer sees static.
-  const single = SINGLE_TOKEN.exec(raw);
-  if (!raw.startsWith("[...") && single?.[1] !== undefined) {
-    return { kind: "single", name: single[1], raw };
-  }
-  // RL1: the type layer lets these fall through as static text (RL3), and
-  // pre-generation there is no registry to catch them; href would otherwise
-  // emit the token verbatim.
-  if (raw.includes("[") || raw.includes("]")) {
+/**
+ * A props promise is user/framework code — a rejection is branded at this
+ * chokepoint (paramour's own errors pass through), keeping the "every throw
+ * is a ParamourError" contract.
+ */
+async function rebrandRejection<T>(promise: Promise<T>): Promise<T> {
+  try {
+    return await promise;
+  } catch (error) {
+    if (error instanceof ParamourError) throw error;
     throw new ParamourError(
-      `malformed dynamic segment "${raw}" in "${path}": expected [name], [...name], or [[...name]]`,
+      `route props promise rejected: ${foreignMessage(error)}`,
+      { cause: error },
     );
   }
-  return { kind: "static", raw };
+}
+
+/**
+ * Wraps a throwing parse into the data-xor-error shape (RL6). Only decode
+ * failures become data; source-contract violations and rebranded foreign
+ * errors stay loud.
+ */
+async function safely<T>(run: () => Promise<T>): Promise<SafeResult<T>> {
+  try {
+    return { data: await run() };
+  } catch (error) {
+    if (
+      error instanceof ParamsDecodeError ||
+      error instanceof SearchDecodeError
+    ) {
+      return { error };
+    }
+    throw error;
+  }
 }

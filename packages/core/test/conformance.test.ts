@@ -1,7 +1,5 @@
 /**
  * Wire-format conformance suite — one test per case in wire-format spec §7.
- * C16 and C17 concern route-param (path) serialization and land with the
- * path-building milestone.
  */
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
@@ -10,8 +8,12 @@ import { z } from "zod";
 import type { Codec, InferSearchInput } from "../src";
 
 import {
+  buildPath,
   buildSearchString,
+  decodeParams,
   decodeSearch,
+  defineRoute,
+  encodeParams,
   encodeSearch,
   p,
   ParamourError,
@@ -155,6 +157,24 @@ describe("byte-layer serialization", () => {
 
   it("S3: only the empty string emits key=", () => {
     expect(searchToString({ q: p.string() }, { q: "" })).toBe("?q=");
+  });
+});
+
+describe("route param segments", () => {
+  it('C16: serializing "" into [id] is a serialization error (R4)', () => {
+    const route = defineRoute("/user/[id]", { params: { id: p.string() } });
+    expect(() => buildPath(route, { id: "" })).toThrow(SerializeError);
+    expect(() => encodeParams(route, { id: "" })).toThrow(SerializeError);
+  });
+
+  it("C17: catch-all elements encode %2F and decode element-wise (R2/R5)", () => {
+    const route = defineRoute("/[...slug]", { params: { slug: p.string() } });
+    expect(buildPath(route, { slug: ["a/b", "c"] })).toBe("/a%2Fb/c");
+    // Decode side receives Next's already-decoded values (R5); the %2F E2E
+    // pin against Next itself is wire-spec open item 1 (@paramour/next).
+    expect(decodeParams(route, { slug: ["a/b", "c"] })).toEqual({
+      slug: ["a/b", "c"],
+    });
   });
 });
 

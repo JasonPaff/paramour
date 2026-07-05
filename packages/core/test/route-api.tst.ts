@@ -8,7 +8,14 @@
 import { expect, test } from "tstyche";
 
 import { defineRoute, p } from "../src";
-import type { AnyRoute, InferRouteParams } from "../src";
+import type {
+  AnyRoute,
+  InferRouteParams,
+  ParamsProps,
+  RouteDecodeError,
+  RouteProps,
+  SafeResult,
+} from "../src";
 
 test("pre-generation fallback: any path literal is accepted and retained", () => {
   const route = defineRoute("/totally/made/up", {});
@@ -129,4 +136,72 @@ test("concrete routes are assignable to AnyRoute (RL4 variance)", () => {
     search: { q: p.string() },
   });
   expect<typeof route>().type.toBeAssignableTo<AnyRoute>();
+});
+
+test("parse methods: full parse returns { params; search } (RL6)", () => {
+  const route = defineRoute("/product/[id]", {
+    params: { id: p.integer() },
+    search: { q: p.string().optional() },
+  });
+  // The search half's keys are READONLY: `SC` is const-inferred (RL1) and
+  // InferSearchOutput is homomorphic, so the config's readonly keys survive
+  // into the output. ParamsOutput maps over PathParamNames (non-homomorphic),
+  // so the params half carries no modifiers.
+  expect(route.parse({})).type.toBe<
+    Promise<{
+      params: { id: number };
+      search: { readonly q: string | undefined };
+    }>
+  >();
+  expect(route.safeParse({})).type.toBe<
+    Promise<
+      SafeResult<{
+        params: { id: number };
+        search: { readonly q: string | undefined };
+      }>
+    >
+  >();
+});
+
+test("parse methods: bare-surface results carry no wrapper (RL6)", () => {
+  const route = defineRoute("/product/[id]", {
+    params: { id: p.integer() },
+    search: { q: p.string().optional() },
+  });
+  expect(route.parseParams({})).type.toBe<Promise<{ id: number }>>();
+  expect(route.safeParseParams({})).type.toBe<
+    Promise<SafeResult<{ id: number }>>
+  >();
+  // readonly per the const-inferred SC (see the note in the previous test).
+  expect(route.parseSearch({})).type.toBe<
+    Promise<{ readonly q: string | undefined }>
+  >();
+  expect(route.safeParseSearch({})).type.toBe<
+    Promise<SafeResult<{ readonly q: string | undefined }>>
+  >();
+});
+
+test("props are structural and MaybePromise-valued (RL6)", () => {
+  interface NextStylePageProps {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+  }
+  expect<NextStylePageProps>().type.toBeAssignableTo<RouteProps>();
+  // Plain objects (tests, other frameworks) and absent members work too.
+  expect<{ params: { id: string } }>().type.toBeAssignableTo<RouteProps>();
+  expect<Record<never, never>>().type.toBeAssignableTo<RouteProps>();
+  // Layout props (no searchParams member) satisfy the params surface.
+  expect<{
+    params: Promise<{ slug: string[] }>;
+  }>().type.toBeAssignableTo<ParamsProps>();
+});
+
+test("SafeResult: if (result.error) narrows both arms (RL6)", () => {
+  const result = {} as SafeResult<{ id: number }>;
+  if (result.error) {
+    expect(result.error).type.toBe<RouteDecodeError>();
+    expect(result.data).type.toBe<undefined>();
+  } else {
+    expect(result.data).type.toBe<{ id: number }>();
+  }
 });
