@@ -23,7 +23,7 @@ CI runs, in order: `format:check`, `lint`, `typecheck`, `test`, `test:types`. Al
 ## Two kinds of tests
 
 - `*.test.ts` (vitest) — runtime behavior. `conformance.test.ts` exercises the wire-format spec's numbered rules.
-- `*.tst.ts` (tstyche) — compile-time API contracts, including *intentional type errors*. These files are deliberately excluded from ESLint and from the package tsconfig; they are checked only by tstyche via `packages/core/tsconfig.tstyche.json` (same compiler options, exclusion removed). Don't "fix" type errors in them and don't add them to the tsc project.
+- `*.tst.ts` (tstyche) — compile-time API contracts, including _intentional type errors_. These files are deliberately excluded from ESLint and from the package tsconfig; they are checked only by tstyche via `packages/core/tsconfig.tstyche.json` (same compiler options, exclusion removed). Don't "fix" type errors in them and don't add them to the tsc project.
 
 ## Design docs and decision IDs
 
