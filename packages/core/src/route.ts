@@ -7,7 +7,12 @@ import {
   type RouteDecodeError,
   SearchDecodeError,
 } from "./errors.js";
-import { decodeParams, type ParamsSource, tokenizePath } from "./path.js";
+import {
+  decodeParams,
+  type ParamsSource,
+  type PathSegment,
+  tokenizePath,
+} from "./path.js";
 import {
   decodeSearch,
   type InferSearchOutput,
@@ -172,6 +177,12 @@ export interface Route<
   ): Promise<SafeResult<InferSearchOutput<SC>>>;
   readonly "~params": PC;
   readonly "~search": SC;
+  /**
+   * `path`, tokenized once at define time so per-call encode/decode (href is
+   * per-link render work) never re-tokenizes. Per-route state, not a central
+   * registry — tree-shaking is untouched.
+   */
+  readonly "~segments": readonly PathSegment[];
 }
 
 /**
@@ -247,7 +258,9 @@ export function defineRoute<
   const PC extends ParamsConfig<Path> = ParamsConfig<Path>,
   const SC extends SearchConfig = Record<never, never>,
 >(path: Path, config: RouteConfig<Path, PC, SC>): Route<Path, PC, SC> {
-  tokenizePath(path); // RL1: throws ParamourError on an invalid literal
+  // RL1: throws ParamourError on an invalid literal; the segments are kept on
+  // the route so the per-call R-rule runtimes never re-tokenize.
+  const segments = tokenizePath(path);
   // The conditional RouteConfig is unresolved inside the generic body; this
   // cast is the one place its two branches are unified.
   const { params, search } = config as { params?: PC; search?: SC };
@@ -281,6 +294,7 @@ export function defineRoute<
     },
     "~params": params ?? ({} as PC),
     "~search": search ?? ({} as SC),
+    "~segments": segments,
   };
   return route;
 }

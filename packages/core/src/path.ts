@@ -98,7 +98,7 @@ export function decodeParams<R extends AnyRoute>(
   // of the result (Object.fromEntries uses define, not set, semantics).
   const entries: [string, unknown][] = [];
 
-  for (const segment of tokenizePath(route.path)) {
+  for (const segment of routeSegments(route)) {
     if (segment.kind === "static") continue;
     const codec = requireCodec(config, segment.name, route.path);
     // Own properties only: unknown keys are never read, and inherited
@@ -237,7 +237,7 @@ export function encodeParams<R extends AnyRoute>(
     Record<string, AnyCodec | undefined> | undefined;
   const segments: string[] = [];
 
-  for (const segment of tokenizePath(route.path)) {
+  for (const segment of routeSegments(route)) {
     if (segment.kind === "static") {
       // RL2/RL5: the literal is URL-shaped and emitted as-is — static
       // segments are never re-encoded.
@@ -412,6 +412,16 @@ function requireCodec(
     );
   }
   return codec;
+}
+
+/**
+ * A route's tokenized segments: defineRoute computes them once at define
+ * time (`~segments`); a hand-built route lacking them falls back to
+ * tokenizing here, so the plain-JS contract is identical either way.
+ */
+function routeSegments(route: AnyRoute): readonly PathSegment[] {
+  const segments = route["~segments"] as readonly PathSegment[] | undefined;
+  return segments ?? tokenizePath(route.path);
 }
 
 function tokenizeSegment(raw: string, path: string): PathSegment {
