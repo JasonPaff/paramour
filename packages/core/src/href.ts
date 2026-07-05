@@ -1,11 +1,10 @@
-import type { AnyRoute } from "./route.js";
+import type { AnyRoute, ParamsConfig, Route } from "./route.js";
 
 import { buildPath, type InferParamsInput } from "./path.js";
 import {
-  buildSearchString,
-  encodeSearch,
   type InferSearchInput,
   type SearchConfig,
+  searchToString,
 } from "./search.js";
 
 /**
@@ -77,25 +76,25 @@ type PartFor<Key extends string, Input> = keyof Input extends never
 export function href<R extends AnyRoute>(
   route: R,
   ...args: HrefArgs<R>
-): Href<R["path"]> {
-  // The conditional tuple is unresolved inside the generic body; this
-  // structural cast unifies its branches (same move as defineRoute's config
-  // cast). Not InferHrefInput<AnyRoute>: for AnyRoute both halves are
-  // empty-input, which PartFor now types `?: never`.
-  const [options] = args as [
-    { hash?: string; params?: unknown; search?: unknown }?,
-  ];
-  const path = buildPath(route, (options?.params ?? {}) as InferParamsInput<R>);
-  const query = buildSearchString(
-    encodeSearch(
-      route["~search"] as SearchConfig,
-      (options?.search ?? {}) as InferSearchInput<SearchConfig>,
-    ),
-  );
+): Href<R["path"]>;
+// The conditional HrefArgs tuple is unresolvable inside a generic body, so
+// the unsoundness lives at this one overload boundary (same move as
+// defineRoute's config cast) instead of per-expression casts: the
+// implementation sees each option half at its loosest honest type.
+export function href(
+  route: Route<string, ParamsConfig<string>, SearchConfig>,
+  options?: {
+    hash?: string;
+    params?: InferParamsInput<AnyRoute>;
+    search?: InferSearchInput<SearchConfig>;
+  },
+): string {
+  const path = buildPath(route, options?.params ?? {});
+  const query = searchToString(route["~search"], options?.search ?? {});
   // S10: the fragment is appended VERBATIM — no encoding, the caller owns
   // escaping (a value already starting with "#" yields "##…"). The empty
   // string emits no "#".
   const hash = options?.hash;
   const fragment = hash === undefined || hash === "" ? "" : `#${hash}`;
-  return `${path}${query}${fragment}` as Href<R["path"]>;
+  return `${path}${query}${fragment}`;
 }
