@@ -23,10 +23,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm format:check
-      - run: pnpm lint
-      # build before typecheck: examples resolve the packages' dist types,
-      # and pnpm's topological order builds core → next → example-basic.
+      # build before lint and typecheck: packages/next's type-checked source
+      # and the examples resolve the packages' dist types, and pnpm's
+      # topological order builds core → next → example-basic.
       - run: pnpm build
+      - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:types
