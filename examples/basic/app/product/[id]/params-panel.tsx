@@ -1,0 +1,43 @@
+"use client";
+
+import { useRouteParams, useSearch } from "@paramour-js/next/client";
+
+import { productRoute } from "./route.def";
+
+// Client-side twin of the server parse in page.tsx (DESIGN §9). The hooks are
+// a useMemo over Next's useParams()/useSearchParams(): no loading state, and a
+// malformed URL surfaces as `{ error }` rather than throwing — the component
+// renders a fallback instead of crashing.
+export function ParamsPanel() {
+  const params = useRouteParams(productRoute);
+  const search = useSearch(productRoute);
+
+  if (params.error) {
+    return <p role="alert">params: {params.error.message}</p>;
+  }
+  if (search.error) {
+    return <p role="alert">search: {search.error.message}</p>;
+  }
+
+  return (
+    <section id="client-params">
+      <h2>Read on the client</h2>
+      <dl>
+        <dt>
+          <code>params.id</code>
+        </dt>
+        <dd>
+          {params.data.id} (typeof {typeof params.data.id})
+        </dd>
+        <dt>
+          <code>search.page</code>
+        </dt>
+        <dd>{search.data.page}</dd>
+        <dt>
+          <code>search.q</code>
+        </dt>
+        <dd>{search.data.q ?? "(not provided — optional)"}</dd>
+      </dl>
+    </section>
+  );
+}

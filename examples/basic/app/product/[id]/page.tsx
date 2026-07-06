@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { RouteProps } from "paramour";
 
+import { ParamsPanel } from "./params-panel";
 import { productRoute } from "./route.def";
 
 // parse/parseParams work identically in generateMetadata (DESIGN §8).
@@ -35,6 +36,7 @@ export default async function ProductPage(props: RouteProps) {
         </dt>
         <dd>{search.q ?? "(not provided — optional)"}</dd>
       </dl>
+      <ParamsPanel />
       <section id="reviews">
         <h2>Reviews</h2>
         <p>The #reviews hash on the home page link lands here.</p>
