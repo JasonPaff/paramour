@@ -6,8 +6,8 @@ import {
   decodeParams,
   decodeSearch,
   type InferRouteParams,
-  type InferSearchOutput,
   type SafeResult,
+  type SearchOutputOf,
 } from "paramour";
 import { useMemo } from "react";
 
@@ -53,7 +53,7 @@ export function useRouteParamsOrThrow<R extends AnyRoute>(
 /** Decoded search params as a `SafeResult` (`{ data } | { error }`). */
 export function useSearch<R extends AnyRoute>(
   route: R,
-): SafeResult<InferSearchOutput<R["~search"]>> {
+): SafeResult<SearchOutputOf<R["~search"]>> {
   const searchParams = useSearchParams();
   return useMemo(
     () => safeDecodeSearch(route, searchParams),
@@ -67,10 +67,20 @@ export function useSearch<R extends AnyRoute>(
  */
 export function useSearchOrThrow<R extends AnyRoute>(
   route: R,
-): InferSearchOutput<R["~search"]> {
+): SearchOutputOf<R["~search"]> {
   const searchParams = useSearchParams();
   return useMemo(
-    () => decodeSearch(route["~search"], searchParams),
+    // decodeSearch is keyed on SearchOutputOf (design-04 SS6) — the correct
+    // public type — but AnyRoute erases its SC to `any`, so for a still-
+    // generic R the call's SearchOutputOf<R["~search"]> reduces to `unknown`
+    // on the value side while staying deferred on the annotation side. The
+    // cast bridges that inference gap to the SAME (correct) type, so a
+    // rawSearch route now infers its schema output here, not a garbage
+    // {~kind, ~schema} shape.
+    () =>
+      decodeSearch(route["~search"], searchParams) as SearchOutputOf<
+        R["~search"]
+      >,
     [route, searchParams],
   );
 }

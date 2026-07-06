@@ -3,10 +3,10 @@ import {
   decodeParams,
   decodeSearch,
   type InferRouteParams,
-  type InferSearchOutput,
   ParamsDecodeError,
   type SafeResult,
   SearchDecodeError,
+  type SearchOutputOf,
   type SearchSource,
 } from "paramour";
 
@@ -48,9 +48,17 @@ export function safeDecodeParams<R extends AnyRoute>(
 export function safeDecodeSearch<R extends AnyRoute>(
   route: R,
   source: SearchSource,
-): SafeResult<InferSearchOutput<R["~search"]>> {
+): SafeResult<SearchOutputOf<R["~search"]>> {
   try {
-    return { data: decodeSearch(route["~search"], source) };
+    // See the matching cast + comment in client.ts's useSearchOrThrow: the
+    // SearchOutputOf type is correct; the cast only bridges AnyRoute's
+    // `any`-erased SC, which makes the call reduce to `unknown` for a still-
+    // generic R.
+    return {
+      data: decodeSearch(route["~search"], source) as SearchOutputOf<
+        R["~search"]
+      >,
+    };
   } catch (error) {
     if (error instanceof SearchDecodeError) return { error };
     throw error;

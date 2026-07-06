@@ -3,12 +3,12 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { type Codec, createCodec } from "./codec.js";
 import {
   foreignMessage,
-  ParamourError,
   ParseError,
   rebrandForeign,
   SerializeError,
   showValue,
 } from "./errors.js";
+import { runStandardSchemaSync } from "./schema.js";
 
 // Wire grammars per wire-format spec §4. `Number()` alone is too loose
 // (accepts hex, trims whitespace), hence explicit anchored patterns.
@@ -38,6 +38,10 @@ function expectSerializableDate(value: unknown): Date {
   return value;
 }
 
+function joinIssues(issues: readonly StandardSchemaV1.Issue[]): string {
+  return issues.map((issue) => issue.message).join("; ");
+}
+
 function parseIntegerElement(raw: string): number {
   if (!INTEGER_RE.test(raw)) {
     throw new ParseError(`"${raw}" is not an integer`);
@@ -64,9 +68,11 @@ function refine<Out>(
   schema: StandardSchemaV1<unknown, Out>,
   value: unknown,
 ): Out {
-  const result = runSchemaSync(schema, value);
-  if (result.issues !== undefined) {
-    throw new ParseError(`Schema validation failed: ${result.issues}`);
+  const result = runStandardSchemaSync(schema, value);
+  if (result.issues) {
+    throw new ParseError(
+      `Schema validation failed: ${joinIssues(result.issues)}`,
+    );
   }
   return result.value;
 }
@@ -80,32 +86,13 @@ function refine<Out>(
  * transforms.
  */
 function refineForSerialize(schema: StandardSchemaV1, value: unknown): unknown {
-  const result = runSchemaSync(schema, value);
-  if (result.issues !== undefined) {
-    throw new SerializeError(`Schema validation failed: ${result.issues}`);
-  }
-  return result.value;
-}
-
-/**
- * Runs a Standard Schema synchronously. Standard Schema permits async
- * validation, but URL parsing must be sync — async schemas are a documented
- * runtime error (design-02 D7).
- */
-function runSchemaSync<Out>(
-  schema: StandardSchemaV1<unknown, Out>,
-  value: unknown,
-): { issues: string } | { issues?: undefined; value: Out } {
-  const result = schema["~standard"].validate(value);
-  if (result instanceof Promise) {
-    throw new ParamourError(
-      "Async Standard Schema validation is not supported: URL parsing must be synchronous",
+  const result = runStandardSchemaSync(schema, value);
+  if (result.issues) {
+    throw new SerializeError(
+      `Schema validation failed: ${joinIssues(result.issues)}`,
     );
   }
-  if (result.issues) {
-    return { issues: result.issues.map((issue) => issue.message).join("; ") };
-  }
-  return { issues: undefined, value: result.value };
+  return result.value;
 }
 
 function serializeFiniteNumber(value: unknown): string {

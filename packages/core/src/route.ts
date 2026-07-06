@@ -15,8 +15,8 @@ import {
 } from "./path.js";
 import {
   decodeSearch,
-  type InferSearchOutput,
-  type SearchConfig,
+  type SearchOutputOf,
+  type SearchSlot,
 } from "./search.js";
 
 /**
@@ -147,7 +147,7 @@ export type RegisteredRoutePaths = ParamourRegister extends {
 export interface Route<
   Path extends string,
   PC extends ParamsConfig<Path>,
-  SC extends SearchConfig,
+  SC extends SearchSlot,
 > {
   /**
    * Decodes both props members. Awaits BOTH up front, then decodes params
@@ -156,25 +156,23 @@ export interface Route<
    */
   parse(props: RouteProps): Promise<{
     params: ParamsOutput<Path, PC>;
-    search: InferSearchOutput<SC>;
+    search: SearchOutputOf<SC>;
   }>;
   /** Bare params object (RL6) — layout props are structurally assignable. */
   parseParams(props: ParamsProps): Promise<ParamsOutput<Path, PC>>;
   /** Bare search object (RL6) — the search half alone. */
-  parseSearch(props: SearchProps): Promise<InferSearchOutput<SC>>;
+  parseSearch(props: SearchProps): Promise<SearchOutputOf<SC>>;
   readonly path: Path;
   safeParse(props: RouteProps): Promise<
     SafeResult<{
       params: ParamsOutput<Path, PC>;
-      search: InferSearchOutput<SC>;
+      search: SearchOutputOf<SC>;
     }>
   >;
   safeParseParams(
     props: ParamsProps,
   ): Promise<SafeResult<ParamsOutput<Path, PC>>>;
-  safeParseSearch(
-    props: SearchProps,
-  ): Promise<SafeResult<InferSearchOutput<SC>>>;
+  safeParseSearch(props: SearchProps): Promise<SafeResult<SearchOutputOf<SC>>>;
   readonly "~params": PC;
   readonly "~search": SC;
   /**
@@ -194,7 +192,7 @@ export interface Route<
 export type RouteConfig<
   Path extends string,
   PC extends ParamsConfig<Path>,
-  SC extends SearchConfig,
+  SC extends SearchSlot,
 > = [PathParamNames<Path>] extends [never]
   ? { readonly params?: never; readonly search?: SC }
   : { readonly params: ConformParams<Path, PC>; readonly search?: SC };
@@ -256,7 +254,7 @@ export function defineRoute<
   // eslint-disable-next-line @typescript-eslint/no-duplicate-type-constituents
   Path extends RegisteredRoutePaths & string,
   const PC extends ParamsConfig<Path> = ParamsConfig<Path>,
-  const SC extends SearchConfig = Record<never, never>,
+  const SC extends SearchSlot = Record<never, never>,
 >(path: Path, config: RouteConfig<Path, PC, SC>): Route<Path, PC, SC> {
   // RL1: throws ParamourError on an invalid literal; the segments are kept on
   // the route so the per-call R-rule runtimes never re-tokenize.
