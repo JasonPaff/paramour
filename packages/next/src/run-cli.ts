@@ -9,7 +9,11 @@ import {
   generate,
   type GenerateInputs,
 } from "./generate.js";
-import { acquireWatcherLock, watcherLockPath } from "./lock.js";
+import {
+  type AcquireLockResult,
+  acquireWatcherLock,
+  watcherLockPath,
+} from "./lock.js";
 import { DEFAULT_PAGE_EXTENSIONS, resolveAppDir } from "./scan.js";
 import { watchAppDir } from "./watch.js";
 
@@ -129,6 +133,14 @@ function parsePageExtensions(flag: string | undefined): string[] | undefined {
   if (list.length === 0) {
     throw new Error("--page-extensions requires a comma-separated list");
   }
+  // Mirrors the config-file validation: a leading dot silently matches
+  // nothing (`page..tsx` never exists on disk).
+  const dotted = list.find((ext) => ext.startsWith("."));
+  if (dotted !== undefined) {
+    throw new Error(
+      `--page-extensions entries must not start with a dot: "${dotted}"`,
+    );
+  }
   return list;
 }
 
@@ -246,7 +258,15 @@ function runWatch(
     // only option-resolution errors (earlier) are fatal.
     stderr(`paramour: initial generation failed: ${message(error)}`);
   }
-  const lock = acquireWatcherLock(watcherLockPath(projectRoot));
+  let lock: AcquireLockResult;
+  try {
+    lock = acquireWatcherLock(watcherLockPath(projectRoot));
+  } catch (error) {
+    // A corrupt lock location (e.g. a directory at the pidfile path) is an
+    // operational error, not a crash: exit 2 like every other one (TR7).
+    stderr(`paramour: ${message(error)}`);
+    return 2;
+  }
   if (!lock.acquired) {
     stdout(
       `paramour: watcher already running (pid ${String(lock.ownerPid)}); exiting`,

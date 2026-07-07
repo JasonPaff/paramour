@@ -40,6 +40,14 @@ declare module "paramour" {
     expect(content.endsWith("\n\n")).toBe(false);
   });
 
+  it("sorts by code unit, not locale ('/Z' < '/a' < '/é')", () => {
+    // A localeCompare regression would pass every ASCII-lowercase-only test;
+    // this pin feeds TR3's byte-identical-on-every-OS guarantee.
+    expect(emitArtifact(["/a", "/Z", "/é"])).toContain(
+      ['      | "/Z"', '      | "/a"', '      | "/é";'].join("\n"),
+    );
+  });
+
   it("omits the routes member entirely for an empty scan", () => {
     const content = emitArtifact([]);
     expect(content).toContain("interface ParamourRegister {}");
@@ -79,6 +87,15 @@ describe("writeIfChanged (TR3)", () => {
       written: true,
     });
     expect(readFileSync(file, "utf8")).toBe("new\n");
+  });
+
+  it("creates missing nested parent directories for the target file", () => {
+    const file = join(makeTempDir(), "types", "deep", "routes.d.ts");
+    expect(writeIfChanged(file, "content\n")).toEqual({
+      previousContent: null,
+      written: true,
+    });
+    expect(readFileSync(file, "utf8")).toBe("content\n");
   });
 
   it("distinguishes an empty existing file from a missing one", () => {

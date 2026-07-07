@@ -137,6 +137,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@testing-library/dom':
         specifier: ^10.4.0
         version: 10.4.1
@@ -161,6 +164,9 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
 packages:
 

@@ -86,6 +86,20 @@ describe("withTypedRoutes phase dispatch (TR4)", () => {
     expect(userConfig).toHaveBeenCalledExactlyOnceWith("phase-test", ctx);
   });
 
+  it("resolves a sync (non-async) function-form config on a build phase", async () => {
+    const root = makeProject(["app/page.mdx"]);
+    silenceWarn();
+    const ctx = { defaultConfig: {} };
+    const userConfig = vi.fn(() => ({ pageExtensions: ["mdx"] }));
+    const result = await withTypedRoutes(userConfig)(PHASE_BUILD, ctx);
+    expect(result).toEqual({ pageExtensions: ["mdx"] });
+    expect(userConfig).toHaveBeenCalledExactlyOnceWith(PHASE_BUILD, ctx);
+    // The resolved config's pageExtensions drove the scan.
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitArtifact(["/"]),
+    );
+  });
+
   it("warns once and skips generation when no app dir exists", async () => {
     const root = makeProject(["src/pages/index.tsx"]);
     const warn = silenceWarn();
@@ -145,6 +159,36 @@ describe("withTypedRoutes build phase (TR4)", () => {
     );
   });
 
+  it("strict: true still resolves when generation itself fails (§7.3: only drift may fail a strict build)", async () => {
+    // outFile pointing at an existing DIRECTORY makes the artifact write
+    // throw (EISDIR) — an incidental generation failure, not drift.
+    makeProject(["app/page.tsx", "artifact-dir/"]);
+    const warn = silenceWarn();
+    const config = { reactStrictMode: true as const };
+    await expect(
+      withTypedRoutes(config, { outFile: "artifact-dir", strict: true })(
+        PHASE_BUILD,
+        {},
+      ),
+    ).resolves.toBe(config);
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining("stale route types"),
+      expect.anything(),
+    );
+    expect(devWatcherCountForTests()).toBe(0);
+  });
+
+  it("strict: true rejects on a missing artifact, generating it before the throw", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    const artifact = join(root, "paramour-env.d.ts");
+    await expect(
+      withTypedRoutes({}, { strict: true })(PHASE_BUILD, {}),
+    ).rejects.toThrow(/was missing/);
+    // The build fails but the artifact was generated before the throw.
+    expect(existsSync(artifact)).toBe(true);
+    expect(readFileSync(artifact, "utf8")).toBe(emitArtifact(["/"]));
+  });
+
   it("honors the wrapped config's pageExtensions and the outFile option", async () => {
     const root = makeProject(["app/page.mdx", "app/skipped/page.tsx"]);
     silenceWarn();
@@ -180,6 +224,23 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
     expect(devWatcherCountForTests()).toBe(1);
   });
 
+  it("continues (config resolves) when dev-phase generation fails", async () => {
+    // Same directory-as-artifact trick as the build-phase test: the write
+    // throws, dev must keep going in stale-types mode (§7.3).
+    makeProject(["app/page.tsx", "artifact-dir/"]);
+    const warn = silenceWarn();
+    const config = { reactStrictMode: true as const };
+    await expect(
+      withTypedRoutes(config, { outFile: "artifact-dir" })(PHASE_DEV, {}),
+    ).resolves.toBe(config);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("dev continues with stale route types"),
+      expect.anything(),
+    );
+    // Watcher startup itself is unaffected by the failed generation pass.
+    expect(devWatcherCountForTests()).toBe(1);
+  });
+
   it("regenerates the artifact when a route folder appears", async () => {
     const root = makeProject(["app/page.tsx"]);
     await withTypedRoutes({})(PHASE_DEV, {});
@@ -190,6 +251,28 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
         emitArtifact(["/", "/pricing"]),
       );
     }, 5000);
+  });
+
+  it("continues (config resolves) when lock acquisition itself throws (§7.3)", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    // The canonical lock path exists as a DIRECTORY: writing the pidfile
+    // throws EISDIR, which must not take down `next dev`.
+    mkdirSync(
+      join(root, "node_modules", ".cache", "paramour", "watcher.lock"),
+      { recursive: true },
+    );
+    const warn = silenceWarn();
+    const config = { reactStrictMode: true as const };
+    await expect(withTypedRoutes(config)(PHASE_DEV, {})).resolves.toBe(config);
+    // Generation itself succeeded; only the watcher fell into stale-types mode.
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitArtifact(["/"]),
+    );
+    expect(devWatcherCountForTests()).toBe(0);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("dev watcher failed"),
+      expect.anything(),
+    );
   });
 
   it("declines the watcher when a live process holds the lock, but still generates", async () => {

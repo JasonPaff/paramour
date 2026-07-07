@@ -70,6 +70,45 @@ describe("loadConfigFile (TR7 / §7.2)", () => {
     );
   });
 
+  it("rejects a JSON array config", async () => {
+    const root = makeProject({ "paramour.config.json": `[]` });
+    await expect(loadConfigFile(root)).rejects.toThrow(
+      /must export a config object/,
+    );
+  });
+
+  it("rejects a JSON null config", async () => {
+    const root = makeProject({ "paramour.config.json": `null` });
+    await expect(loadConfigFile(root)).rejects.toThrow(
+      /must export a config object/,
+    );
+  });
+
+  it("rejects an .mjs config default-exporting a function", async () => {
+    const root = makeProject({
+      "paramour.config.mjs": `export default () => ({ appDir: "app" });\n`,
+    });
+    await expect(loadConfigFile(root)).rejects.toThrow(
+      /must export a config object/,
+    );
+  });
+
+  it("rejects pageExtensions entries with a leading dot (would silently match nothing)", async () => {
+    const root = makeProject({
+      "paramour.config.json": `{ "pageExtensions": ["tsx", ".mdx"] }`,
+    });
+    await expect(loadConfigFile(root)).rejects.toThrow(
+      /`pageExtensions` entries must not start with a dot: "\.mdx"/,
+    );
+  });
+
+  it("names the file on invalid JSON syntax", async () => {
+    const root = makeProject({ "paramour.config.json": `{ "appDir": ` });
+    await expect(loadConfigFile(root)).rejects.toThrow(
+      /paramour\.config\.json: invalid JSON/,
+    );
+  });
+
   it("rejects unknown keys (typo protection)", async () => {
     const root = makeProject({
       "paramour.config.json": `{ "pagesExtensions": ["tsx"] }`,
@@ -82,6 +121,7 @@ describe("loadConfigFile (TR7 / §7.2)", () => {
   it("rejects wrongly typed fields, naming the key", async () => {
     const cases: [string, RegExp][] = [
       [`{ "appDir": 42 }`, /`appDir` must be a non-empty string/],
+      [`{ "appDir": "" }`, /`appDir` must be a non-empty string/],
       [`{ "outFile": "" }`, /`outFile` must be a non-empty string/],
       [
         `{ "pageExtensions": "tsx" }`,

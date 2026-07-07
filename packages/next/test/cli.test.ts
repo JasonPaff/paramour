@@ -87,6 +87,14 @@ describe("paramour generate — one-shot (TR7)", () => {
     expect(run.out).toEqual([expect.stringContaining("unchanged")]);
   });
 
+  it("pluralizes the route count message correctly for one route", async () => {
+    makeProject(["app/page.tsx"]);
+    const run = cli(["generate"]);
+    await expect(run.code).resolves.toBe(0);
+    expect(run.out[0]).toContain("(1 route)");
+    expect(run.out[0]).not.toContain("1 routes");
+  });
+
   it("fails loudly (exit 2) when no app dir exists", async () => {
     const root = makeProject(["src/pages/index.tsx"]);
     const run = cli(["generate"]);
@@ -127,6 +135,21 @@ describe("paramour generate — flags and usage (TR7)", () => {
     await expect(cli([]).code).resolves.toBe(2);
   });
 
+  it("-h short alias prints usage to stdout and exits 0", async () => {
+    makeProject([]);
+    const run = cli(["-h"]);
+    await expect(run.code).resolves.toBe(0);
+    expect(run.out.join("\n")).toContain("Usage: paramour generate");
+    expect(run.err).toEqual([]);
+  });
+
+  it("rejects a stray extra positional (exit 2)", async () => {
+    makeProject(["app/page.tsx"]);
+    const run = cli(["generate", "extra"]);
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err.join("\n")).toContain("exactly one command");
+  });
+
   it("rejects --watch --check together (exit 2)", async () => {
     makeProject(["app/page.tsx"]);
     const run = cli(["generate", "--watch", "--check"]);
@@ -139,6 +162,15 @@ describe("paramour generate — flags and usage (TR7)", () => {
     const run = cli(["generate", "--page-extensions", " , "]);
     await expect(run.code).resolves.toBe(2);
     expect(run.err).toEqual([expect.stringContaining("--page-extensions")]);
+  });
+
+  it("rejects --page-extensions entries with a leading dot (exit 2)", async () => {
+    makeProject(["app/page.tsx"]);
+    const run = cli(["generate", "--page-extensions", ".tsx,mdx"]);
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err).toEqual([
+      expect.stringContaining('must not start with a dot: ".tsx"'),
+    ]);
   });
 });
 
@@ -195,6 +227,37 @@ describe("paramour generate — config precedence (TR7 / §7.2)", () => {
       expect.stringContaining("unknown key `pagesExtensions`"),
     ]);
   });
+
+  it("a config-file appDir pointing at a nonexistent dir is exit 2", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    writeFileSync(join(root, "paramour.config.json"), `{ "appDir": "gone" }`);
+    const run = cli(["generate"]);
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err).toEqual([
+      expect.stringContaining("app directory not found"),
+    ]);
+  });
+
+  it("malformed JSON in the config file is exit 2 with the file named, not a crash", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    writeFileSync(join(root, "paramour.config.json"), `{ "appDir": `);
+    const run = cli(["generate"]);
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err).toEqual([
+      expect.stringContaining("paramour.config.json: invalid JSON"),
+    ]);
+  });
+
+  it("an .mjs config that throws at import is exit 2, not a crash", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    writeFileSync(
+      join(root, "paramour.config.mjs"),
+      `throw new Error("config module exploded");\n`,
+    );
+    const run = cli(["generate"]);
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err.join("\n")).toContain("config module exploded");
+  });
 });
 
 describe("paramour generate --check (TR7)", () => {
@@ -232,6 +295,20 @@ describe("paramour generate --check (TR7)", () => {
     makeProject([]);
     await expect(cli(["generate", "--check"]).code).resolves.toBe(2);
   });
+
+  it("reports byte drift with an identical route set (hand-edited artifact)", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    // Same union, different bytes: the header line removed.
+    writeFileSync(
+      join(root, "paramour-env.d.ts"),
+      emitArtifact(["/"]).split("\n").slice(1).join("\n"),
+    );
+    const run = cli(["generate", "--check"]);
+    await expect(run.code).resolves.toBe(1);
+    expect(run.err.join("\n")).toContain(
+      "content differs from generator output",
+    );
+  });
 });
 
 describe("paramour generate --watch (TR5/TR6/TR7)", { retry: 2 }, () => {
@@ -264,6 +341,33 @@ describe("paramour generate --watch (TR5/TR6/TR7)", { retry: 2 }, () => {
     await expect(run.code).resolves.toBe(0);
     // Lock released on abort.
     expect(existsSync(watcherLockPath(root))).toBe(false);
+  });
+
+  it("warns but keeps watching when initial generation fails; a pre-aborted signal resolves 0", async () => {
+    // --out-file pointing at an existing DIRECTORY makes the initial
+    // generation throw (EISDIR) — transient I/O must not kill the watcher.
+    makeProject(["app/page.tsx", "artifact-dir/"]);
+    const controller = new AbortController();
+    controller.abort();
+    const run = cli(["generate", "--watch", "--out-file", "artifact-dir"], {
+      signal: controller.signal,
+    });
+    await expect(run.code).resolves.toBe(0);
+    expect(run.err.join("\n")).toMatch(/initial generation failed/);
+    expect(run.out.join("\n")).toContain("watching");
+  });
+
+  it("maps a watcher-lock acquisition failure to exit 2 instead of rejecting", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    // The canonical lock path exists as a DIRECTORY: writing the pidfile
+    // throws EISDIR, which must surface as the documented operational exit
+    // code — never an unhandled rejection out of the bin.
+    mkdirSync(watcherLockPath(root), { recursive: true });
+    const controller = new AbortController();
+    controller.abort();
+    const run = cli(["generate", "--watch"], { signal: controller.signal });
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err.join("\n")).toMatch(/EISDIR|directory/i);
   });
 
   it("declines when a live process holds the lock, still generating (exit 0)", async () => {

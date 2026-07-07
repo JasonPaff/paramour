@@ -36,7 +36,18 @@ export async function loadConfigFile(
     const path = join(projectRoot, name);
     if (!existsSync(path)) continue;
     if (name.endsWith(".json")) {
-      const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+      const text = readFileSync(path, "utf8");
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch (error) {
+        // Name the file: a bare SyntaxError("Unexpected token …") gives the
+        // user nothing to grep for.
+        throw new Error(
+          `${name}: invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        );
+      }
       return { config: validateConfig(parsed, name), path };
     }
     const { createJiti } = await import("jiti");
@@ -88,6 +99,14 @@ function validateConfig(value: unknown, sourceName: string): ParamourConfig {
         ) {
           throw new Error(
             `${sourceName}: \`pageExtensions\` must be a non-empty array of non-empty strings`,
+          );
+        }
+        // A leading dot silently matches nothing (`page..tsx` never exists) —
+        // exactly the class of typo this hand-rolled validation exists for.
+        const dotted = entry.find((ext) => ext.startsWith("."));
+        if (dotted !== undefined) {
+          throw new Error(
+            `${sourceName}: \`pageExtensions\` entries must not start with a dot: "${dotted}"`,
           );
         }
         config.pageExtensions = entry;

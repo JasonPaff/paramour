@@ -32,6 +32,7 @@
     "react": ">=18.2.0"
   },
   "devDependencies": {
+    "@standard-schema/spec": "^1.1.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^24.0.0",
@@ -39,7 +40,8 @@
     "happy-dom": "^15.11.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
   },
   "description": "Next.js integration for paramour: withTypedRoutes, client hooks, PageProps glue, and the codegen CLI.",
   "author": "Jason Paff <jasonpaff@gmail.com>",

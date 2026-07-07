@@ -78,6 +78,26 @@ describe("acquireWatcherLock (TR6)", () => {
     expect(readFileSync(lockPath, "utf8")).toBe(String(owner));
   });
 
+  it("parses a lock file with a trailing newline (declines a live owner)", () => {
+    const lockPath = tempLockPath();
+    const owner = livePid();
+    writeLock(lockPath, `${String(owner)}\n`);
+    const result = acquire(lockPath);
+    // An unparseable lock would have ACQUIRED; declining with the owner's
+    // PID proves the trailing newline was trimmed before the strict parse.
+    expect(result.acquired).toBe(false);
+    expect(result.ownerPid).toBe(owner);
+  });
+
+  it("throws EISDIR when the lock path is an existing directory", () => {
+    // Pin, not a ruling: readOwnerPid treats the unreadable "lock" as absent,
+    // then the acquisition write throws. Callers own mapping this to their
+    // error policy (see the cli.test.ts watch coverage).
+    const lockPath = tempLockPath();
+    mkdirSync(lockPath, { recursive: true });
+    expect(() => acquireWatcherLock(lockPath)).toThrow(/EISDIR/);
+  });
+
   it("re-acquires its own lock (idempotent across restarts of the guard)", () => {
     const lockPath = tempLockPath();
     writeLock(lockPath, String(process.pid));

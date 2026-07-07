@@ -104,6 +104,13 @@ describe("parseUnionPaths / formatRouteDiff", () => {
     expect(parseUnionPaths(emitArtifact([])).size).toBe(0);
   });
 
+  it("tolerates a CRLF-resaved artifact (JS multiline $ matches before \\r)", () => {
+    // A drift diff against a CRLF-converted artifact must not report every
+    // route as newly appeared — the union members still parse.
+    const crlf = emitArtifact(["/a", "/b"]).replaceAll("\n", "\r\n");
+    expect([...parseUnionPaths(crlf)].sort()).toEqual(["/a", "/b"]);
+  });
+
   it("formats appeared and disappeared lines", () => {
     expect(formatRouteDiff(["/new"], ["/old", "/older"])).toEqual([
       "  + /new",

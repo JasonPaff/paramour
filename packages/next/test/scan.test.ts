@@ -1,3 +1,4 @@
+import { symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -127,6 +128,52 @@ describe("scanRoutes: skipped subtrees (TR2)", () => {
 
   it("skips _private subtrees entirely, pages at any depth included", () => {
     expect(scanTree(["_lib/page.tsx", "_lib/deep/page.tsx"])).toEqual([]);
+  });
+});
+
+describe("scanRoutes: error and traversal edges (TR2)", () => {
+  it("throws on a missing app dir (the caller-side guard is resolveAppDir)", () => {
+    const missing = join(makeTempDir(), "does-not-exist");
+    expect(() => scanRoutes(missing)).toThrow(/ENOENT/);
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "does not follow a symlinked directory (TR2 v1 stance)",
+    () => {
+      const root = makeTempDir();
+      makeTree(root, ["app/", "outside/linked/page.tsx"]);
+      symlinkSync(join(root, "outside"), join(root, "app", "external"), "dir");
+      expect(scanRoutes(join(root, "app"))).toEqual([]);
+    },
+  );
+});
+
+/**
+ * Pins for the group/interception regex edges: these names' classification is
+ * exactly what `^\(.*\)$` (group: stripped) vs `^\(\.{1,3}\)` (interception:
+ * skipped) produce today, guarding future regex refactors.
+ */
+describe("scanRoutes: group/interception regex edge pins (TR2)", () => {
+  it("(a)(b) matches the group regex and is stripped", () => {
+    expect(scanTree(["(a)(b)/x/page.tsx"])).toEqual(["/x"]);
+  });
+
+  it("() matches the group regex (empty name) and is stripped", () => {
+    expect(scanTree(["()/y/page.tsx"])).toEqual(["/y"]);
+  });
+
+  it("(....) is NOT an interception marker (max 3 dots); it strips as a group", () => {
+    expect(scanTree(["(....)/z/page.tsx"])).toEqual(["/z"]);
+  });
+
+  it("composes group stripping with dynamic segments passed through verbatim", () => {
+    expect(
+      scanTree(["(shop)/product/[id]/reviews/[[...rest]]/page.tsx"]),
+    ).toEqual(["/product/[id]/reviews/[[...rest]]"]);
+  });
+
+  it("skip rules below a group still apply: @slot and (.)interception contribute nothing", () => {
+    expect(scanTree(["(g)/@slot/page.tsx", "(g)/(.)foo/page.tsx"])).toEqual([]);
   });
 });
 

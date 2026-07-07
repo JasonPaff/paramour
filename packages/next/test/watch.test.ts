@@ -133,6 +133,23 @@ describe("watchAppDir (TR5)", { retry: 2 }, () => {
     expect(onRescan).not.toHaveBeenCalled();
   });
 
+  it("close() drops a pending debounced rescan", async () => {
+    const appDir = makeTempDir();
+    const onRescan = vi.fn();
+    // A debounce window long enough that the FS event lands well before it
+    // elapses, so close() races only the timer, not event delivery.
+    const watcher = watchAppDir(appDir, { debounceMs: 1000, onRescan });
+    watchers.push(watcher);
+    await settle(100);
+    writeFileSync(join(appDir, "page.tsx"), "");
+    // Let the platform deliver the event (scheduling the debounce timer),
+    // then close before the window elapses.
+    await settle();
+    watcher.close();
+    await settle(1200);
+    expect(onRescan).not.toHaveBeenCalled();
+  });
+
   it("treats startup failure as non-fatal: onError fires, no throw", () => {
     const appDir = join(makeTempDir(), "does-not-exist");
     const onError = vi.fn();
