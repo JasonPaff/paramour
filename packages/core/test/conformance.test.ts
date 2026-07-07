@@ -365,10 +365,17 @@ describe("error contract — every throw is a ParamourError", () => {
   });
 
   it("a missing config (hand-built route lacking ~search) is a ParamourError at both codecs", () => {
-    expect(() => encodeSearch(undefined as never, {})).toThrow(ParamourError);
-    expect(() => encodeSearch(undefined as never, {})).toThrow(
-      /search config must be an object, got undefined/,
-    );
+    // Cast to Record<never, never> rather than `never` itself: `never` would
+    // make encodeSearch's second parameter type (SearchInputOf<S>, a
+    // distributive conditional) collapse to `never` too, since distributing
+    // a conditional type over `never` yields `never` — an unrelated type-level
+    // gotcha, not something this runtime-guard test means to exercise.
+    expect(() =>
+      encodeSearch(undefined as unknown as Record<never, never>, {}),
+    ).toThrow(ParamourError);
+    expect(() =>
+      encodeSearch(undefined as unknown as Record<never, never>, {}),
+    ).toThrow(/search config must be an object, got undefined/);
     expect(() => decodeSearch(undefined as never, {})).toThrow(ParamourError);
     expect(() => decodeSearch(undefined as never, {})).toThrow(
       /search config must be an object, got undefined/,

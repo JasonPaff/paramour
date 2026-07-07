@@ -2,8 +2,8 @@ import type { AnyRoute, ParamsConfig, Route } from "./route.js";
 
 import { buildPath, type InferParamsInput } from "./path.js";
 import {
-  type InferSearchInput,
-  type SearchConfig,
+  type SearchInputOf,
+  type SearchSlot,
   searchToString,
 } from "./search.js";
 
@@ -46,7 +46,7 @@ export type InferHrefInput<R extends AnyRoute> = PartFor<
   "params",
   InferParamsInput<R>
 > &
-  PartFor<"search", InferSearchInput<R["~search"]>> & { hash?: string };
+  PartFor<"search", SearchInputOf<R["~search"]>> & { hash?: string };
 
 /**
  * One options property whose presence follows its input type: required iff
@@ -82,11 +82,11 @@ export function href<R extends AnyRoute>(
 // defineRoute's config cast) instead of per-expression casts: the
 // implementation sees each option half at its loosest honest type.
 export function href(
-  route: Route<string, ParamsConfig<string>, SearchConfig>,
+  route: Route<string, ParamsConfig<string>, SearchSlot>,
   options?: {
     hash?: string;
     params?: InferParamsInput<AnyRoute>;
-    search?: InferSearchInput<SearchConfig>;
+    search?: SearchInputOf<SearchSlot>;
   },
 ): string {
   const path = buildPath(route, options?.params ?? {});

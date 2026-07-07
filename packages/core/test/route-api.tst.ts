@@ -6,8 +6,9 @@
  * assertion here silently flips (design-03 testing plan).
  */
 import { expect, test } from "tstyche";
+import { z } from "zod";
 
-import { defineRoute, href, p } from "../src";
+import { defineRoute, href, p, rawSearch } from "../src";
 import type {
   AnyRoute,
   Href,
@@ -121,6 +122,60 @@ test("search config is retained on the route object", () => {
     search: { page: p.integer().default(1) },
   });
   expect(route["~search"].page["~presence"]).type.toBe<"defaulted">();
+});
+
+test("rawSearch: schema output flows into parse/parseSearch/safeParse* (design-04 SS6)", () => {
+  const schema = z.object({ page: z.coerce.number() });
+  const route = defineRoute("/about", { search: rawSearch(schema) });
+  expect(route.parseSearch({})).type.toBe<Promise<{ page: number }>>();
+  expect(route.safeParseSearch({})).type.toBe<
+    Promise<SafeResult<{ page: number }>>
+  >();
+  expect(route.parse({})).type.toBe<
+    Promise<{ params: {}; search: { page: number } }>
+  >();
+  expect(route.safeParse({})).type.toBe<
+    Promise<SafeResult<{ params: {}; search: { page: number } }>>
+  >();
+});
+
+test("rawSearch: href's search input is the raw wire record, not the schema output (SS5)", () => {
+  const schema = z.object({ page: z.coerce.number() });
+  const route = defineRoute("/about", { search: rawSearch(schema) });
+  expect(href).type.toBeCallableWith(route, {
+    search: { page: "1" },
+  });
+  expect(href).type.toBeCallableWith(route, {
+    search: { tags: ["a", "b"] },
+  });
+  // The schema's OUTPUT type (a number) is not accepted on the encode side —
+  // encode input is always wire-shaped strings, never the decode output.
+  expect(href).type.not.toBeCallableWith(route, {
+    search: { page: 1 },
+  });
+});
+
+test("rawSearch: a codec-map route and a rawSearch route don't cross-contaminate through href/parse", () => {
+  const codecRoute = defineRoute("/s", { search: { q: p.string() } });
+  const rawRoute = defineRoute("/r", {
+    search: rawSearch(z.object({ q: z.string() })),
+  });
+  expect(href).type.toBeCallableWith(codecRoute, { search: { q: "x" } });
+  expect(href).type.not.toBeCallableWith(codecRoute, {
+    search: { q: ["x"] },
+  });
+  expect(href).type.toBeCallableWith(rawRoute, { search: { q: "x" } });
+  expect(href).type.toBeCallableWith(rawRoute, { search: { q: ["x"] } });
+  // readonly per the const-inferred SC (see the note above on parse methods).
+  expect(codecRoute.parseSearch({})).type.toBe<
+    Promise<{ readonly q: string }>
+  >();
+  expect(rawRoute.parseSearch({})).type.toBe<Promise<{ q: string }>>();
+});
+
+test("rawSearch: a non-Standard-Schema argument is a compile error", () => {
+  expect(rawSearch).type.not.toBeCallableWith({ notASchema: true });
+  expect(rawSearch).type.not.toBeCallableWith("nope");
 });
 
 test("malformed bracket tokens fall through as static text (RL3)", () => {

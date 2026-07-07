@@ -1,3 +1,5 @@
+import type { StandardSchemaV1 } from "@standard-schema/spec";
+
 import type { AnyCodec, OutputOf, PresenceOf } from "./codec.js";
 
 import {
@@ -9,6 +11,7 @@ import {
   SearchDecodeError,
   SerializeError,
 } from "./errors.js";
+import { runStandardSchemaSync } from "./schema.js";
 
 /**
  * href-input side (design-02 D4): required presence stays required;
@@ -32,8 +35,55 @@ export type InferSearchOutput<S extends SearchConfig> = {
     : OutputOf<S[K]>;
 };
 
+/**
+ * The whole-object search escape hatch (design-04 SS1/SS2): wraps a bare
+ * Standard Schema in a branded marker so `search:` config discrimination is
+ * unambiguous at both the type and runtime level. `~`-prefixed members are
+ * reserved (codec convention) — a codec map never carries them at the top
+ * level, so there is no collision with user param names.
+ */
+export interface RawSearch<S extends StandardSchemaV1> {
+  readonly "~kind": "raw-search";
+  readonly "~schema": S;
+}
+
 /** A search-params schema: key → codec. */
 export type SearchConfig = Record<string, AnyCodec>;
+
+/**
+ * href / encode side of a `search:` config (design-04 SS6): a `RawSearch`
+ * route accepts the raw wire record (SS5 — the schema never runs on encode,
+ * so there's no encode-side type to infer from it); a codec map keeps its
+ * existing `InferSearchInput` behavior. Module-exported for route.ts/href.ts,
+ * not barrel-exported — same precedent as `encodeComponent`/`readInputValue`.
+ */
+export type SearchInputOf<SC> =
+  SC extends RawSearch<StandardSchemaV1>
+    ? Record<string, string | string[]>
+    : SC extends SearchConfig
+      ? InferSearchInput<SC>
+      : never;
+
+/**
+ * Parse-output side of a `search:` config (design-04 SS6): a `RawSearch`
+ * route's output is the schema's own inferred output; a codec map keeps its
+ * existing `InferSearchOutput` behavior. Module-exported for
+ * route.ts/href.ts, not barrel-exported.
+ */
+export type SearchOutputOf<SC> =
+  SC extends RawSearch<infer S>
+    ? StandardSchemaV1.InferOutput<S>
+    : SC extends SearchConfig
+      ? InferSearchOutput<SC>
+      : never;
+
+/**
+ * The `search:` config slot's full type (design-04 SS2): a codec map (the
+ * main road) or a `RawSearch` marker (the escape hatch). Internal — not
+ * barrel-exported; `Route`/`RouteConfig`/`HrefArgs` consume it as their `SC`
+ * bound.
+ */
+export type SearchSlot = RawSearch<StandardSchemaV1> | SearchConfig;
 
 /**
  * Decoded value-layer sources (wire spec §1): Next's server `searchParams`
@@ -71,12 +121,28 @@ export function buildSearchString(
  * source values are only read (and validated) for declared keys, so junk
  * under keys paramour doesn't own can never fail a decode.
  * Throws {@link SearchDecodeError} carrying one issue per failed key.
+ *
+ * A `RawSearch` config (design-04 SS2) branches to the whole-object schema
+ * path instead: every source key reaches the schema (P8 does not apply
+ * there — the schema owns stripping or passing through extras).
  */
-export function decodeSearch<S extends SearchConfig>(
+export function decodeSearch<S extends SearchSlot>(
   config: S,
   source: SearchSource,
-): InferSearchOutput<S> {
+): SearchOutputOf<S> {
   requireSearchConfig(config);
+  if (isRawSearch(config)) {
+    return decodeRawSearch(config, source) as SearchOutputOf<S>;
+  }
+  // The conditional SearchSlot doesn't narrow inside the generic body once
+  // the RawSearch branch returns (S stays a generic type parameter); this
+  // cast unifies the two branches at the one chokepoint (same move as
+  // defineRoute's config cast). tsc requires the cast (isRawSearch's `is
+  // RawSearch<...>` guard doesn't narrow a generic-typed parameter's negative
+  // branch); no-unnecessary-type-assertion mis-flags it as redundant for this
+  // exact generic-parameter-plus-user-guard shape.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const searchConfig = config as SearchConfig;
   const issues: Issue[] = [];
   // Built as entries so keys like "__proto__" become ordinary own properties
   // of the result (Object.fromEntries uses define, not set, semantics).
@@ -84,7 +150,7 @@ export function decodeSearch<S extends SearchConfig>(
   // Snapshot every declared key's wire values before any user code (custom
   // parse, default/catch factories) runs: code holding the source reference
   // can't change what later declared keys read mid-decode.
-  const sourceValues = readDeclaredValues(config, source);
+  const sourceValues = readDeclaredValues(searchConfig, source);
 
   // Absence is presence's job — .catch() only ever recovers parse
   // *failures* (D2), which is why this is shared by both arity branches.
@@ -102,7 +168,7 @@ export function decodeSearch<S extends SearchConfig>(
     }
   };
 
-  for (const [key, codec] of Object.entries(config)) {
+  for (const [key, codec] of Object.entries(searchConfig)) {
     const values = sourceValues.get(key) ?? [];
 
     if (codec["~arity"] === "many") {
@@ -154,7 +220,7 @@ export function decodeSearch<S extends SearchConfig>(
   if (issues.length > 0) {
     throw new SearchDecodeError(issues);
   }
-  return Object.fromEntries(entries) as InferSearchOutput<S>;
+  return Object.fromEntries(entries) as SearchOutputOf<S>;
 }
 
 /**
@@ -187,12 +253,22 @@ export function encodeComponent(text: string): string {
  * Only value-form defaults elide — factory defaults are excluded, since a
  * time-varying factory would elide an explicit value that later decodes as
  * a different one.
+ *
+ * A `RawSearch` config (design-04 SS5) branches to a raw pass-through
+ * instead: no serializer exists for a whole-object schema, so the caller's
+ * record goes straight to the byte layer and the schema never runs on encode.
  */
-export function encodeSearch<S extends SearchConfig>(
+export function encodeSearch<S extends SearchSlot>(
   config: S,
-  input: InferSearchInput<S>,
+  input: SearchInputOf<S>,
 ): [string, string][] {
   requireSearchConfig(config);
+  if (isRawSearch(config)) {
+    return encodeRawSearch(input);
+  }
+  // See the matching cast + comment in decodeSearch above.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const searchConfig = config as SearchConfig;
   // The TS contract forbids non-object inputs, but plain-JS callers reach
   // here; a null input must fail loud, not read as every-key-absent.
   const untrusted: unknown = input;
@@ -204,7 +280,7 @@ export function encodeSearch<S extends SearchConfig>(
   const pairs: [string, string][] = [];
   const values = untrusted as Record<string, unknown>;
 
-  for (const [key, codec] of Object.entries(config)) {
+  for (const [key, codec] of Object.entries(searchConfig)) {
     const value = readInputValue(values, key);
 
     // Arity first: array codecs carry runtime ~presence "required", so the
@@ -252,6 +328,19 @@ export function encodeSearch<S extends SearchConfig>(
 }
 
 /**
+ * The whole-object search escape hatch (design-04 SS1, maintainer ruling):
+ * an explicit, greppable wrapper around a bare Standard Schema so a route's
+ * `search:` slot never falls into the degraded raw mode by accident — a
+ * bare `search: schema` could be confused for a codec map, but `rawSearch`
+ * is a conscious act. Per-key defaults/`.catch()` and round-trip encoding
+ * are deliberately unavailable here (SS7); reach for `p.custom` if you need
+ * bidirectional per-key transforms instead.
+ */
+export function rawSearch<S extends StandardSchemaV1>(schema: S): RawSearch<S> {
+  return { "~kind": "raw-search", "~schema": schema };
+}
+
+/**
  * Reads one input property for {@link encodeSearch} (and path.ts's
  * encodeParams — exported for it, not from the package barrel). Not a bare
  * `values[key]` read: keys like "constructor" must not pick up inherited
@@ -284,11 +373,151 @@ export function readInputValue(
 }
 
 /** Convenience: encode + build in one step. */
-export function searchToString<S extends SearchConfig>(
+export function searchToString<S extends SearchSlot>(
   config: S,
-  input: InferSearchInput<S>,
+  input: SearchInputOf<S>,
 ): string {
   return buildSearchString(encodeSearch(config, input));
+}
+
+/**
+ * The `RawSearch` decode path (design-04 SS3/SS4). The schema receives EVERY
+ * source key, normalized to Next's own `searchParams` shape — P8's
+ * declared-keys-only stance doesn't apply to a whole-object schema, which
+ * owns stripping or passing through extras itself. Sync only, per D7 (the
+ * shared runner throws on an async `validate`). A validator that THROWS
+ * (rather than returning issues) is rebranded at this chokepoint — the
+ * shared runner deliberately stays throw-preserving (plan-04 step 1) so this
+ * call site owns the wrap, mirroring how a foreign throw is branded
+ * elsewhere in the package.
+ */
+function decodeRawSearch(
+  config: RawSearch<StandardSchemaV1>,
+  source: SearchSource,
+): unknown {
+  const record = readAllValues(source);
+  const result = rebrandForeign(
+    () => runStandardSchemaSync(config["~schema"], record),
+    (error) =>
+      new ParamourError(
+        `raw-search schema validation threw: ${foreignMessage(error)}`,
+        { cause: error },
+      ),
+  );
+  if (result.issues) {
+    // SS3/SS4: the spec types issue.path as ReadonlyArray<PropertyKey |
+    // PathSegment> where PathSegment is { key }. Valibot emits the object
+    // form (a bare String(seg) would be "[object Object]"); Zod emits [] for
+    // a root-level issue (which joins to "", so the sentinel keys off the
+    // empty join, not just a nullish path).
+    const issues: Issue[] = result.issues.map((issue) => {
+      const key = (issue.path ?? [])
+        .map((seg) => String(typeof seg === "object" ? seg.key : seg))
+        .join(".");
+      return { key: key === "" ? "<search>" : key, message: issue.message };
+    });
+    throw new SearchDecodeError(issues);
+  }
+  return result.value;
+}
+
+/**
+ * The `RawSearch` encode path (design-04 SS5): no serializer exists for a
+ * whole-object schema, so the caller's already-wire-shaped record is pushed
+ * straight to the byte layer — one pair per string value, one repeated pair
+ * per array element — and the schema never runs on encode.
+ */
+function encodeRawSearch(input: unknown): [string, string][] {
+  const untrusted: unknown = input;
+  if (typeof untrusted !== "object" || untrusted === null) {
+    throw new SerializeError(
+      `search input must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+    );
+  }
+  const values = untrusted as Record<string, unknown>;
+  const pairs: [string, string][] = [];
+  for (const key of Object.keys(values)) {
+    const value = readThroughReceiver(values, key);
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const element of value) {
+        pairs.push([key, requireRawSearchString(key, element)]);
+      }
+      continue;
+    }
+    pairs.push([key, requireRawSearchString(key, value)]);
+  }
+  return pairs;
+}
+
+/**
+ * Runtime discriminant for the `search:` slot (design-04 SS2): the reserved
+ * `~kind` marker is unambiguous against a codec map, which never carries a
+ * top-level `~`-prefixed key.
+ */
+function isRawSearch(
+  config: SearchSlot,
+): config is RawSearch<StandardSchemaV1> {
+  return "~kind" in config && config["~kind"] === "raw-search";
+}
+
+/**
+ * Snapshots EVERY source key's wire values, before any user code (the
+ * whole-object schema's `validate`) runs — sibling of
+ * {@link readDeclaredValues} that reads all keys instead of declared-only
+ * ones (SS3: a whole-object schema has no declared keys of its own).
+ * Collapses each key's values by occurrence count (plan-04 point 2): one
+ * value → `string`, multiple → `string[]`, uniformly for both
+ * `URLSearchParams` and Next-record sources, so the schema author writes one
+ * mental model regardless of which source it came from.
+ */
+function readAllValues(
+  source: SearchSource,
+): Record<string, string | string[]> {
+  // The TS contract forbids non-object sources, but plain-JS callers reach
+  // here; fail branded, not with a raw TypeError out of Object.keys.
+  const untrusted: unknown = source;
+  if (typeof untrusted !== "object" || untrusted === null) {
+    throw new ParamourError(
+      `search source must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+    );
+  }
+  const grouped = new Map<string, string[]>();
+  if (source instanceof URLSearchParams) {
+    // Values are validated even though the platform type guarantees strings:
+    // a lying subclass or polyfill must surface loudly, exactly like the
+    // Record branch below.
+    for (const [key, value] of source as Iterable<readonly [string, unknown]>) {
+      if (typeof value !== "string") {
+        throw new ParamourError(
+          `search source values for "${key}" must be strings, got ${typeof value}`,
+        );
+      }
+      const list = grouped.get(key);
+      if (list === undefined) grouped.set(key, [value]);
+      else list.push(value);
+    }
+  } else {
+    for (const key of Object.keys(source)) {
+      const values = readRecordValues(source, key);
+      if (values.length > 0) grouped.set(key, values);
+    }
+  }
+  // Built as entries so keys like "__proto__" become ordinary own properties
+  // of the result (Object.fromEntries uses define, not set, semantics).
+  const entries: [string, string | string[]][] = [];
+  for (const [key, values] of grouped) {
+    // A single value collapses to a scalar, else stays an array. `grouped`
+    // only holds non-empty arrays, so `first` is always defined at length 1;
+    // the check re-narrows for noUncheckedIndexedAccess (the repo bans the
+    // non-null assertion that would otherwise say so), it guards no real case.
+    const [first] = values;
+    entries.push([
+      key,
+      values.length === 1 && first !== undefined ? first : values,
+    ]);
+  }
+  return Object.fromEntries(entries);
 }
 
 /**
@@ -388,13 +617,27 @@ function readThroughReceiver(
 }
 
 /**
+ * Enforces {@link encodeRawSearch}'s wire-value contract (SS5): a raw-search
+ * input is already wire-shaped strings, unlike a codec's serializer, so a
+ * non-string leaf is a caller-contract violation, not something to coerce.
+ */
+function requireRawSearchString(key: string, value: unknown): string {
+  if (typeof value !== "string") {
+    throw new SerializeError(
+      `search param "${key}" expects a string or string[], got ${typeof value}`,
+    );
+  }
+  return value;
+}
+
+/**
  * The TS contract makes a non-object config unrepresentable, but a
  * hand-built route missing `~search` reaches both codecs' entry points via
  * href/parseSearch in plain JS; fail branded — a missing config is a
  * config-contract violation (requireCodec's precedent), never a raw
  * TypeError out of Object.entries/Object.keys.
  */
-function requireSearchConfig(config: SearchConfig): void {
+function requireSearchConfig(config: SearchSlot): void {
   const untrusted: unknown = config;
   if (typeof untrusted !== "object" || untrusted === null) {
     throw new ParamourError(

@@ -38,7 +38,10 @@ export {
   encodeSearch,
   type InferSearchInput,
   type InferSearchOutput,
+  rawSearch,
+  type RawSearch,
   type SearchConfig,
+  type SearchOutputOf,
   type SearchSource,
   searchToString,
 } from "./search.js";
