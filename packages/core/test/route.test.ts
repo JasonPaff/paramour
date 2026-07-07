@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import {
   defineRoute,
+  href,
   p,
   ParamourError,
   ParamsDecodeError,
   ParseError,
+  rawSearch,
   SearchDecodeError,
 } from "../src";
 
@@ -63,7 +66,14 @@ describe("defineRoute define-time validation (RL1/RL2)", () => {
   });
 
   it("rejects malformed bracket tokens", () => {
-    for (const path of ["/user/[id", "/x/[]", "/x/[...]", "/x/a[b]c"]) {
+    for (const path of [
+      "/user/[id",
+      "/x/[]",
+      "/x/[...]",
+      "/x/a[b]c",
+      "/x/[[...]]",
+      "/x/[a[b]]",
+    ]) {
       expect(() => defineRoute(path, {})).toThrow(ParamourError);
       expect(() => defineRoute(path, {})).toThrow(/malformed dynamic segment/);
     }
@@ -229,6 +239,83 @@ describe("route parse methods (RL6)", () => {
       route.safeParseParams({ params: Promise.reject(new Error("nope")) }),
     ).rejects.toThrow(/route props promise rejected/);
   });
+
+  it("safeParseSearch rethrows non-decode errors too", async () => {
+    await expect(
+      route.safeParseSearch({ searchParams: 5 as never }),
+    ).rejects.toThrow(ParamourError);
+  });
+
+  it("the bare-surface methods await promised props (Next 15/16 shape)", async () => {
+    await expect(
+      route.parseParams({ params: Promise.resolve({ id: "42" }) }),
+    ).resolves.toEqual({ id: 42 });
+    await expect(
+      route.parseSearch({ searchParams: Promise.resolve({ q: "hi" }) }),
+    ).resolves.toEqual({ q: "hi" });
+  });
+
+  it("a props promise rejecting with a ParamourError passes through unwrapped", async () => {
+    const branded = new ParamourError("already branded");
+    let caught: unknown;
+    try {
+      await route.parseParams({ params: Promise.reject(branded) });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBe(branded);
+    expect((caught as Error).message).toBe("already branded");
+  });
+});
+
+describe("route methods over a rawSearch config (design-04)", () => {
+  // The full method surface must reach the rawSearch decode branch through
+  // defineRoute's ~search wiring — raw-search.test.ts calls decodeSearch
+  // directly, which would miss a defineRoute wiring regression.
+  const route = defineRoute("/shop/[id]", {
+    params: { id: p.integer() },
+    search: rawSearch(
+      z.object({ page: z.coerce.number().optional(), q: z.string() }),
+    ),
+  });
+
+  it("parse decodes params and the whole-object search half together", async () => {
+    await expect(
+      route.parse({
+        params: { id: "42" },
+        searchParams: { page: "2", q: "hi" },
+      }),
+    ).resolves.toEqual({
+      params: { id: 42 },
+      search: { page: 2, q: "hi" },
+    });
+  });
+
+  it("parseSearch returns the schema's own output", async () => {
+    await expect(
+      route.parseSearch({ searchParams: { q: "hi" } }),
+    ).resolves.toEqual({ q: "hi" });
+  });
+
+  it("safeParseSearch maps schema issues into the error arm", async () => {
+    const result = await route.safeParseSearch({ searchParams: {} });
+    expect(result.data).toBeUndefined();
+    expect(result.error).toBeInstanceOf(SearchDecodeError);
+  });
+
+  it("safeParse surfaces a params failure ahead of the search half", async () => {
+    const result = await route.safeParse({
+      params: { id: "nope" },
+      searchParams: {},
+    });
+    expect(result.error).toBeInstanceOf(ParamsDecodeError);
+  });
+
+  it("href accepts the raw wire record alongside required params", () => {
+    expect(href(route, { params: { id: 42 }, search: { q: "a b" } })).toBe(
+      "/shop/42?q=a%20b",
+    );
+  });
 });
 
 describe("ParamsDecodeError (RL6)", () => {
@@ -243,6 +330,16 @@ describe("ParamsDecodeError (RL6)", () => {
       "Failed to decode route params: [id] expected an integer; [slug] required but missing",
     );
     expect(error.name).toBe("ParamsDecodeError");
+  });
+
+  it("SearchDecodeError's message format is the mirror image", () => {
+    const issues = [{ key: "q", message: "required but missing" }];
+    const error = new SearchDecodeError(issues);
+    expect(error.issues).toBe(issues);
+    expect(error.message).toBe(
+      "Failed to decode search params: [q] required but missing",
+    );
+    expect(error.name).toBe("SearchDecodeError");
   });
 });
 
@@ -284,6 +381,13 @@ describe("instanceof brand hardening (RL6)", () => {
     expect(new ParamourError("x")).not.toBeInstanceOf(ParseError);
   });
 
+  it("primitives and null never match (hasBrand's non-object guard)", () => {
+    expect((5 as unknown) instanceof ParamourError).toBe(false);
+    expect((null as unknown) instanceof ParamourError).toBe(false);
+    expect(("ParamourError" as unknown) instanceof ParseError).toBe(false);
+    expect((undefined as unknown) instanceof SearchDecodeError).toBe(false);
+  });
+
   it("recognizes instances from a second copy of the package", async () => {
     // Simulates the dual-package / duplicated-copy hazard: reset vitest's
     // module registry so the barrel loads twice as distinct class identities
@@ -299,6 +403,10 @@ describe("instanceof brand hardening (RL6)", () => {
       copyA.ParamsDecodeError,
     );
     expect(new copyB.ParseError("x")).toBeInstanceOf(copyA.ParseError);
+    expect(new copyB.SearchDecodeError([])).toBeInstanceOf(
+      copyA.SearchDecodeError,
+    );
+    expect(new copyB.SerializeError("x")).toBeInstanceOf(copyA.SerializeError);
     // Hierarchy stays correct across copies.
     expect(new copyB.ParseError("x")).not.toBeInstanceOf(
       copyA.SearchDecodeError,

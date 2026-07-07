@@ -40,6 +40,26 @@ describe("href assembly (RL4)", () => {
     expect(typeof href(about)).toBe("string");
   });
 
+  it('the root route builds "/" (R6: no trailing-slash games)', () => {
+    const root = defineRoute("/", {});
+    expect(href(root)).toBe("/");
+    expect(href(root, { hash: "top" })).toBe("/#top");
+  });
+
+  it("R6: no href ever gains a trailing slash", () => {
+    const route = defineRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+      search: { q: p.string().optional() },
+    });
+    for (const link of [
+      href(route),
+      href(route, { params: { slug: ["a"] } }),
+      href(route, { params: { slug: ["a"] }, search: { q: "x" } }),
+    ]) {
+      expect(link === "/" || !link.split("?")[0]?.endsWith("/")).toBe(true);
+    }
+  });
+
   it("emits only schema-declared search params (S9)", () => {
     const route = defineRoute("/about", { search: { q: p.string() } });
     expect(href(route, { search: { junk: "x", q: "a" } as never })).toBe(
@@ -78,6 +98,12 @@ describe("hash emission (S10)", () => {
 
   it("the empty string emits no #", () => {
     expect(href(about, { hash: "" })).toBe("/about");
+  });
+
+  it("an explicit undefined emits no # either (plain-JS caller shape)", () => {
+    // exactOptionalPropertyTypes bans this spelling in TS; a JS caller can
+    // still pass it, and it must mean "absent".
+    expect(href(about, { hash: undefined } as never)).toBe("/about");
   });
 
   it("is appended verbatim — no encoding, the caller owns escaping", () => {

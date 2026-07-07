@@ -134,6 +134,55 @@ describe("encodeParams / buildPath (RL5)", () => {
     expect(() => buildPath(route, { id: "1" })).toThrow(/declares no codec/);
     expect(() => decodeParams(route, { id: "1" })).toThrow(/declares no codec/);
   });
+
+  it("the root route builds /", () => {
+    const root = defineRoute("/", {});
+    expect(buildPath(root, {})).toBe("/");
+    expect(encodeParams(root, {})).toEqual([]);
+  });
+
+  it("a static route ignores junk input keys", () => {
+    const route = defineRoute("/about", {});
+    expect(buildPath(route, { junk: 1 } as never)).toBe("/about");
+  });
+
+  it("an optional catch-all given a non-array non-undefined is a SerializeError", () => {
+    const route = defineRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+    });
+    expect(() => buildPath(route, { slug: "a" } as never)).toThrow(
+      /expects an array/,
+    );
+  });
+
+  it("class instances exposing params via prototype getters encode (readInputValue parity with search)", () => {
+    const route = defineRoute("/product/[id]", {
+      params: { id: p.integer() },
+    });
+    // A literal getter, not a readonly field: a value living on the class
+    // PROTOTYPE (not as an own property) is exactly what this test pins.
+    /* eslint-disable @typescript-eslint/class-literal-property-style */
+    class Params {
+      get id() {
+        return 42;
+      }
+    }
+    /* eslint-enable @typescript-eslint/class-literal-property-style */
+    expect(buildPath(route, new Params())).toBe("/product/42");
+  });
+
+  it("a throwing prototype getter on a params input is a SerializeError", () => {
+    const route = defineRoute("/product/[id]", {
+      params: { id: p.integer() },
+    });
+    class Boom {
+      get id(): number {
+        throw new RangeError("store not hydrated");
+      }
+    }
+    expect(() => buildPath(route, new Boom())).toThrow(SerializeError);
+    expect(() => buildPath(route, new Boom())).toThrow("store not hydrated");
+  });
 });
 
 describe("decodeParams (RL7)", () => {
@@ -278,5 +327,53 @@ describe("decodeParams (RL7)", () => {
   it("a missing codec for a dynamic segment is a loud ParamourError", () => {
     const route = defineRoute("/x/[id]", {} as never);
     expect(() => decodeParams(route, { id: "1" })).toThrow(/declares no codec/);
+  });
+
+  it("an optional catch-all PRESENT as [] decodes to [] (twin of the absent case)", () => {
+    const route = defineRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+    });
+    expect(decodeParams(route, { slug: [] })).toEqual({ slug: [] });
+  });
+
+  it("a [__proto__] segment decodes to an own property (pollution defense parity with search)", () => {
+    const route = defineRoute("/x/[__proto__]", {
+      params: { ["__proto__"]: p.string() },
+    });
+    const source = JSON.parse('{"__proto__":"v"}') as Record<string, string>;
+    const result = decodeParams(route, source) as Record<string, unknown>;
+    expect(Object.hasOwn(result, "__proto__")).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(result, "__proto__")?.value).toBe(
+      "v",
+    );
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+  });
+
+  it("a non-ParseError ParamourError from a segment codec stays loud through .catch()", () => {
+    const codec = p
+      .custom<string>({
+        parse() {
+          throw new SerializeError("config-side failure");
+        },
+        serialize: (value) => value,
+      })
+      .catch("fb");
+    const route = defineRoute("/x/[id]", { params: { id: codec } });
+    expect(() => decodeParams(route, { id: "v" })).toThrow(SerializeError);
+    expect(() => decodeParams(route, { id: "v" })).toThrow(
+      "config-side failure",
+    );
+  });
+
+  it("impure catch-all index getters cannot smuggle junk past validation (copy-first parity with search)", () => {
+    const route = defineRoute("/files/[...seg]", {
+      params: { seg: p.string() },
+    });
+    let reads = 0;
+    const tampered: string[] = [];
+    Object.defineProperty(tampered, "0", {
+      get: (): number | string => (reads++ === 0 ? "x" : 42),
+    });
+    expect(decodeParams(route, { seg: tampered })).toEqual({ seg: ["x"] });
   });
 });

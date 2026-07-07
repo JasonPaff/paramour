@@ -35,6 +35,32 @@ describe("p.integer", () => {
     expect(() => serialize(p.integer(), 1.5)).toThrow(SerializeError);
     expect(() => serialize(p.integer(), Number.NaN)).toThrow(SerializeError);
   });
+
+  it("rejects non-numbers at serialize time (no string coercion)", () => {
+    expect(() => serialize(p.integer(), "5")).toThrow(SerializeError);
+    expect(() => serialize(p.integer(), null)).toThrow(SerializeError);
+  });
+
+  it("accepts leading zeros and -0 on parse (grammar latitude, §4)", () => {
+    expect(parse(p.integer(), "007")).toBe(7);
+    expect(Object.is(parse(p.integer(), "-0"), -0)).toBe(true);
+  });
+
+  it("a normalizing schema whose output is not a safe integer fails serialize", () => {
+    // StandardSchemaV1<number, number> by type, but returns a non-integer —
+    // the post-refinement safe-integer check must still fire (N9).
+    const halving: StandardSchemaV1<number, number> = {
+      "~standard": {
+        validate: (value) => ({ value: (value as number) / 2 }),
+        vendor: "test",
+        version: 1,
+      },
+    };
+    expect(() => serialize(p.integer(halving), 3)).toThrow(SerializeError);
+    expect(() => serialize(p.integer(halving), 3)).toThrow(
+      /is not a safe integer/,
+    );
+  });
 });
 
 describe("p.number", () => {
@@ -64,6 +90,20 @@ describe("p.number", () => {
 
   it("canonicalizes -0 to 0", () => {
     expect(serialize(p.number(), -0)).toBe("0");
+  });
+
+  it("rejects grammar-valid text that overflows to Infinity", () => {
+    // Passes NUMBER_RE but Number() yields ±Infinity — the post-regex
+    // finiteness branch, distinct from the grammar rejection.
+    for (const raw of ["1e400", "-1e309"]) {
+      expect(() => parse(p.number(), raw)).toThrow(ParseError);
+      expect(() => parse(p.number(), raw)).toThrow(/not a finite number/);
+    }
+  });
+
+  it("accepts trailing zeros and leading zeros on parse (grammar latitude, §4)", () => {
+    expect(parse(p.number(), "1.50")).toBe(1.5);
+    expect(parse(p.number(), "007")).toBe(7);
   });
 });
 
@@ -126,6 +166,22 @@ describe("p.isoDate", () => {
     negative.setUTCFullYear(-1);
     expect(() => serialize(p.isoDate(), negative)).toThrow(SerializeError);
   });
+
+  it("accepts real leap days", () => {
+    const date = parse(p.isoDate(), "2024-02-29") as Date;
+    expect(date.toISOString()).toBe("2024-02-29T00:00:00.000Z");
+    expect(serialize(p.isoDate(), date)).toBe("2024-02-29");
+  });
+
+  it("rejects invalid Dates and non-Dates at serialize time", () => {
+    expect(() => serialize(p.isoDate(), new Date(Number.NaN))).toThrow(
+      SerializeError,
+    );
+    expect(() => serialize(p.isoDate(), new Date(Number.NaN))).toThrow(
+      /Expected a valid Date/,
+    );
+    expect(() => serialize(p.isoDate(), "2026-01-01")).toThrow(SerializeError);
+  });
 });
 
 describe("p.timestamp", () => {
@@ -168,6 +224,33 @@ describe("p.timestamp", () => {
 
   it("rejects Dates outside years 0000-9999 at serialize time", () => {
     expect(() => serialize(p.timestamp(), new Date(8.64e15))).toThrow(
+      SerializeError,
+    );
+    const negative = new Date(Date.UTC(2000, 0, 1));
+    negative.setUTCFullYear(-1);
+    expect(() => serialize(p.timestamp(), negative)).toThrow(SerializeError);
+  });
+
+  it("accepts 1- and 2-digit milliseconds, right-padded (canonicalization latitude)", () => {
+    expect(
+      (parse(p.timestamp(), "2026-07-04T12:34:56.5Z") as Date).getTime(),
+    ).toBe(Date.UTC(2026, 6, 4, 12, 34, 56, 500));
+    expect(
+      (parse(p.timestamp(), "2026-07-04T12:34:56.55Z") as Date).getTime(),
+    ).toBe(Date.UTC(2026, 6, 4, 12, 34, 56, 550));
+  });
+
+  it("rejects a lowercase z designator (strict grammar)", () => {
+    expect(() => parse(p.timestamp(), "2026-07-04T12:34:56z")).toThrow(
+      ParseError,
+    );
+  });
+
+  it("rejects invalid Dates and non-Dates at serialize time", () => {
+    expect(() => serialize(p.timestamp(), new Date(Number.NaN))).toThrow(
+      SerializeError,
+    );
+    expect(() => serialize(p.timestamp(), 1720000000000)).toThrow(
       SerializeError,
     );
   });
@@ -214,6 +297,28 @@ describe("p.json", () => {
     circular.self = circular;
     expect(() => serialize(p.json(z.any()), circular)).toThrow(SerializeError);
   });
+
+  it("a schema output JSON.stringify maps to undefined is a SerializeError", () => {
+    // lib.d.ts types stringify as always-string; undefined input is the
+    // documented exception the explicit branch guards.
+    expect(() => serialize(p.json(z.any()), undefined)).toThrow(SerializeError);
+    expect(() => serialize(p.json(z.any()), undefined)).toThrow(
+      /not JSON-serializable/,
+    );
+  });
+
+  it("BigInt values are a SerializeError, not a raw TypeError", () => {
+    expect(() => serialize(p.json(z.any()), 1n)).toThrow(SerializeError);
+  });
+
+  it("a throwing toJSON() is a SerializeError, not a raw foreign error", () => {
+    const value = {
+      toJSON(): never {
+        throw new RangeError("boom");
+      },
+    };
+    expect(() => serialize(p.json(z.any()), value)).toThrow(SerializeError);
+  });
 });
 
 describe("Standard Schema refinements", () => {
@@ -242,6 +347,24 @@ describe("Standard Schema refinements", () => {
   it("emits the schema's normalized value at serialize time", () => {
     const trimmed = p.string(z.string().trim());
     expect(serialize(trimmed, " a ")).toBe("a");
+  });
+
+  it("joins multiple schema issues into one message", () => {
+    const twoIssues: StandardSchemaV1<string, string> = {
+      "~standard": {
+        validate: () => ({
+          issues: [{ message: "too short" }, { message: "wrong shape" }],
+        }),
+        vendor: "test",
+        version: 1,
+      },
+    };
+    expect(() => parse(p.string(twoIssues), "x")).toThrow(
+      "too short; wrong shape",
+    );
+    expect(() => serialize(p.string(twoIssues), "x")).toThrow(
+      "too short; wrong shape",
+    );
   });
 
   it("throws a clear error for async schemas", () => {
@@ -281,6 +404,25 @@ describe("p.custom", () => {
     expect(() => parse(codec, "x")).toThrow(ParseError);
     expect(() => parse(codec, "x")).toThrow("bad");
   });
+
+  it("wraps non-Error primitive throws, preserving their text", () => {
+    const codec = p.custom<string>({
+      parse() {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- a plain-JS throw is the point
+        throw "oops";
+      },
+      serialize: (value) => value,
+    });
+    expect(() => parse(codec, "x")).toThrow(ParseError);
+    expect(() => parse(codec, "x")).toThrow("oops");
+  });
+});
+
+describe("p.string serialize contract", () => {
+  it("rejects non-strings at serialize time", () => {
+    expect(() => serialize(p.string(), 5)).toThrow(SerializeError);
+    expect(() => serialize(p.string(), 5)).toThrow(/Expected a string/);
+  });
 });
 
 describe("modifier runtime guards (JS consumers)", () => {
@@ -318,5 +460,29 @@ describe("modifier runtime guards (JS consumers)", () => {
   it("~caught reflects catch state at runtime", () => {
     expect(p.integer()["~caught"]).toBe(false);
     expect(p.integer().catch(0)["~caught"]).toBe(true);
+  });
+
+  it("rejects a second .default() and .optional() after .default()", () => {
+    const defaulted = p.integer().default(1) as unknown as {
+      default: (value: number) => unknown;
+      optional: () => unknown;
+    };
+    expect(() => defaulted.default(2)).toThrow(ParamourError);
+    expect(() => defaulted.default(2)).toThrow(/after \.default\(\)/);
+    expect(() => defaulted.optional()).toThrow(ParamourError);
+    expect(() => defaulted.optional()).toThrow(/after \.default\(\)/);
+  });
+
+  it("a codec-invalid (not schema-invalid) value default fails at .default() time", () => {
+    // 1.5 fails p.integer's own serialize contract with no schema involved —
+    // the eager-validation twin of the schema-invalid conformance case.
+    expect(() => p.integer().default(1.5)).toThrow(SerializeError);
+    expect(() => p.integer().default(1.5)).toThrow(/not a safe integer/);
+  });
+
+  it(".catch() then .optional() composes both behaviors", () => {
+    const codec = p.integer().catch(0).optional();
+    expect(codec["~presence"]).toBe("optional");
+    expect(codec["~caught"]).toBe(true);
   });
 });

@@ -10,10 +10,12 @@ import { z } from "zod";
 import {
   decodeSearch,
   defineRoute,
+  encodeSearch,
   href,
   ParamourError,
   rawSearch,
   SearchDecodeError,
+  SerializeError,
 } from "../src";
 
 /** Never fails; echoes back whatever record it's handed. */
@@ -193,6 +195,77 @@ describe("rawSearch decode (design-04 SS3/SS4)", () => {
     expect(output.__proto__).toBe("x");
     expect(Object.getPrototypeOf(output)).toBe(Object.prototype);
   });
+
+  it("numeric PathSegments join like string ones (items.0)", () => {
+    const schema: StandardSchemaV1<unknown, never> = {
+      "~standard": {
+        validate: () => ({
+          issues: [{ message: "not a number", path: ["items", 0] }],
+        }),
+        vendor: "test",
+        version: 1,
+      },
+    };
+    try {
+      decodeSearch(rawSearch(schema), {});
+      expect.unreachable();
+    } catch (error) {
+      expect((error as SearchDecodeError).issues).toEqual([
+        { key: "items.0", message: "not a number" },
+      ]);
+    }
+  });
+
+  it("a non-object source fails branded on the rawSearch path too", () => {
+    expect(() => decodeSearch(rawSearch(echoSchema()), null as never)).toThrow(
+      ParamourError,
+    );
+    expect(() => decodeSearch(rawSearch(echoSchema()), null as never)).toThrow(
+      /search source must be an object/,
+    );
+  });
+
+  it("a lying URLSearchParams subclass is a loud ParamourError on the rawSearch path", () => {
+    const lying = new URLSearchParams("q=x");
+    Object.defineProperty(lying, Symbol.iterator, {
+      value: function* (): Generator<readonly [string, undefined]> {
+        yield ["q", undefined];
+      },
+    });
+    expect(() => decodeSearch(rawSearch(echoSchema()), lying)).toThrow(
+      /must be strings/,
+    );
+  });
+
+  it("non-string record values under any key fail loud before the schema runs", () => {
+    let validateCalls = 0;
+    const counting: StandardSchemaV1<unknown, unknown> = {
+      "~standard": {
+        validate: (value) => {
+          validateCalls++;
+          return { value };
+        },
+        vendor: "test",
+        version: 1,
+      },
+    };
+    expect(() =>
+      decodeSearch(rawSearch(counting), { q: 5 } as unknown as Record<
+        string,
+        string
+      >),
+    ).toThrow(ParamourError);
+    expect(validateCalls).toBe(0);
+  });
+
+  it("an explicit-undefined record value is absent from the schema input", () => {
+    const output = decodeSearch(rawSearch(echoSchema()), {
+      gone: undefined,
+      q: "hi",
+    });
+    expect(output).toEqual({ q: "hi" });
+    expect(Object.hasOwn(output, "gone")).toBe(false);
+  });
 });
 
 describe("rawSearch encode / href (design-04 SS5)", () => {
@@ -224,5 +297,67 @@ describe("rawSearch encode / href (design-04 SS5)", () => {
     // like the schema's parsed output (e.g. a coerced number) is required.
     const link = href(route, { search: { q: "hi" } });
     expect(link).toBe("/search?q=hi");
+  });
+
+  it("a non-string leaf is a SerializeError, not coerced (SS5 wire-value contract)", () => {
+    const config = rawSearch(echoSchema());
+    expect(() =>
+      encodeSearch(config, { page: 1 } as unknown as Record<string, string>),
+    ).toThrow(SerializeError);
+    expect(() =>
+      encodeSearch(config, { page: 1 } as unknown as Record<string, string>),
+    ).toThrow(/expects a string or string\[\]/);
+    expect(() =>
+      encodeSearch(config, { tag: ["a", 2] } as unknown as Record<
+        string,
+        string[]
+      >),
+    ).toThrow(SerializeError);
+  });
+
+  it("an empty array and explicit undefined emit nothing", () => {
+    const config = rawSearch(echoSchema());
+    expect(encodeSearch(config, { q: "hi", tag: [] })).toEqual([["q", "hi"]]);
+    expect(
+      encodeSearch(config, { gone: undefined, q: "hi" } as unknown as Record<
+        string,
+        string
+      >),
+    ).toEqual([["q", "hi"]]);
+  });
+
+  it("a non-object encode input fails loud, not as all-absent", () => {
+    const config = rawSearch(echoSchema());
+    expect(() =>
+      encodeSearch(config, null as unknown as Record<string, string>),
+    ).toThrow(SerializeError);
+    expect(() =>
+      encodeSearch(config, null as unknown as Record<string, string>),
+    ).toThrow(/must be an object/);
+  });
+
+  it("a throwing input getter is branded, not a raw foreign error", () => {
+    const input = Object.defineProperty({}, "q", {
+      enumerable: true,
+      get(): string {
+        throw new RangeError("store not hydrated");
+      },
+    }) as Record<string, string>;
+    expect(() => encodeSearch(rawSearch(echoSchema()), input)).toThrow(
+      SerializeError,
+    );
+    expect(() => encodeSearch(rawSearch(echoSchema()), input)).toThrow(
+      "store not hydrated",
+    );
+  });
+
+  it("a __proto__ input key encodes (own-key read, no prototype walk)", () => {
+    const input = JSON.parse('{"__proto__":"x","q":"hi"}') as Record<
+      string,
+      string
+    >;
+    const pairs = encodeSearch(rawSearch(echoSchema()), input);
+    expect(pairs).toContainEqual(["__proto__", "x"]);
+    expect(pairs).toContainEqual(["q", "hi"]);
   });
 });

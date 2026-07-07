@@ -6,7 +6,12 @@ import { expect, test } from "tstyche";
 import { z } from "zod";
 
 import { p } from "../src";
-import type { InferSearchInput, InferSearchOutput } from "../src";
+import type {
+  InferSearchInput,
+  InferSearchOutput,
+  OutputOf,
+  PresenceOf,
+} from "../src";
 
 test("base builders carry their output types", () => {
   expect(p.string()["~out"]).type.toBe<string>();
@@ -40,6 +45,33 @@ test("illegal chains are not callable", () => {
   expect(p.string().default("a").optional).type.toBe<never>();
   expect(p.integer().catch(0).catch).type.toBe<never>();
   expect(p.string().optional().optional).type.toBe<never>();
+  expect(p.integer().default(1).default).type.toBe<never>();
+  expect(p.integer().catch(0).default(1).catch).type.toBe<never>();
+});
+
+test("schema slots are constrained to the codec's wire type", () => {
+  // p.integer/p.number take StandardSchemaV1<number, number>; p.string takes
+  // StandardSchemaV1<string, string>. A mismatched vendor schema must fail
+  // on the argument, not silently widen the codec.
+  expect(p.integer).type.not.toBeCallableWith(z.string());
+  expect(p.number).type.not.toBeCallableWith(z.string());
+  expect(p.string).type.not.toBeCallableWith(z.number());
+  expect(p.integer).type.toBeCallableWith(z.number().min(1));
+  expect(p.string).type.toBeCallableWith(z.string().min(1));
+});
+
+test("p.custom infers Out from a matched parse/serialize pair", () => {
+  const codec = p.custom({
+    parse: (raw) => BigInt(raw),
+    serialize: (value: bigint) => value.toString(),
+  });
+  expect(codec["~out"]).type.toBe<bigint>();
+});
+
+test("exported utility types resolve against built codecs", () => {
+  const codec = p.integer().default(1);
+  expect<OutputOf<typeof codec>>().type.toBe<number>();
+  expect<PresenceOf<typeof codec>>().type.toBe<"defaulted">();
 });
 
 test("array codecs reject presence modifiers; catch stays legal", () => {
@@ -92,6 +124,21 @@ test("search input side: defaulted and optional keys may be omitted", () => {
     InferSearchInput<typeof config>
   >();
   expect<{ page: number }>().type.not.toBeAssignableTo<
+    InferSearchInput<typeof config>
+  >();
+});
+
+test("search input side: explicit undefined is banned under exactOptionalPropertyTypes", () => {
+  const config = {
+    page: p.integer().default(1),
+    q: p.string(),
+    sort: p.enum(["price", "rating"]).optional(),
+  };
+  // Omission is the only spelling of absence — `?:` without `| undefined`.
+  expect<{ page: undefined; q: string }>().type.not.toBeAssignableTo<
+    InferSearchInput<typeof config>
+  >();
+  expect<{ q: string; sort: undefined }>().type.not.toBeAssignableTo<
     InferSearchInput<typeof config>
   >();
 });

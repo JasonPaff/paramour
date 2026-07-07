@@ -158,6 +158,38 @@ describe("byte-layer serialization", () => {
   it("S3: only the empty string emits key=", () => {
     expect(searchToString({ q: p.string() }, { q: "" })).toBe("?q=");
   });
+
+  it("S4: the bare-key form is never emitted — an empty value still gets its =", () => {
+    expect(buildSearchString([["flag", ""]])).toBe("?flag=");
+  });
+
+  it("S2: keys are encoded too, not just values", () => {
+    expect(buildSearchString([["a b", "c"]])).toBe("?a%20b=c");
+  });
+
+  it("S7: a lone surrogate in a KEY is a serialization error", () => {
+    expect(() => buildSearchString([["\uD800", "x"]])).toThrow(SerializeError);
+  });
+
+  it("S8: no unicode normalization — NFC and NFD are distinct values that round-trip distinctly", () => {
+    const nfc = "\u00e9"; // e-acute as one code point
+    const nfd = "e\u0301"; // e + combining acute
+    const nfcWire = searchToString({ q: p.string() }, { q: nfc });
+    const nfdWire = searchToString({ q: p.string() }, { q: nfd });
+    expect(nfcWire).not.toBe(nfdWire);
+    expect(
+      decodeSearch({ q: p.string() }, new URLSearchParams(nfcWire.slice(1))),
+    ).toEqual({ q: nfc });
+    expect(
+      decodeSearch({ q: p.string() }, new URLSearchParams(nfdWire.slice(1))),
+    ).toEqual({ q: nfd });
+  });
+
+  it("P9: semicolons are not separators — a=1;b=2 is one pair", () => {
+    expect(
+      decodeSearch({ a: p.string() }, new URLSearchParams("a=1;b=2")),
+    ).toEqual({ a: "1;b=2" });
+  });
 });
 
 describe("route param segments", () => {
@@ -336,6 +368,51 @@ describe("decode-side hygiene", () => {
     expect(() =>
       encodeSearch({ q: p.string() }, {} as unknown as { q: string }),
     ).toThrow(SerializeError);
+  });
+
+  it("D2: .catch() never recovers ABSENCE — a missing required search param stays an error", () => {
+    // The search-side twin of path.test.ts's required-missing pin: catch
+    // recovers parse failures only, absence is presence's job.
+    expect(() => decodeSearch({ q: p.string().catch("fb") }, {})).toThrow(
+      SearchDecodeError,
+    );
+    expect(() => decodeSearch({ q: p.string().catch("fb") }, {})).toThrow(
+      /required search param is missing/,
+    );
+  });
+
+  it("an explicit undefined under a declared key decodes as absent (Next's real record shape)", () => {
+    expect(() => decodeSearch({ q: p.string() }, { q: undefined })).toThrow(
+      /required search param is missing/,
+    );
+    expect(
+      decodeSearch({ q: p.string().default("d") }, { q: undefined }),
+    ).toEqual({ q: "d" });
+    expect(decodeSearch({ tag: p.stringArray() }, { tag: undefined })).toEqual({
+      tag: [],
+    });
+  });
+
+  it("an explicit undefined encode input for an optional key is omitted, never the text 'undefined'", () => {
+    const config = { q: p.string().optional() };
+    expect(
+      encodeSearch(config, {
+        q: undefined,
+      } as unknown as InferSearchInput<typeof config>),
+    ).toEqual([]);
+  });
+
+  it("a failing array ELEMENT at encode time is a SerializeError", () => {
+    expect(() =>
+      encodeSearch({ tag: p.stringArray() }, {
+        tag: ["a", 5],
+      } as unknown as { tag: string[] }),
+    ).toThrow(SerializeError);
+    expect(() =>
+      encodeSearch({ tag: p.stringArray() }, {
+        tag: ["a", 5],
+      } as unknown as { tag: string[] }),
+    ).toThrow(/Expected an array of strings/);
   });
 });
 
@@ -620,6 +697,17 @@ describe("prototype-chain hygiene", () => {
     );
     expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
   });
+
+  it("a __proto__ config key encodes from an own input property", () => {
+    const config = { ["__proto__"]: p.string() };
+    // JSON.parse is the one honest way to build an object whose OWN
+    // "__proto__" key holds a value (an object literal would set the
+    // prototype instead).
+    const input = JSON.parse('{"__proto__":"x"}') as InferSearchInput<
+      typeof config
+    >;
+    expect(encodeSearch(config, input)).toEqual([["__proto__", "x"]]);
+  });
 });
 
 describe("output-shape invariants (D4)", () => {
@@ -695,6 +783,58 @@ describe("default and catch value isolation", () => {
     expect(() => decodeSearch(config, { page: "x" })).toThrow(
       /\.catch\(\) factory threw/,
     );
+  });
+
+  it("a .catch() factory throwing a non-ParseError ParamourError propagates unwrapped", () => {
+    // toThunk's pass-through arm: config-side paramour errors stay loud
+    // as themselves, never re-wrapped as ".catch() factory threw".
+    const config = {
+      page: p.integer().catch((): number => {
+        throw new SerializeError("config-side failure");
+      }),
+    };
+    let caught: unknown;
+    try {
+      decodeSearch(config, { page: "x" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SerializeError);
+    expect((caught as Error).message).toBe("config-side failure");
+  });
+
+  it("a whole-array .catch() recovers a failing arity-many parse (contrast: element-wise in params)", () => {
+    // No public builder makes a throwing arity-many codec; a structural
+    // codec (the exported Codec interface permits it) exercises the many
+    // branch of decodeSearch's shared recovery.
+    const manyCaught = {
+      "~arity": "many",
+      "~catchValue": () => ["fallback"],
+      "~caught": true,
+      "~defaultElides": false,
+      "~defaultValue": undefined,
+      "~parseElement": (raw: string) => {
+        if (raw === "boom") throw new ParseError("bad element");
+        return raw;
+      },
+      "~presence": "required",
+      "~serializeElement": (value: unknown) => String(value),
+    } as unknown as Codec<string[], "required", true, "many">;
+    expect(
+      decodeSearch(
+        { tag: manyCaught },
+        new URLSearchParams("tag=a&tag=boom&tag=c"),
+      ),
+    ).toEqual({ tag: ["fallback"] });
+    // Without the catch value, the whole key is one aggregated issue.
+    const manyBare = {
+      ...manyCaught,
+      "~catchValue": undefined,
+      "~caught": false,
+    } as unknown as Codec<string[], "required", false, "many">;
+    expect(() =>
+      decodeSearch({ tag: manyBare }, new URLSearchParams("tag=boom")),
+    ).toThrow(SearchDecodeError);
   });
 
   it("a .catch() factory throwing ParseError is branded as a config-side failure, not passed through raw", () => {

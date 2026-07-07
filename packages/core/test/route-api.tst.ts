@@ -178,6 +178,26 @@ test("rawSearch: a non-Standard-Schema argument is a compile error", () => {
   expect(rawSearch).type.not.toBeCallableWith("nope");
 });
 
+test("rawSearch composes with required params (all prior coverage is static-path)", () => {
+  const route = defineRoute("/shop/[id]", {
+    params: { id: p.integer() },
+    search: rawSearch(z.object({ q: z.string() })),
+  });
+  // Both halves keep their own contract: typed params, raw wire search.
+  expect(href).type.toBeCallableWith(route, {
+    params: { id: 1 },
+    search: { q: "x" },
+  });
+  expect(href).type.not.toBeCallableWith(route, { search: { q: "x" } });
+  expect(href).type.not.toBeCallableWith(route, {
+    params: { id: "1" },
+    search: { q: "x" },
+  });
+  expect(route.parse({})).type.toBe<
+    Promise<{ params: { id: number }; search: { q: string } }>
+  >();
+});
+
 test("malformed bracket tokens fall through as static text (RL3)", () => {
   // No type-level path linting: these are static paths to the type layer
   // (tokenizePath rejects them at runtime), so an empty config typechecks.

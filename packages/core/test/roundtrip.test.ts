@@ -7,6 +7,7 @@
  */
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   buildPath,
@@ -164,6 +165,94 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
         expect(decodeParams(route, source)).toStrictEqual({ slug: values });
       }),
     );
+  });
+});
+
+describe("dual property (§6): serialize ∘ parse ≅ id on canonical wire", () => {
+  const parseWire = (codec: Codec<unknown>, raw: string): unknown =>
+    codec["~parseElement"](raw);
+  const serializeValue = (codec: Codec<unknown>, value: unknown): string =>
+    codec["~serializeElement"](value);
+  const reserialize = (codec: Codec<unknown>, raw: string): string =>
+    serializeValue(codec, parseWire(codec, raw));
+
+  it("canonical wire strings survive parse-then-serialize byte-identically", () => {
+    const cases: [Codec<unknown>, string[]][] = [
+      [p.string() as Codec<unknown>, ["", "hello", "a b", "é", "1e3"]],
+      [
+        p.integer() as Codec<unknown>,
+        ["0", "2", "-17", "9007199254740991", "-9007199254740991"],
+      ],
+      [
+        p.number() as Codec<unknown>,
+        ["0", "1.5", "-2.25", "1e+21", "0.30000000000000004", "1e-7"],
+      ],
+      [p.boolean() as Codec<unknown>, ["true", "false"]],
+      [p.enum(["price", "rating"]) as Codec<unknown>, ["price", "rating"]],
+      [
+        p.isoDate() as Codec<unknown>,
+        ["2026-07-04", "0050-01-01", "2024-02-29", "9999-12-31"],
+      ],
+      [
+        p.timestamp() as Codec<unknown>,
+        ["2026-07-04T12:34:56.789Z", "0001-01-01T00:00:00.000Z"],
+      ],
+      [
+        p.json(z.object({ a: z.number() })) as Codec<unknown>,
+        ['{"a":1}', '{"a":0.5}'],
+      ],
+    ];
+    for (const [codec, wires] of cases) {
+      for (const wire of wires) {
+        expect(reserialize(codec, wire)).toBe(wire);
+      }
+    }
+  });
+
+  it("fc: every canonical number/integer wire is a fixed point", () => {
+    fc.assert(
+      fc.property(fc.double({ noDefaultInfinity: true, noNaN: true }), (n) => {
+        const wire = String(n === 0 ? 0 : n);
+        expect(reserialize(p.number() as Codec<unknown>, wire)).toBe(wire);
+      }),
+    );
+    fc.assert(
+      fc.property(integerArb, (n) => {
+        const wire = String(n === 0 ? 0 : n);
+        expect(reserialize(p.integer() as Codec<unknown>, wire)).toBe(wire);
+      }),
+    );
+  });
+
+  it("non-canonical accepted inputs re-serialize to canonical form (normalizer, never error amplifier)", () => {
+    const cases: [Codec<unknown>, string, string][] = [
+      [p.integer() as Codec<unknown>, "007", "7"],
+      [p.integer() as Codec<unknown>, "-0", "0"],
+      [p.number() as Codec<unknown>, "2E3", "2000"],
+      [p.number() as Codec<unknown>, "1.50", "1.5"],
+      [p.number() as Codec<unknown>, "1e21", "1e+21"],
+      [p.number() as Codec<unknown>, "-0", "0"],
+      [
+        p.timestamp() as Codec<unknown>,
+        "2026-07-04T12:34:56Z",
+        "2026-07-04T12:34:56.000Z",
+      ],
+      [
+        p.timestamp() as Codec<unknown>,
+        "2026-07-04T12:34:56.5Z",
+        "2026-07-04T12:34:56.500Z",
+      ],
+      [
+        p.json(z.object({ a: z.number() })) as Codec<unknown>,
+        '{ "a" : 1 }',
+        '{"a":1}',
+      ],
+    ];
+    for (const [codec, accepted, canonical] of cases) {
+      expect(reserialize(codec, accepted)).toBe(canonical);
+      // The canonical form is a fixed point of a second pass.
+      expect(reserialize(codec, canonical)).toBe(canonical);
+    }
   });
 });
 
