@@ -6,12 +6,12 @@ import {
   decodeParams,
   decodeSearch,
   type InferRouteParams,
+  safeDecodeParams,
+  safeDecodeSearch,
   type SafeResult,
   type SearchOutputOf,
 } from "paramour";
 import { useMemo } from "react";
-
-import { safeDecodeParams, safeDecodeSearch } from "./safe-decode.js";
 
 /**
  * Client hooks (DESIGN §9). Each is a `useMemo` over Next's `useSearchParams()`

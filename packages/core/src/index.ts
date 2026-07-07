@@ -18,7 +18,12 @@ export {
 } from "./errors.js";
 export { href, type Href, type HrefArgs, type InferHrefInput } from "./href.js";
 export { p } from "./p.js";
-export { buildPath, decodeParams, encodeParams } from "./path.js";
+export {
+  buildPath,
+  decodeParams,
+  encodeParams,
+  type ParamsSource,
+} from "./path.js";
 export {
   type AnyRoute,
   defineRoute,
@@ -32,6 +37,7 @@ export {
   type SafeResult,
   type SearchProps,
 } from "./route.js";
+export { safeDecodeParams, safeDecodeSearch } from "./safe-decode.js";
 export {
   buildSearchString,
   decodeSearch,
