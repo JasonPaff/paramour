@@ -38,8 +38,11 @@ function expectSerializableDate(value: unknown): Date {
   return value;
 }
 
+// Array.from, not .map: the issues array belongs to the validator and may be
+// an Array subclass whose Symbol.species constructor mangles a mapped result
+// (see the note in search.ts's decodeRawSearch).
 function joinIssues(issues: readonly StandardSchemaV1.Issue[]): string {
-  return issues.map((issue) => issue.message).join("; ");
+  return Array.from(issues, (issue) => issue.message).join("; ");
 }
 
 function parseIntegerElement(raw: string): number {
