@@ -20,7 +20,12 @@ export default async function ProductPage(props: RouteProps) {
   return (
     <main>
       <h1>Product #{params.id}</h1>
-      <dl>
+      <p className="lede">
+        Decoded on the server with <code>route.parse(props)</code>. Every value
+        below is its real in-memory type, not a raw string.
+      </p>
+      <p className="eyebrow">Decoded on the server</p>
+      <dl className="kv">
         <dt>
           <code>params.id</code>
         </dt>
@@ -39,7 +44,9 @@ export default async function ProductPage(props: RouteProps) {
       <ParamsPanel />
       <section id="reviews">
         <h2>Reviews</h2>
-        <p>The #reviews hash on the home page link lands here.</p>
+        <p className="lede">
+          The #reviews hash on the home page link lands here.
+        </p>
       </section>
     </main>
   );

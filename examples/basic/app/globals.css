@@ -1,0 +1,367 @@
+/*
+ * One stylesheet for the whole example. Semantic class names only, so the .tsx
+ * files stay readable as paramour documentation rather than as markup.
+ *
+ * Anything that is wire format (a path, a query key) is monospace; the decoded,
+ * in-memory values sit beside it in a key/value grid.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --accent: #5b5bd6;
+  --accent-soft: rgb(91 91 214 / 10%);
+  --bg: #fbfbfd;
+  --danger: #c5303a;
+  --danger-soft: rgb(197 48 58 / 8%);
+  --fg: #16161d;
+  --line: #e6e6ec;
+  --line-strong: #d2d2dc;
+  --mono:
+    ui-monospace, "SF Mono", sfmono-regular, "Cascadia Code", menlo, monospace;
+  --muted: #6c6c80;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --surface: #fff;
+  --surface-2: #f4f4f7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #9b9bf7;
+    --accent-soft: rgb(155 155 247 / 12%);
+    --bg: #0c0c10;
+    --danger: #ff7b7b;
+    --danger-soft: rgb(255 123 123 / 10%);
+    --fg: #e7e7ef;
+    --line: #26262f;
+    --line-strong: #3a3a46;
+    --muted: #93939f;
+    --surface: #131318;
+    --surface-2: #1a1a21;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  line-height: 1.6;
+}
+
+/* ---------- shell ---------- */
+
+.shell {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 0 1.25rem 5rem;
+}
+
+.topbar {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  margin-bottom: 2.5rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+/* ---------- nav ---------- */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+}
+
+.tabs a {
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    color 0.12s,
+    background 0.12s;
+}
+
+.tabs a:hover {
+  background: var(--surface-2);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.tabs a[aria-current="page"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---------- type ---------- */
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  max-width: 62ch;
+  margin: 0 0 2rem;
+  color: var(--muted);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code {
+  padding: 0.1em 0.32em;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+/* Inline code inside a monospace context needs no second box. */
+.kv code {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---------- route cards ---------- */
+
+.cards {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 2.5rem;
+  padding: 0;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  height: 100%;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  transition:
+    border-color 0.12s,
+    transform 0.12s;
+}
+
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.card__path {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card__path:hover {
+  text-decoration: none;
+}
+
+.card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: auto;
+  padding-top: 0.15rem;
+}
+
+.pill {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+}
+
+/* ---------- decode-failure chips: broken on purpose ---------- */
+
+.chips {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.chip a {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: 6px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+.chip a:hover {
+  border-color: var(--danger);
+  text-decoration: none;
+}
+
+.chip span {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+/* ---------- key/value inspector (the decoded side) ---------- */
+
+.kv {
+  display: grid;
+  gap: 0 1.5rem;
+  margin: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.kv dt,
+.kv dd {
+  min-width: 0;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: break-word;
+}
+
+.kv dt {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+.kv dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+@media (width <= 40rem) {
+  .kv {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kv dd {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+/* ---------- client panel ---------- */
+
+.panel {
+  margin: 2rem 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.panel h2 {
+  margin: 0 0 0.5rem;
+  color: var(--accent);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---------- errors ---------- */
+
+.trace {
+  overflow-x: auto;
+  margin: 0 0 1.25rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: 6px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.alert {
+  padding: 0.6rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+.btn {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

@@ -13,16 +13,24 @@ export function ParamsPanel() {
   const search = useSearch(productRoute);
 
   if (params.error) {
-    return <p role="alert">params: {params.error.message}</p>;
+    return (
+      <p className="alert" role="alert">
+        params: {params.error.message}
+      </p>
+    );
   }
   if (search.error) {
-    return <p role="alert">search: {search.error.message}</p>;
+    return (
+      <p className="alert" role="alert">
+        search: {search.error.message}
+      </p>
+    );
   }
 
   return (
-    <section id="client-params">
+    <section className="panel" id="client-params">
       <h2>Read on the client</h2>
-      <dl>
+      <dl className="kv">
         <dt>
           <code>params.id</code>
         </dt>
