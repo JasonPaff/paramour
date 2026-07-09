@@ -16,7 +16,7 @@ pnpm monorepo (pnpm 11, Node >= 24.18). Run from the repo root:
 - `pnpm test:types:registry` — world-B type tests (`packages/core/test-registry/`, its own tstyche/tsconfig pair): post-generation registry behavior via a hand-authored `declare module "paramour"` augmentation. A separate compilation unit on purpose — module augmentation is program-global, so these files must never move into `test/`
 - `pnpm typecheck` — `tsc --noEmit` in every package; includes `examples/basic`, which needs the packages built first
 - `pnpm build` — topological: core tsc → next tsc (dist + the `paramour` CLI bin) → `examples/basic` `next build`. `pnpm build:packages` skips the example for fast package-only builds. `test/cli-dist.test.ts` and `test:types:registry` need a build to have run
-- `pnpm lint` — ESLint (type-checked rules; slow-ish)
+- `pnpm lint:fix` — ESLint with auto-fix (type-checked rules; slow-ish)
 - `pnpm format` / `pnpm format:check` — Prettier
 - `pnpm changeset` — add a changeset (changesets is the release mechanism)
 
