@@ -11,7 +11,7 @@ export default async function FilesPage(props: RouteProps) {
     return (
       <main>
         <h1>Bad file path</h1>
-        <ul>
+        <ul className="issues">
           {result.error.issues.map((issue) => (
             <li key={issue.key}>
               <code>{issue.key}</code>: {issue.message}
@@ -27,11 +27,12 @@ export default async function FilesPage(props: RouteProps) {
   return (
     <main>
       <h1>File: {path.join("/")}</h1>
-      <p>
+      <p className="lede">
         <code>params.path</code> is a required catch-all — always at least one
         segment (Array of {path.length}).
       </p>
-      <ol>
+      <p className="eyebrow">Segments</p>
+      <ol className="segments">
         {path.map((segment, index) => (
           <li key={`${String(index)}-${segment}`}>{segment}</li>
         ))}

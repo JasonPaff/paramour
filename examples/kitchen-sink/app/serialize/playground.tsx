@@ -45,13 +45,19 @@ function splitCsv(value: string): string[] {
   return value.split(",").filter((segment) => segment !== "");
 }
 
-// Try/catch wrapper so a thrown SerializeError/decode error renders as text
-// rather than a rethrow.
-function attempt(run: () => string): string {
+// A thrown SerializeError/decode error renders as text rather than a rethrow.
+// The `failed` flag is what lets the UI show it as an error instead of letting
+// it read like a successful result.
+interface Attempt {
+  failed: boolean;
+  text: string;
+}
+
+function attempt(run: () => string): Attempt {
   try {
-    return run();
+    return { failed: false, text: run() };
   } catch (error) {
-    return describe(error);
+    return { failed: true, text: describe(error) };
   }
 }
 
@@ -96,60 +102,82 @@ export function Playground() {
   );
 
   return (
-    <div style={{ display: "grid", gap: "1.5rem" }}>
-      <section>
-        <h2>Path — buildPath / encodeParams / decodeParams (productsRoute)</h2>
-        <Field label="id" onChange={setId} value={id} />
-        <Out label="buildPath(route, { id })" value={path} />
-        <Out label="encodeParams(route, { id })" value={segments} />
-        <Out label="href(route, { params: { id }, search: {} })" value={link} />
-        <Out
-          label='decodeParams(route, { id: "<id>" })'
-          value={decodedParams}
-        />
-        <p>
-          Try <code>id = -5</code> (fails the positive schema on both encode and
-          decode) or <code>id = 1.5</code> (not a safe integer).
-        </p>
+    <div className="stack">
+      <section className="section">
+        <h2>Path — buildPath / encodeParams / decodeParams</h2>
+        <div className="split">
+          <div>
+            <Field label="id" onChange={setId} value={id} />
+            <p className="hint">
+              Try <code>id = -5</code> (fails the positive schema on both encode
+              and decode) or <code>id = 1.5</code> (not a safe integer).
+            </p>
+          </div>
+          <div>
+            <Out label="buildPath(route, { id })" result={path} />
+            <Out label="encodeParams(route, { id })" result={segments} />
+            <Out
+              label="href(route, { params: { id }, search: {} })"
+              result={link}
+            />
+            <Out
+              label='decodeParams(route, { id: "<id>" })'
+              result={decodedParams}
+            />
+          </div>
+        </div>
       </section>
 
-      <section>
+      <section className="section">
         <h2>Search — encodeSearch / searchToString / buildSearchString</h2>
-        <Field label="q (optional)" onChange={setQ} value={q} />
-        <Field
-          label="labels (required, csv custom codec)"
-          onChange={setLabels}
-          value={labels}
-        />
-        <Field label="tags (stringArray)" onChange={setTags} value={tags} />
-        <Field
-          label="page (default 1 — elided when it equals 1)"
-          onChange={setPage}
-          value={page}
-        />
-        <Out label="encodeSearch(config, input)" value={pairs} />
-        <Out label="searchToString(config, input)" value={queryString} />
-        <Out label="buildSearchString(encodeSearch(...))" value={built} />
-        <p>
-          Set <code>page = 1</code> to watch D8 elision drop it; clear{" "}
-          <code>labels</code> to see the required key still serialize (empty),
-          or set <code>page = abc</code> for a <code>SerializeError</code>.
-        </p>
+        <div className="split">
+          <div>
+            <Field label="q (optional)" onChange={setQ} value={q} />
+            <Field
+              label="labels (required, csv custom codec)"
+              onChange={setLabels}
+              value={labels}
+            />
+            <Field label="tags (stringArray)" onChange={setTags} value={tags} />
+            <Field
+              label="page (default 1 — elided when it equals 1)"
+              onChange={setPage}
+              value={page}
+            />
+            <p className="hint">
+              Set <code>page = 1</code> to watch D8 elision drop it; clear{" "}
+              <code>labels</code> to see the required key still serialize
+              (empty), or set <code>page = abc</code> for a{" "}
+              <code>SerializeError</code>.
+            </p>
+          </div>
+          <div>
+            <Out label="encodeSearch(config, input)" result={pairs} />
+            <Out label="searchToString(config, input)" result={queryString} />
+            <Out label="buildSearchString(encodeSearch(...))" result={built} />
+          </div>
+        </div>
       </section>
 
-      <section>
+      <section className="section">
         <h2>Search — decodeSearch (from a raw query string)</h2>
-        <Field label="query string" onChange={setQuery} value={query} />
-        <Out
-          label="decodeSearch(config, new URLSearchParams(query))"
-          value={decodedSearch}
-        />
-        <p>
-          Drop <code>labels=</code> for a <code>SearchDecodeError</code> whose{" "}
-          <code>.issues</code> name the missing required key; set{" "}
-          <code>page=abc</code> for a per-key <code>ParseError</code> aggregated
-          into the same error.
-        </p>
+        <div className="split">
+          <div>
+            <Field label="query string" onChange={setQuery} value={query} />
+            <p className="hint">
+              Drop <code>labels=</code> for a <code>SearchDecodeError</code>{" "}
+              whose <code>.issues</code> name the missing required key; set{" "}
+              <code>page=abc</code> for a per-key <code>ParseError</code>{" "}
+              aggregated into the same error.
+            </p>
+          </div>
+          <div>
+            <Out
+              label="decodeSearch(config, new URLSearchParams(query))"
+              result={decodedSearch}
+            />
+          </div>
+        </div>
       </section>
     </div>
   );
@@ -165,35 +193,23 @@ function Field({
   value: string;
 }) {
   return (
-    <label style={{ display: "block", margin: "0.25rem 0" }}>
-      <span style={{ display: "inline-block", minWidth: "22rem" }}>
-        {label}
-      </span>
+    <label className="field">
+      <span>{label}</span>
       <input
         onChange={(event) => {
           onChange(event.target.value);
         }}
-        style={{ fontFamily: "monospace" }}
         value={value}
       />
     </label>
   );
 }
 
-function Out({ label, value }: { label: string; value: string }) {
+function Out({ label, result }: { label: string; result: Attempt }) {
   return (
-    <div style={{ margin: "0.25rem 0" }}>
-      <code style={{ color: "#666" }}>{label}</code>
-      <pre
-        style={{
-          background: "#f4f4f4",
-          margin: "0.15rem 0",
-          padding: "0.4rem 0.6rem",
-          whiteSpace: "pre-wrap",
-        }}
-      >
-        {value}
-      </pre>
+    <div className={result.failed ? "out out--error" : "out"}>
+      <code className="out__label">{label}</code>
+      <pre>{result.text}</pre>
     </div>
   );
 }

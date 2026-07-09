@@ -11,10 +11,13 @@ export default function FindError({
   return (
     <main>
       <h1>That search didn&#39;t validate</h1>
-      <pre style={{ whiteSpace: "pre-wrap" }}>{error.message}</pre>
-      <button onClick={reset} type="button">
-        Try again
-      </button>
+      <p className="eyebrow">SearchDecodeError</p>
+      <pre className="trace trace--error">{error.message}</pre>
+      <p>
+        <button className="btn" onClick={reset} type="button">
+          Try again
+        </button>
+      </p>
     </main>
   );
 }

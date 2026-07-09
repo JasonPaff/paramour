@@ -16,12 +16,13 @@ export default async function FindPage(props: RouteProps) {
   return (
     <main>
       <h1>Find</h1>
-      <p>
+      <p className="lede">
         <code>search</code> came from <code>rawSearch(findSchema)</code> — Zod
         coerced <code>page</code> from a string and normalized <code>tags</code>{" "}
         to an array.
       </p>
-      <dl>
+      <p className="eyebrow">Decoded</p>
+      <dl className="kv">
         <dt>
           <code>search.q</code>
         </dt>

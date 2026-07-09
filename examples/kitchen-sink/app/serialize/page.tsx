@@ -4,7 +4,7 @@ export default function SerializePage() {
   return (
     <main>
       <h1>Serialization playground</h1>
-      <p>
+      <p className="lede">
         The framework-agnostic core: <code>buildPath</code>,{" "}
         <code>encodeParams</code>, <code>decodeParams</code>,{" "}
         <code>encodeSearch</code>, <code>decodeSearch</code>,{" "}

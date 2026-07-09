@@ -15,16 +15,19 @@ export default function HomePage() {
   return (
     <main>
       <h1>paramour — kitchen sink</h1>
-      <p>
+      <p className="lede">
         Every codec, modifier, route shape, parse surface, client hook, and
         serialization function, spread across the routes below. Routes are
-        defined once in colocated <code>route.def.ts</code> files.
+        defined once in colocated <code>route.def.ts</code> files. The bar above
+        shows the wire form of the current URL; each page shows what paramour
+        decoded it into.
       </p>
 
-      <h2>Routes</h2>
-      <ul>
-        <li>
+      <p className="eyebrow">Routes</p>
+      <ul className="cards">
+        <li className="card">
           <Link
+            className="card__path"
             href={href(productsRoute, {
               hash: "client",
               params: { id: 42 },
@@ -39,78 +42,136 @@ export default function HomePage() {
             })}
           >
             /products/42
-          </Link>{" "}
-          — single <code>[id]</code> (Zod-refined integer); search covering
-          string/integer/number/boolean/enum/stringArray with{" "}
-          <code>.default()</code>/<code>.optional()</code>/<code>.catch()</code>
-          ; server <code>parse</code> + client hooks.
+          </Link>
+          <p>
+            A single <code>[id]</code> segment refined by Zod, search params
+            covering every scalar codec, then the same URL re-read on the
+            client.
+          </p>
+          <div className="pills">
+            <span className="pill">integer</span>
+            <span className="pill">string</span>
+            <span className="pill">number</span>
+            <span className="pill">boolean</span>
+            <span className="pill">enum</span>
+            <span className="pill">stringArray</span>
+            <span className="pill">.default()</span>
+            <span className="pill">.optional()</span>
+            <span className="pill">.catch()</span>
+            <span className="pill">parse</span>
+          </div>
         </li>
-        <li>
+
+        <li className="card">
           <Link
+            className="card__path"
             href={href(docsRoute, { params: { slug: ["guides", "intro"] } })}
           >
             /docs/guides/intro
-          </Link>{" "}
-          — optional catch-all <code>[[...slug]]</code>; <code>safeParse</code>{" "}
-          → <code>notFound()</code>.
+          </Link>
+          <p>
+            An optional catch-all that matches with or without segments; a
+            decode failure becomes a 404 rather than an error boundary.
+          </p>
+          <div className="pills">
+            <span className="pill">[[...slug]]</span>
+            <span className="pill">safeParse</span>
+            <span className="pill">notFound()</span>
+          </div>
         </li>
-        <li>
+
+        <li className="card">
           <Link
+            className="card__path"
             href={href(filesRoute, { params: { path: ["src", "index.ts"] } })}
           >
             /files/src/index.ts
-          </Link>{" "}
-          — required catch-all <code>[...path]</code>;{" "}
-          <code>safeParseParams</code>.
+          </Link>
+          <p>
+            A required catch-all — always at least one segment — decoded in
+            data-xor-error form.
+          </p>
+          <div className="pills">
+            <span className="pill">[...path]</span>
+            <span className="pill">safeParseParams</span>
+          </div>
         </li>
-        <li>
+
+        <li className="card">
           <Link
+            className="card__path"
             href={href(eventsRoute, {
               params: { date: new Date("2026-07-06") },
               search: { attempts: 3, ref: ["a", "b"] },
             })}
           >
             /events/2026-07-06
-          </Link>{" "}
-          — <code>isoDate</code> param; <code>timestamp</code>/<code>json</code>
-          /<code>custom</code> search with factory <code>.default()</code>/
-          <code>.catch()</code>; <code>parseParams</code> +{" "}
-          <code>safeParseSearch</code> + throwing client hooks.
+          </Link>
+          <p>
+            A path segment that decodes to a real <code>Date</code>, structured
+            search values, and the throwing client hooks.
+          </p>
+          <div className="pills">
+            <span className="pill">isoDate</span>
+            <span className="pill">timestamp</span>
+            <span className="pill">json</span>
+            <span className="pill">custom</span>
+            <span className="pill">parseParams</span>
+            <span className="pill">safeParseSearch</span>
+          </div>
         </li>
-        <li>
+
+        <li className="card">
           <Link
+            className="card__path"
             href={href(findRoute, { search: { q: "cable", tags: ["a", "b"] } })}
           >
             /find?q=cable
-          </Link>{" "}
-          — <code>rawSearch</code> whole-object schema escape hatch;{" "}
-          <code>parseSearch</code>.
+          </Link>
+          <p>
+            The whole-object escape hatch: hand the entire search object to one
+            schema instead of a codec per key.
+          </p>
+          <div className="pills">
+            <span className="pill">rawSearch</span>
+            <span className="pill">parseSearch</span>
+          </div>
         </li>
-        <li>
-          <Link href={href(serializeRoute)}>/serialize</Link> — interactive{" "}
-          <code>buildPath</code>/<code>encodeSearch</code>/
-          <code>decodeSearch</code>/<code>buildSearchString</code>/
-          <code>searchToString</code> plus the error hierarchy, live in the
-          browser.
+
+        <li className="card">
+          <Link className="card__path" href={href(serializeRoute)}>
+            /serialize
+          </Link>
+          <p>
+            The framework-agnostic core, live in the browser: type a value,
+            watch it become a URL — or a branded error.
+          </p>
+          <div className="pills">
+            <span className="pill">buildPath</span>
+            <span className="pill">encodeSearch</span>
+            <span className="pill">decodeSearch</span>
+            <span className="pill">buildSearchString</span>
+            <span className="pill">searchToString</span>
+          </div>
         </li>
       </ul>
 
-      <h2>Decode failures</h2>
-      <ul>
-        <li>
+      <p className="eyebrow">Decode failures</p>
+      <ul className="chips">
+        <li className="chip">
           {/* parse() throws → the colocated error.tsx boundary. */}
-          <a href="/products/not-a-number">/products/not-a-number</a> — fails
-          the integer grammar.
+          <a href="/products/not-a-number">/products/not-a-number</a>
+          <span>fails the integer grammar.</span>
         </li>
-        <li>
+        <li className="chip">
           {/* The positive-int Zod schema rejects it after the grammar passes. */}
-          <a href="/products/-5">/products/-5</a> — parses as an integer, fails
-          the positive schema.
+          <a href="/products/-5">/products/-5</a>
+          <span>parses as an integer, fails the positive schema.</span>
         </li>
-        <li>
+        <li className="chip">
           {/* safeParse → notFound() instead of an error boundary. */}
-          <a href="/docs?page=not-a-number">/docs?page=not-a-number</a> — a
-          malformed search param becomes a 404.
+          <a href="/docs?page=not-a-number">/docs?page=not-a-number</a>
+          <span>a malformed search param becomes a 404.</span>
         </li>
       </ul>
     </main>

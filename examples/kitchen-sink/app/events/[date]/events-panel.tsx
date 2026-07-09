@@ -15,15 +15,9 @@ export function EventsPanel() {
   const search = useSearchOrThrow(eventsRoute);
 
   return (
-    <section
-      style={{
-        borderLeft: "3px solid #888",
-        margin: "1rem 0",
-        paddingLeft: "1rem",
-      }}
-    >
+    <section className="panel">
       <h2>Read on the client (throwing hooks)</h2>
-      <dl>
+      <dl className="kv">
         <dt>
           <code>useRouteParamsOrThrow</code> → date
         </dt>

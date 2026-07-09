@@ -18,11 +18,12 @@ export default async function ProductPage(props: RouteProps) {
   return (
     <main>
       <h1>Product #{params.id}</h1>
-      <p>
+      <p className="lede">
         Decoded on the server with <code>route.parse(props)</code>. Every value
         below is its real in-memory type, not a raw string.
       </p>
-      <dl>
+      <p className="eyebrow">Decoded on the server</p>
+      <dl className="kv">
         <dt>
           <code>params.id</code> — <code>p.integer(positiveInt)</code>
         </dt>
@@ -67,7 +68,7 @@ export default async function ProductPage(props: RouteProps) {
       </dl>
       <ParamsPanel />
       <section id="client">
-        <p>
+        <p className="lede">
           The panel above re-decodes the same URL on the client with
           paramour&#39;s hooks — scroll target for the <code>#client</code>{" "}
           hash.

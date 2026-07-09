@@ -13,12 +13,12 @@ export default async function EventsPage(props: RouteProps) {
   return (
     <main>
       <h1>Event on {date.toISOString().slice(0, 10)}</h1>
-      <p>
+      <p className="lede">
         <code>params.date</code> — <code>p.isoDate()</code> → a real{" "}
         <code>Date</code> ({date.toISOString()}).
       </p>
       {search.error ? (
-        <ul>
+        <ul className="issues">
           {search.error.issues.map((issue) => (
             <li key={issue.key}>
               <code>{issue.key}</code>: {issue.message}
@@ -26,7 +26,7 @@ export default async function EventsPage(props: RouteProps) {
           ))}
         </ul>
       ) : (
-        <dl>
+        <dl className="kv">
           <dt>
             <code>search.at</code> — <code>p.timestamp().optional()</code>
           </dt>
