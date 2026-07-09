@@ -13,8 +13,9 @@ export default function ProductError({
   return (
     <main>
       <h1>That product URL didn’t decode</h1>
-      <pre style={{ whiteSpace: "pre-wrap" }}>{error.message}</pre>
-      <button onClick={reset} type="button">
+      <p className="eyebrow">ParamourError</p>
+      <pre className="trace">{error.message}</pre>
+      <button className="btn" onClick={reset} type="button">
         Try again
       </button>
     </main>

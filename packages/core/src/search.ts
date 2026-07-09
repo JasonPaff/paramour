@@ -408,12 +408,19 @@ function decodeRawSearch(
     // SS3/SS4: the spec types issue.path as ReadonlyArray<PropertyKey |
     // PathSegment> where PathSegment is { key }. Valibot emits the object
     // form (a bare String(seg) would be "[object Object]"); Zod emits [] for
-    // a root-level issue (which joins to "", so the sentinel keys off the
-    // empty join, not just a nullish path).
-    const issues: Issue[] = result.issues.map((issue) => {
-      const key = (issue.path ?? [])
-        .map((seg) => String(typeof seg === "object" ? seg.key : seg))
-        .join(".");
+    // a root-level issue, Valibot omits path entirely (both join to "", so
+    // the sentinel keys off the empty join, not just a nullish path).
+    //
+    // Array.from, not .map: these arrays belong to the validator, and a
+    // ReadonlyArray may be an Array subclass. ArkType's `path` is one, with a
+    // variadic constructor -- Array.prototype.map builds its result via
+    // Symbol.species (`new ReadonlyPath(0)`), which yields the one-element
+    // array [0], so an empty root path would map to the key "0". Array.from
+    // always produces a plain Array and is immune.
+    const issues: Issue[] = Array.from(result.issues, (issue) => {
+      const key = Array.from(issue.path ?? [], (seg) =>
+        String(typeof seg === "object" ? seg.key : seg),
+      ).join(".");
       return { key: key === "" ? "<search>" : key, message: issue.message };
     });
     throw new SearchDecodeError(issues);

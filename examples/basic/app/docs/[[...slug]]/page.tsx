@@ -15,13 +15,21 @@ export default async function DocsPage(props: RouteProps) {
   return (
     <main>
       <h1>Docs: {params.slug.join("/") || "index"}</h1>
-      <p>
+      <p className="lede">
         <code>params.slug</code> is an optional catch-all — an empty array at{" "}
         <code>/docs</code>, segments otherwise.
       </p>
-      <p>
-        <code>search.page</code>: {search.page ?? "(not provided)"}
-      </p>
+      <p className="eyebrow">Decoded</p>
+      <dl className="kv">
+        <dt>
+          <code>params.slug</code>
+        </dt>
+        <dd>{params.slug.join(", ") || "(empty array)"}</dd>
+        <dt>
+          <code>search.page</code>
+        </dt>
+        <dd>{search.page ?? "(not provided)"}</dd>
+      </dl>
     </main>
   );
 }

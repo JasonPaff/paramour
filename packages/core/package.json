@@ -43,7 +43,9 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "arktype": "^2.2.3",
     "fast-check": "^4.8.0",
+    "valibot": "^1.4.2",
     "zod": "^4.4.3"
   }
 }
