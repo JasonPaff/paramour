@@ -29,6 +29,10 @@ jobs:
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm typecheck
+      # Negative suite: examples/type-errors must fail tsc with EXACTLY its
+      # expected diagnostics (and stay codegen-drift-free). It defines no
+      # build/typecheck scripts, so the recursive gates above never sweep it.
+      - run: pnpm --filter example-type-errors run check
       - run: pnpm test
       - run: pnpm test:types
       - run: pnpm test:types:next

@@ -8,6 +8,7 @@
     "build": "pnpm -r run build",
     "build:packages": "pnpm --filter \"./packages/*\" run build",
     "changeset": "changeset",
+    "check:type-errors": "pnpm --filter example-type-errors run check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
