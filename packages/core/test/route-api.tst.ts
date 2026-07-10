@@ -8,11 +8,14 @@
 import { expect, test } from "tstyche";
 import { z } from "zod";
 
-import { defineRoute, href, p, rawSearch } from "../src";
+import { defineAppRoute, definePagesRoute, href, p, rawSearch } from "../src";
 import type {
+  AnyAppRoute,
+  AnyPagesRoute,
   AnyRoute,
   Href,
   InferRouteParams,
+  PagesContext,
   ParamsProps,
   RouteDecodeError,
   RouteProps,
@@ -20,17 +23,19 @@ import type {
 } from "../src";
 
 test("pre-generation fallback: any path literal is accepted and retained", () => {
-  const route = defineRoute("/totally/made/up", {});
+  const route = defineAppRoute("/totally/made/up", {});
   expect(route.path).type.toBe<"/totally/made/up">();
 });
 
 test("segment extraction: single param (RL3)", () => {
-  const route = defineRoute("/product/[id]", { params: { id: p.integer() } });
+  const route = defineAppRoute("/product/[id]", {
+    params: { id: p.integer() },
+  });
   expect<InferRouteParams<typeof route>>().type.toBe<{ id: number }>();
 });
 
 test("segment extraction: catch-all decodes element-wise to an array (RL3/D6)", () => {
-  const route = defineRoute("/blog/[...slug]", {
+  const route = defineAppRoute("/blog/[...slug]", {
     params: { slug: p.string() },
   });
   expect<InferRouteParams<typeof route>>().type.toBe<{ slug: string[] }>();
@@ -39,19 +44,19 @@ test("segment extraction: catch-all decodes element-wise to an array (RL3/D6)", 
 test("segment extraction: optional catch-all output key is REQUIRED (RL3 ruling)", () => {
   // Absent normalizes to [] at decode time (D6), so the output side has no
   // `?:` split — a regression to `{ slug?: string[] }` must fail toBe here.
-  const route = defineRoute("/docs/[[...slug]]", {
+  const route = defineAppRoute("/docs/[[...slug]]", {
     params: { slug: p.string() },
   });
   expect<InferRouteParams<typeof route>>().type.toBe<{ slug: string[] }>();
 });
 
 test("segment extraction: static path has no params", () => {
-  const route = defineRoute("/about", {});
+  const route = defineAppRoute("/about", {});
   expect<InferRouteParams<typeof route>>().type.toBe<{}>();
 });
 
 test("segment extraction: mixed static and dynamic segments", () => {
-  const route = defineRoute("/org/[orgId]/repo/[repoId]", {
+  const route = defineAppRoute("/org/[orgId]/repo/[repoId]", {
     params: { orgId: p.string(), repoId: p.integer() },
   });
   expect<InferRouteParams<typeof route>>().type.toBe<{
@@ -61,54 +66,57 @@ test("segment extraction: mixed static and dynamic segments", () => {
 });
 
 test("exact keys: excess and misspelled param keys are rejected (RL1)", () => {
-  expect(defineRoute).type.not.toBeCallableWith("/product/[id]", {
+  expect(defineAppRoute).type.not.toBeCallableWith("/product/[id]", {
     params: { id: p.integer(), extra: p.string() },
   });
   // Wrong casing is just an excess key plus a missing one.
-  expect(defineRoute).type.not.toBeCallableWith("/product/[id]", {
+  expect(defineAppRoute).type.not.toBeCallableWith("/product/[id]", {
     params: { productid: p.integer() },
   });
   // Catch-all keys must match the segment name exactly.
-  expect(defineRoute).type.not.toBeCallableWith("/blog/[...slug]", {
+  expect(defineAppRoute).type.not.toBeCallableWith("/blog/[...slug]", {
     params: { slugs: p.string() },
   });
 });
 
 test("exact keys: a missing param key is rejected (RL1)", () => {
-  expect(defineRoute).type.not.toBeCallableWith("/org/[orgId]/repo/[repoId]", {
-    params: { orgId: p.string() },
-  });
+  expect(defineAppRoute).type.not.toBeCallableWith(
+    "/org/[orgId]/repo/[repoId]",
+    {
+      params: { orgId: p.string() },
+    },
+  );
 });
 
 test("dynamic path requires params; static path rejects them (RL1)", () => {
-  expect(defineRoute).type.not.toBeCallableWith("/product/[id]", {});
-  expect(defineRoute).type.not.toBeCallableWith("/", {
+  expect(defineAppRoute).type.not.toBeCallableWith("/product/[id]", {});
+  expect(defineAppRoute).type.not.toBeCallableWith("/", {
     params: { x: p.string() },
   });
-  expect(defineRoute).type.not.toBeCallableWith("/about", {
+  expect(defineAppRoute).type.not.toBeCallableWith("/about", {
     params: { x: p.string() },
   });
 });
 
 test("params reject presence-modified codecs; catch stays legal (D5)", () => {
-  expect(defineRoute).type.not.toBeCallableWith("/product/[id]", {
+  expect(defineAppRoute).type.not.toBeCallableWith("/product/[id]", {
     params: { id: p.integer().optional() },
   });
-  expect(defineRoute).type.not.toBeCallableWith("/product/[id]", {
+  expect(defineAppRoute).type.not.toBeCallableWith("/product/[id]", {
     params: { id: p.integer().default(1) },
   });
   // The params codec describes ONE segment element (D6); arrays come from
   // the segment kind, so arity-"many" codecs are rejected too.
-  expect(defineRoute).type.not.toBeCallableWith("/product/[id]", {
+  expect(defineAppRoute).type.not.toBeCallableWith("/product/[id]", {
     params: { id: p.stringArray() },
   });
-  expect(defineRoute).type.toBeCallableWith("/files/[...seg]", {
+  expect(defineAppRoute).type.toBeCallableWith("/files/[...seg]", {
     params: { seg: p.integer().catch(0) },
   });
 });
 
 test("const retention: enum literal unions survive into the route object", () => {
-  const route = defineRoute("/items/[sort]", {
+  const route = defineAppRoute("/items/[sort]", {
     params: { sort: p.enum(["price", "rating"]) },
   });
   expect(route["~params"].sort["~out"]).type.toBe<"price" | "rating">();
@@ -118,7 +126,7 @@ test("const retention: enum literal unions survive into the route object", () =>
 });
 
 test("search config is retained on the route object", () => {
-  const route = defineRoute("/about", {
+  const route = defineAppRoute("/about", {
     search: { page: p.integer().default(1) },
   });
   expect(route["~search"].page["~presence"]).type.toBe<"defaulted">();
@@ -126,7 +134,7 @@ test("search config is retained on the route object", () => {
 
 test("rawSearch: schema output flows into parse/parseSearch/safeParse* (design-04 SS6)", () => {
   const schema = z.object({ page: z.coerce.number() });
-  const route = defineRoute("/about", { search: rawSearch(schema) });
+  const route = defineAppRoute("/about", { search: rawSearch(schema) });
   expect(route.parseSearch({})).type.toBe<Promise<{ page: number }>>();
   expect(route.safeParseSearch({})).type.toBe<
     Promise<SafeResult<{ page: number }>>
@@ -141,7 +149,7 @@ test("rawSearch: schema output flows into parse/parseSearch/safeParse* (design-0
 
 test("rawSearch: href's search input is the raw wire record, not the schema output (SS5)", () => {
   const schema = z.object({ page: z.coerce.number() });
-  const route = defineRoute("/about", { search: rawSearch(schema) });
+  const route = defineAppRoute("/about", { search: rawSearch(schema) });
   expect(href).type.toBeCallableWith(route, {
     search: { page: "1" },
   });
@@ -156,8 +164,8 @@ test("rawSearch: href's search input is the raw wire record, not the schema outp
 });
 
 test("rawSearch: a codec-map route and a rawSearch route don't cross-contaminate through href/parse", () => {
-  const codecRoute = defineRoute("/s", { search: { q: p.string() } });
-  const rawRoute = defineRoute("/r", {
+  const codecRoute = defineAppRoute("/s", { search: { q: p.string() } });
+  const rawRoute = defineAppRoute("/r", {
     search: rawSearch(z.object({ q: z.string() })),
   });
   expect(href).type.toBeCallableWith(codecRoute, { search: { q: "x" } });
@@ -179,7 +187,7 @@ test("rawSearch: a non-Standard-Schema argument is a compile error", () => {
 });
 
 test("rawSearch composes with required params (all prior coverage is static-path)", () => {
-  const route = defineRoute("/shop/[id]", {
+  const route = defineAppRoute("/shop/[id]", {
     params: { id: p.integer() },
     search: rawSearch(z.object({ q: z.string() })),
   });
@@ -201,13 +209,13 @@ test("rawSearch composes with required params (all prior coverage is static-path
 test("malformed bracket tokens fall through as static text (RL3)", () => {
   // No type-level path linting: these are static paths to the type layer
   // (tokenizePath rejects them at runtime), so an empty config typechecks.
-  expect(defineRoute).type.toBeCallableWith("/x/[]", {});
-  expect(defineRoute).type.toBeCallableWith("/x/[...]", {});
-  expect(defineRoute).type.toBeCallableWith("/user/a[b]c", {});
+  expect(defineAppRoute).type.toBeCallableWith("/x/[]", {});
+  expect(defineAppRoute).type.toBeCallableWith("/x/[...]", {});
+  expect(defineAppRoute).type.toBeCallableWith("/user/a[b]c", {});
 });
 
 test("concrete routes are assignable to AnyRoute (RL4 variance)", () => {
-  const route = defineRoute("/product/[id]", {
+  const route = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },
     search: { q: p.string() },
   });
@@ -215,7 +223,7 @@ test("concrete routes are assignable to AnyRoute (RL4 variance)", () => {
 });
 
 test("parse methods: full parse returns { params; search } (RL6)", () => {
-  const route = defineRoute("/product/[id]", {
+  const route = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },
     search: { q: p.string().optional() },
   });
@@ -240,7 +248,7 @@ test("parse methods: full parse returns { params; search } (RL6)", () => {
 });
 
 test("parse methods: bare-surface results carry no wrapper (RL6)", () => {
-  const route = defineRoute("/product/[id]", {
+  const route = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },
     search: { q: p.string().optional() },
   });
@@ -286,7 +294,7 @@ test("SafeResult: the status discriminant narrows both arms (RL6, PR12)", () => 
 });
 
 test("href: branded return — assignable to string, never from it (RL4)", () => {
-  const about = defineRoute("/about", {});
+  const about = defineAppRoute("/about", {});
   expect(href(about)).type.toBe<Href<"/about">>();
   expect<Href<"/about">>().type.toBeAssignableTo<string>();
   expect<string>().type.not.toBeAssignableTo<Href>();
@@ -295,12 +303,12 @@ test("href: branded return — assignable to string, never from it (RL4)", () =>
 });
 
 test("href: the whole options argument is omittable only when nothing is required (RL4)", () => {
-  const about = defineRoute("/about", {});
+  const about = defineAppRoute("/about", {});
   expect(href).type.toBeCallableWith(about);
   expect(href).type.toBeCallableWith(about, {});
   expect(href).type.toBeCallableWith(about, { hash: "top" });
 
-  const product = defineRoute("/product/[id]", {
+  const product = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },
   });
   expect(href).type.not.toBeCallableWith(product);
@@ -313,7 +321,7 @@ test("href: the whole options argument is omittable only when nothing is require
 test("href: params omission is presence-driven (2026-07-04 ruling)", () => {
   // An optional-catch-all-only route has no required param key, so the
   // params property — and the whole options argument — may be omitted.
-  const docs = defineRoute("/docs/[[...slug]]", {
+  const docs = defineAppRoute("/docs/[[...slug]]", {
     params: { slug: p.string() },
   });
   expect(href).type.toBeCallableWith(docs);
@@ -321,7 +329,7 @@ test("href: params omission is presence-driven (2026-07-04 ruling)", () => {
   expect(href).type.toBeCallableWith(docs, { params: { slug: ["a"] } });
 
   // A required catch-all keeps params required.
-  const files = defineRoute("/files/[...seg]", {
+  const files = defineAppRoute("/files/[...seg]", {
     params: { seg: p.string() },
   });
   expect(href).type.not.toBeCallableWith(files);
@@ -329,12 +337,14 @@ test("href: params omission is presence-driven (2026-07-04 ruling)", () => {
 });
 
 test("href: search property required iff a required key exists (RL4/D4)", () => {
-  const strict = defineRoute("/s", { search: { q: p.string() } });
+  const strict = defineAppRoute("/s", { search: { q: p.string() } });
   expect(href).type.not.toBeCallableWith(strict);
   expect(href).type.not.toBeCallableWith(strict, {});
   expect(href).type.toBeCallableWith(strict, { search: { q: "x" } });
 
-  const lax = defineRoute("/l", { search: { page: p.integer().default(1) } });
+  const lax = defineAppRoute("/l", {
+    search: { page: p.integer().default(1) },
+  });
   expect(href).type.toBeCallableWith(lax);
   expect(href).type.toBeCallableWith(lax, { search: {} });
   expect(href).type.toBeCallableWith(lax, { search: { page: 2 } });
@@ -344,7 +354,7 @@ test("href: an empty-input half bans its property outright (2026-07-04 ruling)",
   // The bare Partial<Record<Key, {}>> form would accept arbitrary junk on
   // static/empty-config routes — the empty object type is exempt from
   // excess-property checking — and silently drop it from the link.
-  const about = defineRoute("/about", {});
+  const about = defineAppRoute("/about", {});
   expect(href).type.toBeCallableWith(about);
   expect(href).type.toBeCallableWith(about, {});
   expect(href).type.toBeCallableWith(about, { hash: "top" });
@@ -358,11 +368,119 @@ test("href: an empty-input half bans its property outright (2026-07-04 ruling)",
   expect(href).type.not.toBeCallableWith(about, { search: junk });
 
   // A dynamic route with no search config bans the search half the same way.
-  const product = defineRoute("/product/[id]", {
+  const product = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },
   });
   expect(href).type.not.toBeCallableWith(product, {
     params: { id: 1 },
     search: { q: "x" },
   });
+});
+
+test("router brand: the constructors declare distinct brands (PR3/PR7)", () => {
+  const app = defineAppRoute("/about", {});
+  const pages = definePagesRoute("/about", {});
+  expect(app["~router"]).type.toBe<"app">();
+  expect(pages["~router"]).type.toBe<"pages">();
+  expect<typeof app>().type.toBeAssignableTo<AnyAppRoute>();
+  expect<typeof pages>().type.toBeAssignableTo<AnyPagesRoute>();
+  // The brand is what makes a cross-router hand-off a compile error.
+  expect<typeof app>().type.not.toBeAssignableTo<AnyPagesRoute>();
+  expect<typeof pages>().type.not.toBeAssignableTo<AnyAppRoute>();
+  // Both stay router-agnostic AnyRoutes — href's and the decoders' bound.
+  expect<typeof app>().type.toBeAssignableTo<AnyRoute>();
+  expect<typeof pages>().type.toBeAssignableTo<AnyRoute>();
+});
+
+test("method gating (PR3): the wrong router's surface is ABSENT, not just ill-typed", () => {
+  const app = defineAppRoute("/product/[id]", { params: { id: p.integer() } });
+  const pages = definePagesRoute("/product/[id]", {
+    params: { id: p.integer() },
+  });
+  expect(app).type.not.toHaveProperty("parseContext");
+  expect(app).type.not.toHaveProperty("safeParseContext");
+  expect(pages).type.not.toHaveProperty("parse");
+  expect(pages).type.not.toHaveProperty("parseParams");
+  expect(pages).type.not.toHaveProperty("parseSearch");
+  expect(pages).type.not.toHaveProperty("safeParse");
+  expect(pages).type.not.toHaveProperty("safeParseParams");
+  expect(pages).type.not.toHaveProperty("safeParseSearch");
+});
+
+test("pages routes share the world-A fallback and the param machinery (PR7)", () => {
+  const pages = definePagesRoute("/totally/made/up", {});
+  expect(pages.path).type.toBe<"/totally/made/up">();
+  const legacy = definePagesRoute("/legacy/[slug]", {
+    params: { slug: p.string() },
+  });
+  expect<InferRouteParams<typeof legacy>>().type.toBe<{ slug: string }>();
+  // RL1 exact keys and the dynamic-path params requirement apply unchanged.
+  expect(definePagesRoute).type.not.toBeCallableWith("/legacy/[slug]", {});
+  expect(definePagesRoute).type.not.toBeCallableWith("/legacy/[slug]", {
+    params: { slugs: p.string() },
+  });
+});
+
+test("parseContext: sync, typed halves (PR10)", () => {
+  const pages = definePagesRoute("/product/[id]", {
+    params: { id: p.integer() },
+    search: { q: p.string().optional() },
+  });
+  // Synchronous — no Promise wrapper anywhere on the pages surface.
+  expect(pages.parseContext({ query: {} })).type.toBe<{
+    params: { id: number };
+    search: { readonly q: string | undefined };
+  }>();
+  expect(pages.safeParseContext({ query: {} })).type.toBe<
+    SafeResult<{
+      params: { id: number };
+      search: { readonly q: string | undefined };
+    }>
+  >();
+});
+
+test("parseContext rejects a query-less GetStaticPropsContext shape (PR10)", () => {
+  const pages = definePagesRoute("/product/[id]", {
+    params: { id: p.integer() },
+  });
+  // getStaticProps has no query string; typed search there would be a lie.
+  expect(pages.parseContext).type.not.toBeCallableWith({
+    params: { id: "1" },
+  });
+  expect(pages.parseContext).type.toBeCallableWith({ query: {} });
+  expect(pages.parseContext).type.toBeCallableWith({
+    params: { id: "1" },
+    query: { id: "1" },
+  });
+  // The getInitialProps shape (query, no params) composes too.
+  expect<{
+    query: Record<string, string | string[] | undefined>;
+  }>().type.toBeAssignableTo<PagesContext>();
+});
+
+test("search ∩ params: a shadowing key fails on pages, is allowed on app (PR9)", () => {
+  // router.query merges the halves with the route param winning — a pages
+  // search codec at a param name could never receive a value.
+  expect(definePagesRoute).type.not.toBeCallableWith("/product/[id]", {
+    params: { id: p.string() },
+    search: { id: p.string() },
+  });
+  // App sources are separate (useParams vs useSearchParams), so ?id= on
+  // /product/[id] is well-defined there.
+  expect(defineAppRoute).type.toBeCallableWith("/product/[id]", {
+    params: { id: p.string() },
+    search: { id: p.string() },
+  });
+  // Non-shadowing pages search keys stay legal.
+  expect(definePagesRoute).type.toBeCallableWith("/product/[id]", {
+    params: { id: p.string() },
+    search: { q: p.string().optional() },
+  });
+});
+
+test("href accepts both routers (PR3 — href stays router-agnostic)", () => {
+  const pages = definePagesRoute("/product/[id]", {
+    params: { id: p.integer() },
+  });
+  expect(href(pages, { params: { id: 1 } })).type.toBe<Href<"/product/[id]">>();
 });

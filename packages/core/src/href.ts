@@ -79,7 +79,7 @@ export function href<R extends AnyRoute>(
 ): Href<R["path"]>;
 // The conditional HrefArgs tuple is unresolvable inside a generic body, so
 // the unsoundness lives at this one overload boundary (same move as
-// defineRoute's config cast) instead of per-expression casts: the
+// routeData's config cast) instead of per-expression casts: the
 // implementation sees each option half at its loosest honest type.
 export function href(
   route: Route<string, ParamsConfig<string>, SearchSlot>,

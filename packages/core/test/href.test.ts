@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { defineRoute, href, p, ParamourError, SerializeError } from "../src";
+import { defineAppRoute, href, p, ParamourError, SerializeError } from "../src";
 
 describe("href assembly (RL4)", () => {
   it("assembles path, ?query, #hash in fixed order", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
       search: { q: p.string() },
     });
@@ -14,7 +14,7 @@ describe("href assembly (RL4)", () => {
   });
 
   it("omits the query entirely when no pairs are emitted (S1)", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
       search: { q: p.string().optional() },
     });
@@ -22,13 +22,13 @@ describe("href assembly (RL4)", () => {
   });
 
   it("the whole options argument is omittable on a static route", () => {
-    const about = defineRoute("/about", {});
+    const about = defineAppRoute("/about", {});
     expect(href(about)).toBe("/about");
     expect(href(about, {})).toBe("/about");
   });
 
   it("an optional-catch-all-only route is bare-callable (presence ruling)", () => {
-    const docs = defineRoute("/docs/[[...slug]]", {
+    const docs = defineAppRoute("/docs/[[...slug]]", {
       params: { slug: p.string() },
     });
     expect(href(docs)).toBe("/docs");
@@ -36,18 +36,18 @@ describe("href assembly (RL4)", () => {
   });
 
   it("returns a primitive string — the brand is type-only", () => {
-    const about = defineRoute("/about", {});
+    const about = defineAppRoute("/about", {});
     expect(typeof href(about)).toBe("string");
   });
 
   it('the root route builds "/" (R6: no trailing-slash games)', () => {
-    const root = defineRoute("/", {});
+    const root = defineAppRoute("/", {});
     expect(href(root)).toBe("/");
     expect(href(root, { hash: "top" })).toBe("/#top");
   });
 
   it("R6: no href ever gains a trailing slash", () => {
-    const route = defineRoute("/docs/[[...slug]]", {
+    const route = defineAppRoute("/docs/[[...slug]]", {
       params: { slug: p.string() },
       search: { q: p.string().optional() },
     });
@@ -61,14 +61,14 @@ describe("href assembly (RL4)", () => {
   });
 
   it("emits only schema-declared search params (S9)", () => {
-    const route = defineRoute("/about", { search: { q: p.string() } });
+    const route = defineAppRoute("/about", { search: { q: p.string() } });
     expect(href(route, { search: { junk: "x", q: "a" } as never })).toBe(
       "/about?q=a",
     );
   });
 
   it("a JS caller omitting a required search half gets encodeSearch's error", () => {
-    const route = defineRoute("/about", { search: { q: p.string() } });
+    const route = defineAppRoute("/about", { search: { q: p.string() } });
     expect(() => (href as (r: unknown) => string)(route)).toThrow(
       SerializeError,
     );
@@ -90,7 +90,7 @@ describe("href assembly (RL4)", () => {
 });
 
 describe("hash emission (S10)", () => {
-  const about = defineRoute("/about", {});
+  const about = defineAppRoute("/about", {});
 
   it("comes only from the explicit caller option", () => {
     expect(href(about, { hash: "top" })).toBe("/about#top");

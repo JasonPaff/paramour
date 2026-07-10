@@ -1,11 +1,11 @@
-import { defineRoute, p } from "paramour";
+import { defineAppRoute, p } from "paramour";
 
 import { positiveInt, searchQuery } from "../../../lib/schemas";
 
 // The flagship route: a single [id] param plus a search config that exercises
 // most of the codec/modifier surface. Search keys are alphabetized (ESLint
 // perfectionist) — declaration order only affects encode output ordering.
-export const productsRoute = defineRoute("/products/[id]", {
+export const productsRoute = defineAppRoute("/products/[id]", {
   params: {
     // p.integer refined by a Standard Schema (Zod): grammar first, then the
     // positive-whole-number schema. A schema failure throws ParseError too.

@@ -13,7 +13,7 @@ import "paramour";
 
 declare module "paramour" {
   interface ParamourRegister {
-    routes:
+    appRoutes:
       | "/"
       | "/about"
       | "/product/[id]";
@@ -24,7 +24,7 @@ declare module "paramour" {
   });
 
   it("keeps the leading-pipe union form for a single path", () => {
-    expect(emitArtifact(["/"])).toContain('routes:\n      | "/";');
+    expect(emitArtifact(["/"])).toContain('appRoutes:\n      | "/";');
   });
 
   it("is deterministic and sorts/dedupes its own input", () => {
@@ -48,10 +48,10 @@ declare module "paramour" {
     );
   });
 
-  it("omits the routes member entirely for an empty scan", () => {
+  it("omits the appRoutes member entirely for an empty scan", () => {
     const content = emitArtifact([]);
     expect(content).toContain("interface ParamourRegister {}");
-    expect(content).not.toContain("routes:");
+    expect(content).not.toContain("Routes:");
     expect(content).not.toContain("never");
   });
 });

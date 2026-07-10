@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { renderHook } from "@testing-library/react";
 import {
-  defineRoute,
+  defineAppRoute,
   p,
   ParamsDecodeError,
   rawSearch,
@@ -18,7 +18,7 @@ import {
 } from "../src/client.js";
 import { __setParams, __setSearchParams } from "./stubs/next-navigation.js";
 
-const productRoute = defineRoute("/product/[id]", {
+const productRoute = defineAppRoute("/product/[id]", {
   params: { id: p.integer() },
   search: {
     page: p.integer().default(1),
@@ -26,11 +26,11 @@ const productRoute = defineRoute("/product/[id]", {
   },
 });
 
-const filesRoute = defineRoute("/files/[...slug]", {
+const filesRoute = defineAppRoute("/files/[...slug]", {
   params: { slug: p.string() },
 });
 
-const rawRoute = defineRoute("/raw", {
+const rawRoute = defineAppRoute("/raw", {
   search: rawSearch(
     z.object({ page: z.coerce.number().optional(), q: z.string() }),
   ),

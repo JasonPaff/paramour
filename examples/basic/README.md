@@ -5,7 +5,7 @@ The canonical minimal paramour app, typechecked and built in CI.
 What it demonstrates:
 
 - **Colocated route definitions** — each route folder owns a `route.def.ts`
-  built with `defineRoute` and `p.*` codecs (integer params, defaulted and
+  built with `defineAppRoute` and `p.*` codecs (integer params, defaulted and
   optional search params, an optional catch-all).
 - **Server-surface parsing** — `route.parse(props)` in pages (throws to the
   colocated `error.tsx`; try `/product/not-a-number`), `parseParams` in
@@ -15,7 +15,7 @@ What it demonstrates:
 hash })`.
 - **Codegen** — `next.config.ts` wraps the config with
   `withTypedRoutes(config, { strict: true })`. The generated
-  `paramour-env.d.ts` is committed: it narrows `defineRoute` path literals to
+  `paramour-env.d.ts` is committed: it narrows `defineAppRoute` path literals to
   filesystem-verified routes, and `strict: true` makes a production build
   fail on drift.
 

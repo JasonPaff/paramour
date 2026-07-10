@@ -37,7 +37,7 @@ Then try the decode-failure links on the home page (`/products/not-a-number`,
 
 `next.config.ts` wraps the config with `withTypedRoutes(config, { strict: true })`,
 and `paramour.config.ts` configures the standalone CLI. The generated
-`paramour-env.d.ts` is committed: it narrows `defineRoute` path literals to
+`paramour-env.d.ts` is committed: it narrows `defineAppRoute` path literals to
 filesystem-verified routes, and `strict: true` makes a production build fail on
 drift. Add or remove a page folder and regenerate:
 

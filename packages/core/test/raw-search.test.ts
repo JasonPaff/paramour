@@ -9,7 +9,7 @@ import { z } from "zod";
 
 import {
   decodeSearch,
-  defineRoute,
+  defineAppRoute,
   encodeSearch,
   href,
   ParamourError,
@@ -281,7 +281,7 @@ describe("rawSearch encode / href (design-04 SS5)", () => {
         version: 1,
       },
     };
-    const route = defineRoute("/search", {
+    const route = defineAppRoute("/search", {
       search: rawSearch(countingSchema),
     });
     const link = href(route, { search: { q: "a b", tag: ["x", "y"] } });
@@ -290,7 +290,7 @@ describe("rawSearch encode / href (design-04 SS5)", () => {
   });
 
   it("href builds a link without ever needing a decode-shaped value", () => {
-    const route = defineRoute("/search", {
+    const route = defineAppRoute("/search", {
       search: rawSearch(z.object({ q: z.string() })),
     });
     // The encode-side value is already wire-shaped strings (SS5) — nothing

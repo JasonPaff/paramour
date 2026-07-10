@@ -29,7 +29,7 @@ export function resolveAppDir(projectRoot: string): string | undefined {
 
 /**
  * Walk an app dir and return the sorted, deduped union of URL-shaped route
- * paths — exactly the strings `defineRoute` accepts (TR2, RL2). Pure
+ * paths — exactly the strings `defineAppRoute` accepts (TR2, RL2). Pure
  * `fs.readdir` recursion; no dependency on Next internals.
  */
 export function scanRoutes(

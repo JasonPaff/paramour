@@ -28,9 +28,9 @@ const HEADER =
 export function emitArtifact(paths: readonly string[]): string {
   const sorted = [...new Set(paths)].sort();
   if (sorted.length === 0) {
-    // TR3: no routes yet → NO `routes` member (explicitly not `never`, which
-    // would make every `defineRoute` call an error). The empty merge keeps
-    // the documented world-A `string` fallback (RL8).
+    // TR3: no routes yet → NO `appRoutes` member (explicitly not `never`,
+    // which would make every route-constructor call an error). The empty
+    // merge keeps the documented world-A `string` fallback (RL8).
     return [
       HEADER,
       'import "paramour";',
@@ -52,7 +52,10 @@ export function emitArtifact(paths: readonly string[]): string {
     "",
     'declare module "paramour" {',
     "  interface ParamourRegister {",
-    "    routes:",
+    // PR9's app member (the pages member arrives with the pages scanner);
+    // Group 2's registry read side keys on `appRoutes`, so the emitter must
+    // write the same name to keep world B live.
+    "    appRoutes:",
     union,
     "  }",
     "}",

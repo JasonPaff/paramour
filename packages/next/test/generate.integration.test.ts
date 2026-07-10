@@ -18,7 +18,7 @@ import { makeTempDir, makeTree } from "./helpers.js";
  * scan → emit → write pipeline, then type-checks a consumer twice with the
  * compiler API: without the artifact in the program (world A: any literal
  * accepted via the RL8 `string` fallback) and with it (world B: unregistered
- * literals fail at `defineRoute`).
+ * literals fail at `defineAppRoute`).
  */
 
 // The "paramour" specifier is paths-mapped to src (winning over core's
@@ -33,10 +33,10 @@ const typesRoot = fileURLToPath(
   new URL("../node_modules/@types", import.meta.url),
 );
 
-const CONSUMER = `import { defineRoute } from "paramour";
+const CONSUMER = `import { defineAppRoute } from "paramour";
 
-export const good = defineRoute("/about", {});
-export const bad = defineRoute("/nope", {});
+export const good = defineAppRoute("/about", {});
+export const bad = defineAppRoute("/nope", {});
 `;
 
 function checkProgram(rootNames: readonly string[]): string[] {
@@ -70,7 +70,7 @@ function checkProgram(rootNames: readonly string[]): string[] {
   });
 }
 
-describe("generated artifact flips defineRoute verification on (TR3/RL8)", () => {
+describe("generated artifact flips defineAppRoute verification on (TR3/RL8)", () => {
   let artifactPath: string;
   let consumerPath: string;
 

@@ -13,7 +13,7 @@ import {
   buildPath,
   type Codec,
   decodeParams,
-  defineRoute,
+  defineAppRoute,
   href,
   p,
   type Route,
@@ -71,7 +71,7 @@ const roundtripV = <Out>(
 
 describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id", () => {
   it("p.string() through [v] (unicode, spaces, slashes)", () => {
-    const route = defineRoute("/x/[v]", { params: { v: p.string() } });
+    const route = defineAppRoute("/x/[v]", { params: { v: p.string() } });
     fc.assert(
       fc.property(segmentString, (value) => {
         expect(roundtripV(route, value)).toBe(value);
@@ -80,7 +80,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
   });
 
   it("p.integer() through [v], up to safe magnitudes", () => {
-    const route = defineRoute("/x/[v]", { params: { v: p.integer() } });
+    const route = defineAppRoute("/x/[v]", { params: { v: p.integer() } });
     fc.assert(
       fc.property(integerArb, (value) => {
         expect(roundtripV(route, value)).toBe(value);
@@ -89,7 +89,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
   });
 
   it("p.number() through [v] — precision exact, -0 comes back as 0 (§6.1)", () => {
-    const route = defineRoute("/x/[v]", { params: { v: p.number() } });
+    const route = defineAppRoute("/x/[v]", { params: { v: p.number() } });
     fc.assert(
       fc.property(
         fc.double({ noDefaultInfinity: true, noNaN: true }),
@@ -102,13 +102,13 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
   });
 
   it("p.boolean() and p.enum() through [v]", () => {
-    const flags = defineRoute("/x/[v]", { params: { v: p.boolean() } });
+    const flags = defineAppRoute("/x/[v]", { params: { v: p.boolean() } });
     fc.assert(
       fc.property(fc.boolean(), (value) => {
         expect(roundtripV(flags, value)).toBe(value);
       }),
     );
-    const sorts = defineRoute("/x/[v]", {
+    const sorts = defineAppRoute("/x/[v]", {
       params: { v: p.enum(["price", "rating"]) },
     });
     fc.assert(
@@ -119,7 +119,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
   });
 
   it("p.timestamp() round-trips by instant (§6.3)", () => {
-    const route = defineRoute("/x/[v]", { params: { v: p.timestamp() } });
+    const route = defineAppRoute("/x/[v]", { params: { v: p.timestamp() } });
     fc.assert(
       fc.property(dateArb, (value) => {
         expect(roundtripV(route, value).getTime()).toBe(value.getTime());
@@ -128,7 +128,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
   });
 
   it("p.isoDate() round-trips by calendar day (§6.3)", () => {
-    const route = defineRoute("/x/[v]", { params: { v: p.isoDate() } });
+    const route = defineAppRoute("/x/[v]", { params: { v: p.isoDate() } });
     fc.assert(
       fc.property(dateArb, (value) => {
         expect(roundtripV(route, value).toISOString().slice(0, 10)).toBe(
@@ -139,7 +139,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
   });
 
   it("catch-all elements round-trip element-wise, including / (R2)", () => {
-    const route = defineRoute("/files/[...seg]", {
+    const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string() },
     });
     fc.assert(
@@ -153,7 +153,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
   });
 
   it("optional catch-all: [] elides and comes back as [] (§6.2 analog)", () => {
-    const route = defineRoute("/docs/[[...slug]]", {
+    const route = defineAppRoute("/docs/[[...slug]]", {
       params: { slug: p.string() },
     });
     fc.assert(
@@ -258,7 +258,7 @@ describe("dual property (§6): serialize ∘ parse ≅ id on canonical wire", ()
 
 describe("full loop: parse ∘ href ≅ id", () => {
   it("params + mixed-presence search survive the whole wire (§6)", async () => {
-    const route = defineRoute("/shop/[cat]", {
+    const route = defineAppRoute("/shop/[cat]", {
       params: { cat: p.string() },
       search: {
         flag: p.boolean().optional(),

@@ -1,4 +1,4 @@
-import { defineRoute, rawSearch } from "paramour";
+import { defineAppRoute, rawSearch } from "paramour";
 
 import { findSchema } from "../../lib/schemas";
 
@@ -6,6 +6,6 @@ import { findSchema } from "../../lib/schemas";
 // entire query object is validated by one Standard Schema. The schema owns
 // every key (unknown keys are the schema's to strip), there are no per-key
 // .default()/.catch(), and encode is a raw pass-through (SS5/SS7).
-export const findRoute = defineRoute("/find", {
+export const findRoute = defineAppRoute("/find", {
   search: rawSearch(findSchema),
 });
