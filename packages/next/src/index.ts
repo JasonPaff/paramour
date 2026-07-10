@@ -5,7 +5,11 @@ export {
   type WriteIfChangedResult,
 } from "./emit.js";
 export { type AcquireLockResult, acquireWatcherLock } from "./lock.js";
-export { DEFAULT_PAGE_EXTENSIONS, resolveAppDir, scanRoutes } from "./scan.js";
+export {
+  DEFAULT_PAGE_EXTENSIONS,
+  resolveAppDir,
+  scanAppRoutes,
+} from "./scan-app.js";
 export {
   type AppDirWatcher,
   DEFAULT_DEBOUNCE_MS,

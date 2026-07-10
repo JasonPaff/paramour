@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   emitArtifact,
   resolveAppDir,
-  scanRoutes,
+  scanAppRoutes,
   writeIfChanged,
 } from "../src";
 import { makeTempDir, makeTree } from "./helpers.js";
@@ -83,7 +83,7 @@ describe("generated artifact flips defineAppRoute verification on (TR3/RL8)", ()
 
     const appDir = resolveAppDir(projectRoot);
     if (appDir === undefined) throw new Error("app dir not resolved");
-    const routes = scanRoutes(appDir);
+    const routes = scanAppRoutes(appDir);
     expect(routes).toEqual(["/", "/about"]);
 
     artifactPath = join(projectRoot, "paramour-env.d.ts");

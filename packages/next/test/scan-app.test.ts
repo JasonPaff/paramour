@@ -2,7 +2,7 @@ import { symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { resolveAppDir, scanRoutes } from "../src";
+import { resolveAppDir, scanAppRoutes } from "../src";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /** Build a tree in a temp dir and scan it in one step. */
@@ -13,11 +13,11 @@ function scanTree(
   const root = makeTempDir();
   makeTree(root, entries);
   return pageExtensions === undefined
-    ? scanRoutes(root)
-    : scanRoutes(root, pageExtensions);
+    ? scanAppRoutes(root)
+    : scanAppRoutes(root, pageExtensions);
 }
 
-describe("scanRoutes: page detection (TR2)", () => {
+describe("scanAppRoutes: page detection (TR2)", () => {
   it("emits '/' for a root page", () => {
     expect(scanTree(["page.tsx"])).toEqual(["/"]);
   });
@@ -70,7 +70,7 @@ describe("scanRoutes: page detection (TR2)", () => {
   });
 });
 
-describe("scanRoutes: dynamic segments verbatim (TR2/RL2)", () => {
+describe("scanAppRoutes: dynamic segments verbatim (TR2/RL2)", () => {
   it("preserves [id]", () => {
     expect(scanTree(["product/[id]/page.tsx"])).toEqual(["/product/[id]"]);
   });
@@ -86,7 +86,7 @@ describe("scanRoutes: dynamic segments verbatim (TR2/RL2)", () => {
   });
 });
 
-describe("scanRoutes: route groups (TR2)", () => {
+describe("scanAppRoutes: route groups (TR2)", () => {
   it("strips (group) from the emitted path", () => {
     expect(scanTree(["(marketing)/about/page.tsx"])).toEqual(["/about"]);
   });
@@ -104,7 +104,7 @@ describe("scanRoutes: route groups (TR2)", () => {
   });
 });
 
-describe("scanRoutes: skipped subtrees (TR2)", () => {
+describe("scanAppRoutes: skipped subtrees (TR2)", () => {
   it("skips @slot subtrees entirely, pages at any depth included", () => {
     expect(scanTree(["@modal/page.tsx", "@modal/deep/page.tsx"])).toEqual([]);
   });
@@ -131,10 +131,10 @@ describe("scanRoutes: skipped subtrees (TR2)", () => {
   });
 });
 
-describe("scanRoutes: error and traversal edges (TR2)", () => {
+describe("scanAppRoutes: error and traversal edges (TR2)", () => {
   it("throws on a missing app dir (the caller-side guard is resolveAppDir)", () => {
     const missing = join(makeTempDir(), "does-not-exist");
-    expect(() => scanRoutes(missing)).toThrow(/ENOENT/);
+    expect(() => scanAppRoutes(missing)).toThrow(/ENOENT/);
   });
 
   it.skipIf(process.platform === "win32")(
@@ -143,7 +143,7 @@ describe("scanRoutes: error and traversal edges (TR2)", () => {
       const root = makeTempDir();
       makeTree(root, ["app/", "outside/linked/page.tsx"]);
       symlinkSync(join(root, "outside"), join(root, "app", "external"), "dir");
-      expect(scanRoutes(join(root, "app"))).toEqual([]);
+      expect(scanAppRoutes(join(root, "app"))).toEqual([]);
     },
   );
 });
@@ -153,7 +153,7 @@ describe("scanRoutes: error and traversal edges (TR2)", () => {
  * exactly what `^\(.*\)$` (group: stripped) vs `^\(\.{1,3}\)` (interception:
  * skipped) produce today, guarding future regex refactors.
  */
-describe("scanRoutes: group/interception regex edge pins (TR2)", () => {
+describe("scanAppRoutes: group/interception regex edge pins (TR2)", () => {
   it("(a)(b) matches the group regex and is stripped", () => {
     expect(scanTree(["(a)(b)/x/page.tsx"])).toEqual(["/x"]);
   });

@@ -14,7 +14,7 @@ import {
   acquireWatcherLock,
   watcherLockPath,
 } from "./lock.js";
-import { DEFAULT_PAGE_EXTENSIONS, resolveAppDir } from "./scan.js";
+import { DEFAULT_PAGE_EXTENSIONS, resolveAppDir } from "./scan-app.js";
 import { watchAppDir } from "./watch.js";
 
 /** @internal I/O seams for tests; defaults write to the console. */

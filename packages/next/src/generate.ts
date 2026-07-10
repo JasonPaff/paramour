@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 
 import { emitArtifact, writeIfChanged } from "./emit.js";
-import { scanRoutes } from "./scan.js";
+import { scanAppRoutes } from "./scan-app.js";
 
 /**
  * The shared generation engine (TR9): `withTypedRoutes` and the CLI drive
@@ -52,7 +52,7 @@ const UNION_MEMBER = /^\s*\| "(.*)";?$/gm;
  * CI-degrades-to-world-A case the committed file exists to prevent (TR3).
  */
 export function checkArtifact(inputs: GenerateInputs): CheckResult {
-  const routes = scanRoutes(inputs.appDir, inputs.pageExtensions);
+  const routes = scanAppRoutes(inputs.appDir, inputs.pageExtensions);
   const expected = emitArtifact(routes);
   const current = existsSync(inputs.artifactPath)
     ? readFileSync(inputs.artifactPath, "utf8")
@@ -88,7 +88,7 @@ export function formatRouteDiff(
 
 /** One generation pass: scan → emit → write-if-changed (TR3). */
 export function generate(inputs: GenerateInputs): GenerateResult {
-  const routes = scanRoutes(inputs.appDir, inputs.pageExtensions);
+  const routes = scanAppRoutes(inputs.appDir, inputs.pageExtensions);
   return {
     routes,
     ...writeIfChanged(inputs.artifactPath, emitArtifact(routes)),

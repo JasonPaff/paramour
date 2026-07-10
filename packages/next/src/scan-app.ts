@@ -17,7 +17,7 @@ const ROUTE_GROUP = /^\(.*\)$/;
 /**
  * The app dir is `app/` or `src/app/`, first that exists under the project
  * root (TR2); `undefined` when neither does. This is the caller-side guard —
- * `scanRoutes` itself lets a missing dir throw.
+ * `scanAppRoutes` itself lets a missing dir throw.
  */
 export function resolveAppDir(projectRoot: string): string | undefined {
   for (const candidate of ["app", join("src", "app")]) {
@@ -32,7 +32,7 @@ export function resolveAppDir(projectRoot: string): string | undefined {
  * paths — exactly the strings `defineAppRoute` accepts (TR2, RL2). Pure
  * `fs.readdir` recursion; no dependency on Next internals.
  */
-export function scanRoutes(
+export function scanAppRoutes(
   appDir: string,
   pageExtensions: readonly string[] = DEFAULT_PAGE_EXTENSIONS,
 ): string[] {
