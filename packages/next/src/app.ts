@@ -2,7 +2,7 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import {
-  type AnyRoute,
+  type AnyAppRoute,
   decodeParams,
   decodeSearch,
   type InferRouteParams,
@@ -30,10 +30,15 @@ import { useMemo } from "react";
  *
  * Both read the route's blessed-internal `~search` / `~params` via the core
  * decoders (design-03 RL6 — `@paramour/next` is a sanctioned consumer).
+ *
+ * Every hook is gated to `AnyAppRoute` (design-06 PR3): a pages-branded route
+ * at one of these call sites is a compile error, not a runtime surprise —
+ * these hooks read Next's App-Router navigation hooks, whose pages twin has
+ * different state cardinality (`@paramour-js/next/pages`).
  */
 
 /** Decoded route params as a `SafeResult` (discriminated on `status`, PR12). */
-export function useRouteParams<R extends AnyRoute>(
+export function useRouteParams<R extends AnyAppRoute>(
   route: R,
 ): SafeResult<InferRouteParams<R>> {
   const params = useParams();
@@ -44,7 +49,7 @@ export function useRouteParams<R extends AnyRoute>(
  * Decoded route params, or a thrown {@link ParamsDecodeError} (→ nearest
  * client error boundary) on a malformed URL.
  */
-export function useRouteParamsOrThrow<R extends AnyRoute>(
+export function useRouteParamsOrThrow<R extends AnyAppRoute>(
   route: R,
 ): InferRouteParams<R> {
   const params = useParams();
@@ -52,7 +57,7 @@ export function useRouteParamsOrThrow<R extends AnyRoute>(
 }
 
 /** Decoded search params as a `SafeResult` (discriminated on `status`, PR12). */
-export function useSearch<R extends AnyRoute>(
+export function useSearch<R extends AnyAppRoute>(
   route: R,
 ): SafeResult<SearchOutputOf<R["~search"]>> {
   const searchParams = useSearchParams();
@@ -66,13 +71,13 @@ export function useSearch<R extends AnyRoute>(
  * Decoded search params, or a thrown {@link SearchDecodeError} (→ nearest
  * client error boundary) on a malformed URL.
  */
-export function useSearchOrThrow<R extends AnyRoute>(
+export function useSearchOrThrow<R extends AnyAppRoute>(
   route: R,
 ): SearchOutputOf<R["~search"]> {
   const searchParams = useSearchParams();
   return useMemo(
     // decodeSearch is keyed on SearchOutputOf (design-04 SS6) — the correct
-    // public type — but AnyRoute erases its SC to `any`, so for a still-
+    // public type — but AnyAppRoute erases its SC to `any`, so for a still-
     // generic R the call's SearchOutputOf<R["~search"]> reduces to `unknown`
     // on the value side while staying deferred on the annotation side. The
     // cast bridges that inference gap to the SAME (correct) type, so a
