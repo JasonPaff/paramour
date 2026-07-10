@@ -11,6 +11,7 @@ export {
   resolveAppDir,
   scanAppRoutes,
 } from "./scan-app.js";
+export { scanPagesRoutes } from "./scan-pages.js";
 export {
   type AppDirWatcher,
   DEFAULT_DEBOUNCE_MS,
