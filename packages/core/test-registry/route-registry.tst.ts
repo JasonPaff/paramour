@@ -9,6 +9,16 @@
  */
 import { expect, test } from "tstyche";
 
+import {
+  useRouteParams as useAppRouteParams,
+  useRouteParamsOrThrow,
+  useSearch as useAppSearch,
+  useSearchOrThrow,
+} from "@paramour-js/next/app";
+import {
+  useRouteParams as usePagesRouteParams,
+  useSearch as usePagesSearch,
+} from "@paramour-js/next/pages";
 import { defineAppRoute, definePagesRoute, href, p } from "paramour";
 import type { Href, InferRouteParams } from "paramour";
 
@@ -57,6 +67,32 @@ test("method gating survives world B (PR3): parse* app-only, parseContext pages-
   expect(app).type.not.toHaveProperty("parseContext");
   expect(pages).type.not.toHaveProperty("parse");
   expect(pages).type.toHaveProperty("parseContext");
+});
+
+test("app hooks reject a pages route, in world B too (PR3, PR11 §3)", () => {
+  // The hooks resolve through the BUILT d.ts (tsconfig paths), so this
+  // certifies the gate as consumers see it, post declaration emit.
+  const app = defineAppRoute("/product/[id]", { params: { id: p.integer() } });
+  const pages = definePagesRoute("/legacy/[id]", {
+    params: { id: p.integer() },
+  });
+  expect(useAppRouteParams).type.toBeCallableWith(app);
+  expect(useAppSearch).type.toBeCallableWith(app);
+  expect(useAppRouteParams).type.not.toBeCallableWith(pages);
+  expect(useAppSearch).type.not.toBeCallableWith(pages);
+  expect(useRouteParamsOrThrow).type.not.toBeCallableWith(pages);
+  expect(useSearchOrThrow).type.not.toBeCallableWith(pages);
+});
+
+test("pages hooks reject an app route, in world B too (PR3, PR11 §3)", () => {
+  const app = defineAppRoute("/product/[id]", { params: { id: p.integer() } });
+  const pages = definePagesRoute("/legacy/[id]", {
+    params: { id: p.integer() },
+  });
+  expect(usePagesRouteParams).type.toBeCallableWith(pages);
+  expect(usePagesSearch).type.toBeCallableWith(pages);
+  expect(usePagesRouteParams).type.not.toBeCallableWith(app);
+  expect(usePagesSearch).type.not.toBeCallableWith(app);
 });
 
 test("param extraction still runs on the literal, not the registry (spike-01)", () => {
