@@ -1,7 +1,8 @@
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resolveRouteDirs, RouteCollisionError, scanRoutes } from "../src";
+import * as scanApp from "../src/scan-app.js";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /**
@@ -107,6 +108,36 @@ describe("resolveRouteDirs (spike-2 ruling)", () => {
     expect(() => resolveRouteDirs(root, ["mdx"])).toThrow(
       /silently unreachable/,
     );
+  });
+
+  describe("src-dir probe error handling (bug 3)", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("rethrows a non-collision probe error instead of the config error", () => {
+      // A readdir EACCES/EPERM or a dir removed mid-scan surfaces as a
+      // non-RouteCollisionError throw; the probe must NOT relabel that as
+      // "silently unreachable" (which would mask the real I/O failure).
+      const root = makeTempDir();
+      makeTree(root, ["pages/", "src/app/"]);
+      vi.spyOn(scanApp, "scanAppRoutes").mockImplementation(() => {
+        throw new TypeError("simulated readdir failure");
+      });
+      expect(() => resolveRouteDirs(root)).toThrow(TypeError);
+      expect(() => resolveRouteDirs(root)).toThrow(/simulated readdir failure/);
+      expect(() => resolveRouteDirs(root)).not.toThrow(/silently unreachable/);
+    });
+
+    it("still treats a RouteCollisionError probe throw as populated", () => {
+      // The one throw that DOES prove page files exist stays the config error.
+      const root = makeTempDir();
+      makeTree(root, ["pages/", "src/app/"]);
+      vi.spyOn(scanApp, "scanAppRoutes").mockImplementation(() => {
+        throw new RouteCollisionError("collision inside ignored dir");
+      });
+      expect(() => resolveRouteDirs(root)).toThrow(/silently unreachable/);
+    });
   });
 });
 

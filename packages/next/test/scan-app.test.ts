@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { RouteCollisionError, scanAppRoutes } from "../src";
-import { makeTempDir, makeTree } from "./helpers.js";
+import { makeTempDir, makeTree, trySymlink } from "./helpers.js";
 
 /** Build a tree in a temp dir and scan it in one step. */
 function scanTree(
@@ -54,7 +54,7 @@ describe("scanAppRoutes: page detection (TR2)", () => {
     expect(scanTree(["x/page.mdx", "y/page.tsx"], ["mdx"])).toEqual(["/x"]);
   });
 
-  it("ignores route.ts handlers (TR2)", () => {
+  it("does not emit a route.ts handler alone (TR2/§14)", () => {
     expect(scanTree(["api/route.ts"])).toEqual([]);
   });
 
@@ -226,6 +226,114 @@ describe("scanAppRoutes: error and traversal edges (TR2)", () => {
       expect(scanAppRoutes(join(root, "app"))).toEqual([]);
     },
   );
+
+  it("follows a symlinked page FILE — Next serves it (Bug 4)", (ctx) => {
+    // A file symlink is followed (statSync resolves the target), unlike a
+    // directory symlink above. Common in pnpm-linked monorepos.
+    const root = makeTempDir();
+    makeTree(root, ["app/aliased/", "target/page.tsx"]);
+    if (
+      !trySymlink(
+        join(root, "target", "page.tsx"),
+        join(root, "app", "aliased", "page.tsx"),
+        "file",
+      )
+    ) {
+      ctx.skip();
+      return;
+    }
+    expect(scanAppRoutes(join(root, "app"))).toEqual(["/aliased"]);
+  });
+
+  it("silently skips a broken page-file symlink (Bug 4)", (ctx) => {
+    const root = makeTempDir();
+    makeTree(root, ["app/broken/"]);
+    if (
+      !trySymlink(
+        join(root, "does-not-exist", "page.tsx"),
+        join(root, "app", "broken", "page.tsx"),
+        "file",
+      )
+    ) {
+      ctx.skip();
+      return;
+    }
+    expect(scanAppRoutes(join(root, "app"))).toEqual([]);
+  });
+});
+
+describe("scanAppRoutes: page/route-handler conflicts (PR9, Bug 5)", () => {
+  it("throws when a page and a route handler share a directory", () => {
+    expect(() => scanTree(["api/page.tsx", "api/route.ts"])).toThrow(
+      RouteCollisionError,
+    );
+    expect(() => scanTree(["api/page.tsx", "api/route.ts"])).toThrow(
+      /"\/api": page api\/page\.tsx and route handler api\/route\.ts/,
+    );
+  });
+
+  it("throws when a page and a route handler collide across route groups", () => {
+    expect(() => scanTree(["(a)/x/page.tsx", "(b)/x/route.ts"])).toThrow(
+      RouteCollisionError,
+    );
+    expect(() => scanTree(["(a)/x/page.tsx", "(b)/x/route.ts"])).toThrow(
+      /"\/x": page/,
+    );
+  });
+
+  it("throws when two route handlers collide across route groups", () => {
+    // Next also refuses (a)/x/route.ts + (b)/x/route.ts; consistent with the
+    // PR9 invariant even though no page is involved.
+    expect(() => scanTree(["(a)/x/route.ts", "(b)/x/route.ts"])).toThrow(
+      RouteCollisionError,
+    );
+    expect(() => scanTree(["(a)/x/route.ts", "(b)/x/route.ts"])).toThrow(
+      /route handler/,
+    );
+  });
+
+  it("emits nothing for route handlers across every extension", () => {
+    expect(
+      scanTree(["a/route.ts", "b/route.js", "c/route.tsx", "d/route.jsx"]),
+    ).toEqual([]);
+  });
+
+  it("emits the page and ignores a route handler at a DIFFERENT path", () => {
+    expect(scanTree(["dash/page.tsx", "api/route.ts"])).toEqual(["/dash"]);
+  });
+});
+
+describe("scanAppRoutes: %5F escaped-underscore folders (Bug 8, TR2)", () => {
+  it("decodes a leading %5F folder to a /_name segment", () => {
+    expect(scanTree(["%5Fsettings/page.tsx"])).toEqual(["/_settings"]);
+  });
+
+  it("decodes a lowercase %5f folder too (both hex cases accepted)", () => {
+    expect(scanTree(["%5fsettings/page.tsx"])).toEqual(["/_settings"]);
+  });
+
+  it("decodes a nested %5F folder", () => {
+    expect(scanTree(["account/%5Fsettings/page.tsx"])).toEqual([
+      "/account/_settings",
+    ]);
+  });
+
+  it("still skips a real _private folder (the skip reads the raw fs name)", () => {
+    expect(scanTree(["_settings/page.tsx"])).toEqual([]);
+  });
+
+  it("collides on the DECODED /_x key across route groups", () => {
+    // (a)/%5Fx + (b)/%5Fx both decode to /_x; the collision message names the
+    // decoded path, proving the escaped form drives collision detection (Bug
+    // 8). (Distinct fs parents, so this works on case-insensitive filesystems
+    // where %5Fx and %5fx would be the same directory.)
+    expect(() => scanTree(["(a)/%5Fx/page.tsx", "(b)/%5Fx/page.tsx"])).toThrow(
+      RouteCollisionError,
+    );
+    expect(() => scanTree(["(a)/%5Fx/page.tsx", "(b)/%5Fx/page.tsx"])).toThrow(
+      /"\/_x"/,
+    );
+  });
 });
 
 /**

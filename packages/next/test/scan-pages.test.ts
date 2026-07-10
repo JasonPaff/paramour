@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { RouteCollisionError, scanPagesRoutes } from "../src";
-import { makeTempDir, makeTree } from "./helpers.js";
+import { makeTempDir, makeTree, trySymlink } from "./helpers.js";
 
 /**
  * PR4's fixture matrix (PR11 §1) — one fixture per scanner rule. The trees
@@ -199,5 +199,39 @@ describe("scanPagesRoutes: error and traversal edges", () => {
 
   it("returns [] for an empty pages dir", () => {
     expect(scanTree([])).toEqual([]);
+  });
+
+  it("follows a symlinked page FILE — Next serves it (Bug 4)", (ctx) => {
+    // `Dirent.isFile()` is false for a symlink; the scanner resolves the
+    // target with statSync so a symlinked page routes like a real file.
+    const root = makeTempDir();
+    makeTree(root, ["pages/aliased/", "target/real.tsx"]);
+    if (
+      !trySymlink(
+        join(root, "target", "real.tsx"),
+        join(root, "pages", "aliased", "index.tsx"),
+        "file",
+      )
+    ) {
+      ctx.skip();
+      return;
+    }
+    expect(scanPagesRoutes(join(root, "pages"))).toEqual(["/aliased"]);
+  });
+
+  it("silently skips a broken page-file symlink (Bug 4)", (ctx) => {
+    const root = makeTempDir();
+    makeTree(root, ["pages/"]);
+    if (
+      !trySymlink(
+        join(root, "does-not-exist.tsx"),
+        join(root, "pages", "broken.tsx"),
+        "file",
+      )
+    ) {
+      ctx.skip();
+      return;
+    }
+    expect(scanPagesRoutes(join(root, "pages"))).toEqual([]);
   });
 });

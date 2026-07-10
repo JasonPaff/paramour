@@ -3,6 +3,7 @@ import {
   mkdtempSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -48,5 +49,24 @@ export function makeTree(root: string, entries: readonly string[]): void {
     }
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, "");
+  }
+}
+
+/**
+ * Attempt a `symlinkSync`, returning whether it succeeded. Creating symlinks
+ * on Windows needs the SeCreateSymbolicLink privilege (Developer Mode or an
+ * elevated shell); when that is unavailable the call throws EPERM. Callers use
+ * the boolean to skip a symlink test rather than fail on an environment quirk.
+ */
+export function trySymlink(
+  target: string,
+  path: string,
+  type: "dir" | "file",
+): boolean {
+  try {
+    symlinkSync(target, path, type);
+    return true;
+  } catch {
+    return false;
   }
 }

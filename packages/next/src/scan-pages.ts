@@ -5,7 +5,7 @@ import {
   assertNoStructuralCollisions,
   RouteCollisionError,
 } from "./collisions.js";
-import { DEFAULT_PAGE_EXTENSIONS } from "./scan-app.js";
+import { DEFAULT_PAGE_EXTENSIONS, resolvesToFile } from "./scan-app.js";
 
 /**
  * Pages Router scanner (PR4). Deliberately a separate walker from
@@ -87,7 +87,11 @@ function walk(
   );
   for (const entry of entries) {
     const name = entry.name;
-    if (entry.isFile()) {
+    // A real file, or a symlink whose target is a file: Next resolves and
+    // serves symlinked page files, so a file symlink routes exactly like a
+    // real file (Bug 4, TR2 shared posture). Directory symlinks fall through
+    // to the directory guard below and stay not-followed.
+    if (resolvesToFile(entry, dir)) {
       // Declaration files match `.ts` but are never pages (PR11 §1).
       if (name.endsWith(".d.ts")) continue;
       const ext = matchExtension(name, pageExtensions);
@@ -109,7 +113,8 @@ function walk(
       continue;
     }
     // Symlinked directories are deliberately not followed (TR2 v1 stance,
-    // shared posture).
+    // shared posture): `resolvesToFile` returned false and `isDirectory()` is
+    // false for the link Dirent, so the subtree is skipped here.
     if (!entry.isDirectory()) continue;
     // `pages/api/**` is excluded — top level only, so `pages/foo/api/bar.tsx`
     // routes (API-route typing is deferred to v1.x, PR4/§14). NO app-style

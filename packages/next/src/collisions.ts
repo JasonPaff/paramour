@@ -29,7 +29,7 @@ const OPTIONAL_CATCH_ALL = /^\[\[\.\.\..+\]\]$/;
  * whose name is `[...x]`.
  */
 const DYNAMIC_SEGMENT =
-  /^(?:\[\[\.\.\.(?<optional>.+)\]\]|\[\.\.\.(?<catchAll>.+)\]|\[(?<plain>[^[\].]+)\])$/;
+  /^(?:\[\[\.\.\.(?<optional>.+)\]\]|\[\.\.\.(?<catchAll>.+)\]|\[(?<plain>[^[\]]+)\])$/;
 
 /**
  * PR9's structural collisions — same detection pass, non-equal strings. Two

@@ -54,9 +54,12 @@ export function resolveRouteDirs(
     let populated: boolean;
     try {
       populated = scan(dir).length > 0;
-    } catch {
-      // A collision inside the ignored dir still proves it has page files —
-      // which is the only fact the probe needs.
+    } catch (error) {
+      // Only a RouteCollisionError proves the ignored dir has page files —
+      // which is the fact the probe needs. Any other throw (EACCES/EPERM,
+      // a dir removed mid-scan, …) is a real I/O failure that must not be
+      // masked by the "silently unreachable" config diagnosis; rethrow it.
+      if (!(error instanceof RouteCollisionError)) throw error;
       populated = true;
     }
     if (populated) {
