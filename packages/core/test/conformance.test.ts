@@ -1,6 +1,7 @@
 /**
  * Wire-format conformance suite — one test per case in wire-format spec §7.
  */
+import { parse as parseQuerystring } from "node:querystring";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -189,6 +190,46 @@ describe("byte-layer serialization", () => {
     expect(
       decodeSearch({ a: p.string() }, new URLSearchParams("a=1;b=2")),
     ).toEqual({ a: "1;b=2" });
+  });
+});
+
+/**
+ * The `+` character (P2 / design-06 §7). Empirical result: Next's two query
+ * layers AGREE — the Pages Router's `router.query` (node `querystring.parse`
+ * server-side) and `URLSearchParams` (client-side, and the App Router's
+ * `useSearchParams`) both decode `+` as a space. There is no
+ * router-vs-platform divergence; the layer that does NOT translate is plain
+ * `decodeURIComponent`, which is why paramour emits `%20`/`%2B` and never
+ * `+` (S1/C14): its URLs mean the same thing under either interpretation.
+ * The value layer never re-interprets (P2), so an OBJECT source keeps a
+ * literal `+` — the same wire text yields different values depending on
+ * which layer already decoded it.
+ */
+describe("the + character (P2 / design-06 §7)", () => {
+  it("C21: hand-typed q=a+b decodes as a space through both of Next's layers", () => {
+    // Client layer (URLSearchParams — what decodeSearch consumes directly).
+    expect(
+      decodeSearch({ q: p.string() }, new URLSearchParams("q=a+b")),
+    ).toEqual({ q: "a b" });
+    // Server layer (router.query is node querystring.parse over the URL):
+    // pinned to agree, so a hand-typed link reads the same on both sides.
+    expect(parseQuerystring("q=a+b")).toEqual({ q: "a b" });
+  });
+
+  it("C22: a literal + emits %2B and round-trips exactly", () => {
+    const wire = searchToString({ q: p.string() }, { q: "a+b" });
+    expect(wire).toBe("?q=a%2Bb");
+    expect(
+      decodeSearch({ q: p.string() }, new URLSearchParams(wire.slice(1))),
+    ).toEqual({ q: "a+b" });
+  });
+
+  it("C23: an object source is value-layer — + is never re-interpreted (P2)", () => {
+    // Next hands searchParams/query values already decoded; by the time a
+    // `+` survives to the value layer it IS a plus sign.
+    expect(decodeSearch({ q: p.string() }, { q: "a+b" })).toEqual({
+      q: "a+b",
+    });
   });
 });
 
