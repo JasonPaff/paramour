@@ -117,6 +117,73 @@ describe("scanAppRoutes: route groups (TR2)", () => {
   });
 });
 
+describe("scanAppRoutes: structural collisions (PR9)", () => {
+  it("errors on different slug names at one level", () => {
+    expect(() => scanTree(["x/[id]/page.tsx", "x/[slug]/page.tsx"])).toThrow(
+      RouteCollisionError,
+    );
+    expect(() => scanTree(["x/[id]/page.tsx", "x/[slug]/page.tsx"])).toThrow(
+      /\[id\].*\[slug\]|\[slug\].*\[id\]/,
+    );
+  });
+
+  it("errors on different slug names at the root level", () => {
+    expect(() => scanTree(["[id]/page.tsx", "[slug]/page.tsx"])).toThrow(
+      RouteCollisionError,
+    );
+  });
+
+  it("catches a slug-name conflict buried below different subtrees", () => {
+    // The colliding position is x/*; the pages live deeper. Next still
+    // refuses to build [id] beside [slug] regardless of where pages sit.
+    expect(() =>
+      scanTree(["x/[id]/page.tsx", "x/[slug]/edit/page.tsx"]),
+    ).toThrow(RouteCollisionError);
+  });
+
+  it("allows the documented priority pattern: [id] beside [...slug]", () => {
+    // Predefined > dynamic > catch-all is Next's own resolution order, not
+    // a collision — the kind split in the detector exists for this case.
+    expect(scanTree(["post/[id]/page.tsx", "post/[...slug]/page.tsx"])).toEqual(
+      ["/post/[...slug]", "/post/[id]"],
+    );
+  });
+
+  it("allows the same slug name under different parents", () => {
+    expect(scanTree(["a/[id]/page.tsx", "b/[slug]/page.tsx"])).toEqual([
+      "/a/[id]",
+      "/b/[slug]",
+    ]);
+  });
+
+  it("errors on required beside optional catch-all at one level", () => {
+    expect(() =>
+      scanTree(["docs/[...slug]/page.tsx", "docs/[[...slug]]/page.tsx"]),
+    ).toThrow(RouteCollisionError);
+  });
+
+  it("errors on an optional catch-all beside its own base path", () => {
+    expect(() =>
+      scanTree(["docs/page.tsx", "docs/[[...slug]]/page.tsx"]),
+    ).toThrow(RouteCollisionError);
+    expect(() =>
+      scanTree(["docs/page.tsx", "docs/[[...slug]]/page.tsx"]),
+    ).toThrow(/same specificity/);
+  });
+
+  it("errors on a root optional catch-all beside a root page", () => {
+    expect(() => scanTree(["page.tsx", "[[...slug]]/page.tsx"])).toThrow(
+      RouteCollisionError,
+    );
+  });
+
+  it("allows an optional catch-all whose base path has no page", () => {
+    expect(scanTree(["docs/[[...slug]]/page.tsx"])).toEqual([
+      "/docs/[[...slug]]",
+    ]);
+  });
+});
+
 describe("scanAppRoutes: skipped subtrees (TR2)", () => {
   it("skips @slot subtrees entirely, pages at any depth included", () => {
     expect(scanTree(["@modal/page.tsx", "@modal/deep/page.tsx"])).toEqual([]);

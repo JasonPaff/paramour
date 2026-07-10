@@ -1,7 +1,10 @@
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { RouteCollisionError } from "./collisions.js";
+import {
+  assertNoStructuralCollisions,
+  RouteCollisionError,
+} from "./collisions.js";
 
 /** Next's default `pageExtensions` — extensions only, no leading dot (TR2). */
 export const DEFAULT_PAGE_EXTENSIONS = ["tsx", "ts", "jsx", "js"] as const;
@@ -49,7 +52,11 @@ export function scanAppRoutes(
   walk(appDir, [], [], pageFileNames, out);
   // Code-unit sort, never localeCompare — locale independence feeds TR3's
   // byte-identical-on-every-OS guarantee.
-  return [...out.keys()].sort();
+  const paths = [...out.keys()].sort();
+  // PR9 structural collisions (different slug names, optional-catch-all
+  // specificity) — non-equal strings the Map above cannot catch.
+  assertNoStructuralCollisions(paths.map((path) => ({ path, router: "app" })));
+  return paths;
 }
 
 function walk(
