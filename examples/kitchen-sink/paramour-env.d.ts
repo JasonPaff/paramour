@@ -5,10 +5,16 @@ declare module "paramour" {
   interface ParamourRegister {
     appRoutes:
       | "/"
+      | "/_internal"
+      | "/about"
+      | "/dashboard"
       | "/docs/[[...slug]]"
       | "/events/[date]"
+      | "/feed"
       | "/files/[...path]"
       | "/find"
+      | "/gallery"
+      | "/gallery/[photoId]"
       | "/products"
       | "/products/[id]"
       | "/search"

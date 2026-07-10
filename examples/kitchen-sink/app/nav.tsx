@@ -5,10 +5,14 @@ import { usePathname } from "next/navigation";
 import { href } from "paramour";
 
 import { legacyRoute } from "../lib/legacy.def";
+import { aboutRoute } from "./(marketing)/about/route.def";
+import { dashboardRoute } from "./dashboard/route.def";
 import { docsRoute } from "./docs/[[...slug]]/route.def";
 import { eventsRoute } from "./events/[date]/route.def";
+import { feedRoute } from "./feed/route.def";
 import { filesRoute } from "./files/[...path]/route.def";
 import { findRoute } from "./find/route.def";
+import { galleryRoute } from "./gallery/route.def";
 import { productsListRoute } from "./products/route.def";
 import { homeRoute } from "./route.def";
 import { serializeRoute } from "./serialize/route.def";
@@ -48,6 +52,13 @@ const links = [
     to: href(findRoute, { search: { q: "cable" } }),
   },
   { label: "Serialize", prefix: "/serialize", to: href(serializeRoute) },
+  // The exotic-conventions wing: a route group page, a parallel-routes page,
+  // and the two interception hosts. Gallery's prefix also matches
+  // /gallery/[photoId], so the tab stays lit under the modal.
+  { label: "About", prefix: "/about", to: href(aboutRoute) },
+  { label: "Dashboard", prefix: "/dashboard", to: href(dashboardRoute) },
+  { label: "Gallery", prefix: "/gallery", to: href(galleryRoute) },
+  { label: "Feed", prefix: "/feed", to: href(feedRoute) },
   {
     label: "Legacy",
     prefix: "/legacy",

@@ -594,3 +594,30 @@ code {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------- gallery interception modal ---------- */
+
+.modal-overlay {
+  display: grid;
+  position: fixed;
+  z-index: 10;
+  background: rgb(0 0 0 / 55%);
+  inset: 0;
+  place-items: center;
+}
+
+.modal {
+  position: relative;
+  max-width: 26rem;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  width: min(90vw, 26rem);
+}
+
+.modal__close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+}

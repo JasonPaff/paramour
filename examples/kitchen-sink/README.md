@@ -20,9 +20,35 @@ It also depends on [Zod](https://zod.dev) to show Standard Schema integration
 | `/search`           | legacy redirect endpoint that never renders: server-side `safeParseSearch`, `redirect(href(...))` translating old keys (`keyword`→`q`, `tag`→`tags`), `permanentRedirect(href(...))` for moved deep links (`?product=4` → `/products/4`; browsers cache 308s hard); decode failure falls back to the bare list                |
 | `/serialize`        | interactive `buildPath`/`encodeParams`/`decodeParams`/`encodeSearch`/`decodeSearch`/`buildSearchString`/`searchToString`, and the error hierarchy (`ParamourError`, `ParseError` vs `SerializeError`, `ParamsDecodeError`/`SearchDecodeError` + `.issues`)                                                                    |
 | `/legacy`           | the hybrid route (design-06 PR1): a `pages/` route beside `app/`; `definePagesRoute`; three-state `useSearch` from `@paramour-js/next/pages`; one artifact registering `appRoutes` **and** `pagesRoutes`; `href()` across the router boundary                                                                                 |
+| `/about`            | route group: the page lives at `app/(marketing)/about/` under a group layout (shared banner, private `_components/` folder), but the typed route — and the artifact entry — is plain `/about`                                                                                                                                 |
+| `/dashboard`        | parallel routes: the server page and the client `@stats` slot render side by side and decode the **same** typed search (`range` enum with D8-eliding default) from one URL; the `@stats` subtree never reaches the artifact                                                                                                   |
+| `/gallery`          | intercepting route, modal pattern: soft-nav from the grid renders `@modal/(.)[photoId]` as an overlay (`router.back()` dismisses); hard load renders the full `[photoId]` page — same URL, one route def typing both surfaces                                                                                                 |
+| `/feed`             | slot-less interception (Next docs' `feed/(..)photo` shape): the same `/gallery/[photoId]` links render `(..)gallery/[photoId]` inline in the children position on soft nav; the third surface decoding the one `galleryPhotoRoute` def                                                                                        |
+| `/_internal`        | the `%5F` escape: a `%5Finternal/` folder serves a URL segment with a literal leading `_` (a plain `_internal/` folder would be private and route nothing); the scanner decodes the escape the same way                                                                                                                       |
 
 Shared pieces live in `lib/`: `schemas.ts` (the Zod validators) and `codecs.ts`
 (a `p.custom` CSV codec and a standalone `SearchConfig` for the playground).
+
+## Exotic file conventions as a scanner gate
+
+The last five routes above exist for a second reason: they keep every exotic
+App Router file convention alive in a tree that CI both `next build`s and
+drift-checks (`strict: true`), so a scanner regression against real Next
+behavior fails the build, not just a unit test. What the scanner must do with
+each:
+
+- **emit, group-stripped** — `(marketing)/about` → `/about`
+- **emit, escape-decoded** — `%5Finternal` → `/_internal`
+- **skip entirely** — `@stats`, `@modal` (parallel slots), `(.)[photoId]`,
+  `(..)gallery` (interception markers), `_components` (private folder)
+
+The interception conventions are pure render plumbing — they never mint a new
+URL. That's the demo on the read side too: the full page, the `@modal`
+overlay, and the `/feed` inline preview all decode params through the single
+`galleryPhotoRoute` def, because they all serve `/gallery/[photoId]`.
+
+Try it: from `/gallery` click a card (overlay; the URL bar changes), reload
+(full page), then from `/feed` click the same photo (inline preview).
 
 ## Running it
 
