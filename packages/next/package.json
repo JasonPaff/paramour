@@ -18,7 +18,7 @@
     }
   },
   "bin": {
-    "paramour": "./dist/cli.js"
+    "paramour": "./bin/paramour.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -60,6 +60,7 @@
     "url": "https://github.com/JasonPaff/paramour/issues"
   },
   "files": [
+    "bin",
     "dist"
   ]
 }

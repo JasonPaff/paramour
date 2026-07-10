@@ -40,5 +40,18 @@ export default tseslint.config(
     files: ["*.ts"],
   },
 
+  // Committed bin stubs: plain Node ESM outside the TS projects, so the
+  // type-checked blocks never see them; declare the Node globals they use.
+  {
+    files: ["packages/*/bin/*.js"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        URL: "readonly",
+      },
+    },
+  },
+
   prettier,
 );
