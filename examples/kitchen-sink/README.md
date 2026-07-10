@@ -8,23 +8,24 @@ It also depends on [Zod](https://zod.dev) to show Standard Schema integration
 
 ## What each route demonstrates
 
-| Route               | Surface                                                                                                                                                                                                                                                                                                                       |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                 | static route; `href()` to every route; branded `Href` into `<Link>`                                                                                                                                                                                                                                                           |
-| `/products`         | URL-as-state filter form: safe `useSearch` + `router.replace(href(route, { search }), { scroll: false })` round-trip (text input debounced); `router.push(href(...))` to the detail route; `InferSearchInput` form state; D8 elision and S6 (`[]` ≡ absent) live in the URL bar; Suspense boundary instead of `force-dynamic` |
-| `/products/[id]`    | single `[id]` (Zod-refined `p.integer`); search covering `p.string`(+schema)/`p.number`/`p.boolean`/`p.enum`/`p.integer`/`p.stringArray` with `.optional()`, value `.default()` (+ D8 elision), and `.default().catch()`; server `parse` + `parseParams`; safe client hooks (`useRouteParams`/`useSearch`)                    |
-| `/docs/[[...slug]]` | optional catch-all; `safeParse` → `notFound()`                                                                                                                                                                                                                                                                                |
-| `/files/[...path]`  | required catch-all; `safeParseParams` (renders `.issues` on failure)                                                                                                                                                                                                                                                          |
-| `/events/[date]`    | `p.isoDate` param; `p.timestamp`/`p.json`(+schema)/`p.custom` search; **factory** `.default(() => …)` and `.catch(() => …)`; `parseParams` + `safeParseSearch`; throwing client hooks (`useRouteParamsOrThrow`/`useSearchOrThrow`)                                                                                            |
-| `/find`             | `rawSearch(schema)` whole-object escape hatch; `parseSearch`                                                                                                                                                                                                                                                                  |
-| `/search`           | legacy redirect endpoint that never renders: server-side `safeParseSearch`, `redirect(href(...))` translating old keys (`keyword`→`q`, `tag`→`tags`), `permanentRedirect(href(...))` for moved deep links (`?product=4` → `/products/4`; browsers cache 308s hard); decode failure falls back to the bare list                |
-| `/serialize`        | interactive `buildPath`/`encodeParams`/`decodeParams`/`encodeSearch`/`decodeSearch`/`buildSearchString`/`searchToString`, and the error hierarchy (`ParamourError`, `ParseError` vs `SerializeError`, `ParamsDecodeError`/`SearchDecodeError` + `.issues`)                                                                    |
-| `/legacy`           | the hybrid route (design-06 PR1): a `pages/` route beside `app/`; `definePagesRoute`; three-state `useSearch` from `@paramour-js/next/pages`; one artifact registering `appRoutes` **and** `pagesRoutes`; `href()` across the router boundary                                                                                 |
-| `/about`            | route group: the page lives at `app/(marketing)/about/` under a group layout (shared banner, private `_components/` folder), but the typed route — and the artifact entry — is plain `/about`                                                                                                                                 |
-| `/dashboard`        | parallel routes: the server page and the client `@stats` slot render side by side and decode the **same** typed search (`range` enum with D8-eliding default) from one URL; the `@stats` subtree never reaches the artifact                                                                                                   |
-| `/gallery`          | intercepting route, modal pattern: soft-nav from the grid renders `@modal/(.)[photoId]` as an overlay (`router.back()` dismisses); hard load renders the full `[photoId]` page — same URL, one route def typing both surfaces                                                                                                 |
-| `/feed`             | slot-less interception (Next docs' `feed/(..)photo` shape): the same `/gallery/[photoId]` links render `(..)gallery/[photoId]` inline in the children position on soft nav; the third surface decoding the one `galleryPhotoRoute` def                                                                                        |
-| `/_internal`        | the `%5F` escape: a `%5Finternal/` folder serves a URL segment with a literal leading `_` (a plain `_internal/` folder would be private and route nothing); the scanner decodes the escape the same way                                                                                                                       |
+| Route               | Surface                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                 | static route; `href()` to every route; branded `Href` into `<Link>`                                                                                                                                                                                                                                                                                                                                                             |
+| `/products`         | URL-as-state filter form: safe `useSearch` + `router.replace(href(route, { search }), { scroll: false })` round-trip (text input debounced); `router.push(href(...))` to the detail route; `InferSearchInput` form state; D8 elision and S6 (`[]` ≡ absent) live in the URL bar; Suspense boundary instead of `force-dynamic`; a server action (jump form) validating with sync `safeDecodeParams` before `redirect(href(...))` |
+| `/api/products`     | route handler (GET): a **standalone** `SearchConfig` — no route def, handlers are never emitted (§14) — spread from the page's config plus an API-only `limit`; sync `decodeSearch` on `request.nextUrl.searchParams`; `SearchDecodeError.issues` → JSON 400                                                                                                                                                                    |
+| `/products/[id]`    | single `[id]` (Zod-refined `p.integer`); search covering `p.string`(+schema)/`p.number`/`p.boolean`/`p.enum`/`p.integer`/`p.stringArray` with `.optional()`, value `.default()` (+ D8 elision), and `.default().catch()`; server `parse` + `parseParams`; safe client hooks (`useRouteParams`/`useSearch`)                                                                                                                      |
+| `/docs/[[...slug]]` | optional catch-all; `safeParse` → `notFound()`                                                                                                                                                                                                                                                                                                                                                                                  |
+| `/files/[...path]`  | required catch-all; `safeParseParams` (renders `.issues` on failure)                                                                                                                                                                                                                                                                                                                                                            |
+| `/events/[date]`    | `p.isoDate` param; `p.timestamp`/`p.json`(+schema)/`p.custom` search; **factory** `.default(() => …)` and `.catch(() => …)`; `parseParams` + `safeParseSearch`; throwing client hooks (`useRouteParamsOrThrow`/`useSearchOrThrow`)                                                                                                                                                                                              |
+| `/find`             | `rawSearch(schema)` whole-object escape hatch; `parseSearch`                                                                                                                                                                                                                                                                                                                                                                    |
+| `/search`           | legacy redirect endpoint that never renders: server-side `safeParseSearch`, `redirect(href(...))` translating old keys (`keyword`→`q`, `tag`→`tags`), `permanentRedirect(href(...))` for moved deep links (`?product=4` → `/products/4`; browsers cache 308s hard); decode failure falls back to the bare list                                                                                                                  |
+| `/serialize`        | interactive `buildPath`/`encodeParams`/`decodeParams`/`encodeSearch`/`decodeSearch`/`buildSearchString`/`searchToString`, and the error hierarchy (`ParamourError`, `ParseError` vs `SerializeError`, `ParamsDecodeError`/`SearchDecodeError` + `.issues`)                                                                                                                                                                      |
+| `/legacy`           | the hybrid route (design-06 PR1): a `pages/` route beside `app/`; `definePagesRoute`; three-state `useSearch` from `@paramour-js/next/pages`; one artifact registering `appRoutes` **and** `pagesRoutes`; `href()` across the router boundary                                                                                                                                                                                   |
+| `/about`            | route group: the page lives at `app/(marketing)/about/` under a group layout (shared banner, private `_components/` folder), but the typed route — and the artifact entry — is plain `/about`                                                                                                                                                                                                                                   |
+| `/dashboard`        | parallel routes: the server page and the client `@stats` slot render side by side and decode the **same** typed search (`range` enum with D8-eliding default) from one URL; the `@stats` subtree never reaches the artifact                                                                                                                                                                                                     |
+| `/gallery`          | intercepting route, modal pattern: soft-nav from the grid renders `@modal/(.)[photoId]` as an overlay (`router.back()` dismisses); hard load renders the full `[photoId]` page — same URL, one route def typing both surfaces                                                                                                                                                                                                   |
+| `/feed`             | slot-less interception (Next docs' `feed/(..)photo` shape): the same `/gallery/[photoId]` links render `(..)gallery/[photoId]` inline in the children position on soft nav; the third surface decoding the one `galleryPhotoRoute` def                                                                                                                                                                                          |
+| `/_internal`        | the `%5F` escape: a `%5Finternal/` folder serves a URL segment with a literal leading `_` (a plain `_internal/` folder would be private and route nothing); the scanner decodes the escape the same way                                                                                                                                                                                                                         |
 
 Shared pieces live in `lib/`: `schemas.ts` (the Zod validators) and `codecs.ts`
 (a `p.custom` CSV codec and a standalone `SearchConfig` for the playground).
@@ -49,6 +50,41 @@ overlay, and the `/feed` inline preview all decode params through the single
 
 Try it: from `/gallery` click a card (overlay; the URL bar changes), reload
 (full page), then from `/feed` click the same photo (inline preview).
+
+## Server surfaces beyond pages
+
+Three surfaces a real app hits daily, none of them a page:
+
+- **Route handler** — `app/api/products/route.ts`. Handlers are scanned but
+  never emitted (handler typing is deferred, §14), so there is no route def
+  and no `href()` to this URL; what the handler owns is its **vocabulary**, a
+  standalone `SearchConfig` spread from the page's config. With the dev
+  server running:
+
+  ```sh
+  curl 'http://localhost:3000/api/products?tags=audio&sort=price&limit=2'
+  curl 'http://localhost:3000/api/products?page=x&inStock=maybe'  # 400, one issue per failed key
+  curl 'http://localhost:3000/api/products?utm_source=x'          # unknown keys ignored (P8)
+  ```
+
+- **Server action** — the jump form on `/products`
+  (`app/products/actions.ts`). The action validates the raw form field with
+  the sync `safeDecodeParams` — the exact decode `/products/[id]` runs — then
+  `redirect(href(...))`s, so a success can never produce a redirect its
+  target rejects. Try `0` or `abc`: the error arm renders inline instead of
+  navigating.
+
+- **Proxy (middleware)** — `proxy.ts` canonicalizes `/products` URLs in the
+  routing layer: decode, re-encode with `encodeSearch`/`buildSearchString`,
+  and 308 when the bytes differ. Keys the config doesn't declare (`utm_*`,
+  Next's own `_rsc`) pass through untouched. Try these in the URL bar (308s —
+  use a private window):
+  - `/products?page=1&sort=name` → `/products` (D8 elision, enforced at the
+    edge)
+  - `/products?q=usb+c` → `/products?q=usb%20c` (S2: spaces are `%20`,
+    never `+`)
+  - `/products?sort=price&q=cable` → `/products?q=cable&sort=price` (one
+    canonical key order)
 
 ## Running it
 

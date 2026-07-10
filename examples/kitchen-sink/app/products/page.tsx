@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { FilterPanel } from "./filter-panel";
+import { JumpForm } from "./jump-form";
 
 // The other sanctioned shape for a static route that reads search params:
 // /find opts the whole route into dynamic rendering (force-dynamic); here the
@@ -20,6 +21,7 @@ export default function ProductsPage() {
       <Suspense fallback={<section className="panel" />}>
         <FilterPanel />
       </Suspense>
+      <JumpForm />
     </main>
   );
 }
