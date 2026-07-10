@@ -1,6 +1,8 @@
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+import { RouteCollisionError } from "./collisions.js";
+
 /** Next's default `pageExtensions` — extensions only, no leading dot (TR2). */
 export const DEFAULT_PAGE_EXTENSIONS = ["tsx", "ts", "jsx", "js"] as const;
 
@@ -28,34 +30,55 @@ export function resolveAppDir(projectRoot: string): string | undefined {
 }
 
 /**
- * Walk an app dir and return the sorted, deduped union of URL-shaped route
- * paths — exactly the strings `defineAppRoute` accepts (TR2, RL2). Pure
- * `fs.readdir` recursion; no dependency on Next internals.
+ * Walk an app dir and return the sorted union of URL-shaped route paths —
+ * exactly the strings `defineAppRoute` accepts (TR2, RL2). Pure `fs.readdir`
+ * recursion; no dependency on Next internals. Two page files resolving to
+ * one URL path — `(a)/x` + `(b)/x` group twins, or `page.tsx` + `page.jsx`
+ * extension twins — throw a {@link RouteCollisionError} instead of being
+ * deduped (PR4/PR9 alignment ruling): that state is Next's own build error,
+ * and deduping would emit an artifact for a project that cannot build.
  */
 export function scanAppRoutes(
   appDir: string,
   pageExtensions: readonly string[] = DEFAULT_PAGE_EXTENSIONS,
 ): string[] {
-  const out = new Set<string>();
+  // Path → the fs path (relative to appDir) that produced it, so a collision
+  // can name both files.
+  const out = new Map<string, string>();
   const pageFileNames = new Set(pageExtensions.map((ext) => `page.${ext}`));
-  walk(appDir, [], pageFileNames, out);
+  walk(appDir, [], [], pageFileNames, out);
   // Code-unit sort, never localeCompare — locale independence feeds TR3's
   // byte-identical-on-every-OS guarantee.
-  return [...out].sort();
+  return [...out.keys()].sort();
 }
 
 function walk(
   dir: string,
   urlSegments: readonly string[],
+  fsSegments: readonly string[],
   pageFileNames: ReadonlySet<string>,
-  out: Set<string>,
+  out: Map<string, string>,
 ): void {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  // Sorted traversal: readdir order is platform-dependent, and which of two
+  // colliding files gets named first in the error must not be.
+  const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+  );
+  for (const entry of entries) {
     if (entry.isFile()) {
       // Exact, case-sensitive `page.<ext>` match (TR2). `route.ts` handlers
       // need no special-casing — they never match (handler typing is §14).
       if (pageFileNames.has(entry.name)) {
-        out.add(urlSegments.length === 0 ? "/" : `/${urlSegments.join("/")}`);
+        const path =
+          urlSegments.length === 0 ? "/" : `/${urlSegments.join("/")}`;
+        const file = [...fsSegments, entry.name].join("/");
+        const existing = out.get(path);
+        if (existing !== undefined) {
+          throw new RouteCollisionError(
+            `app route collision at "${path}": ${existing} and ${file} resolve to the same path (PR9)`,
+          );
+        }
+        out.set(path, file);
       }
       continue;
     }
@@ -68,13 +91,24 @@ function walk(
     if (name.startsWith("@")) continue;
     if (INTERCEPTION_PREFIX.test(name)) continue;
     if (ROUTE_GROUP.test(name)) {
-      // Group stripped: recurse with the SAME segments. `out` being a Set
-      // dedupes `(a)/x` + `(b)/x` collisions — Next's own build error (TR2).
-      walk(join(dir, name), urlSegments, pageFileNames, out);
+      // Group stripped: recurse with the SAME url segments (TR2).
+      walk(
+        join(dir, name),
+        urlSegments,
+        [...fsSegments, name],
+        pageFileNames,
+        out,
+      );
       continue;
     }
     // Dynamic segments `[id]` / `[...slug]` / `[[...slug]]` pass through
     // verbatim (TR2, RL2 URL-shaped literals).
-    walk(join(dir, name), [...urlSegments, name], pageFileNames, out);
+    walk(
+      join(dir, name),
+      [...urlSegments, name],
+      [...fsSegments, name],
+      pageFileNames,
+      out,
+    );
   }
 }

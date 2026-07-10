@@ -2,7 +2,7 @@ import { symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { resolveAppDir, scanAppRoutes } from "../src";
+import { resolveAppDir, RouteCollisionError, scanAppRoutes } from "../src";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /** Build a tree in a temp dir and scan it in one step. */
@@ -99,8 +99,21 @@ describe("scanAppRoutes: route groups (TR2)", () => {
     expect(scanTree(["(a)/(b)/x/page.tsx"])).toEqual(["/x"]);
   });
 
-  it("dedupes group collisions to one path", () => {
-    expect(scanTree(["(a)/x/page.tsx", "(b)/x/page.tsx"])).toEqual(["/x"]);
+  it("errors on a group collision instead of deduping (PR4/PR9 alignment)", () => {
+    // (a)/x + (b)/x is Next's own build error; the old Set-dedupe silently
+    // masked exactly the state Next refuses to build.
+    expect(() => scanTree(["(a)/x/page.tsx", "(b)/x/page.tsx"])).toThrow(
+      RouteCollisionError,
+    );
+    expect(() => scanTree(["(a)/x/page.tsx", "(b)/x/page.tsx"])).toThrow(
+      /"\/x".*\(a\)\/x\/page\.tsx.*\(b\)\/x\/page\.tsx/,
+    );
+  });
+
+  it("errors on extension twins in one directory (page.tsx + page.jsx)", () => {
+    expect(() => scanTree(["x/page.tsx", "x/page.jsx"])).toThrow(
+      RouteCollisionError,
+    );
   });
 });
 

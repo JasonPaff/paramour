@@ -1,3 +1,4 @@
+export { RouteCollisionError } from "./collisions.js";
 export { type ParamourConfig } from "./config.js";
 export {
   emitArtifact,
