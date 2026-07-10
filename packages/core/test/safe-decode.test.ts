@@ -65,33 +65,36 @@ const asyncSchema: StandardSchemaV1<unknown, Record<string, never>> = {
 };
 
 describe("safeDecodeSearch", () => {
-  it("returns { data } for a valid URLSearchParams source", () => {
+  it("returns the success arm for a valid URLSearchParams source", () => {
     const result = safeDecodeSearch(
       productRoute,
       new URLSearchParams("page=2&q=hi"),
     );
-    expect(result).toEqual({ data: { page: 2, q: "hi" } });
-    expect(result.error).toBeUndefined();
+    expect(result).toEqual({ data: { page: 2, q: "hi" }, status: "success" });
   });
 
   it("applies codec defaults / optional absence", () => {
     const result = safeDecodeSearch(productRoute, new URLSearchParams());
-    expect(result.data).toEqual({ page: 1, q: undefined });
+    expect(result).toEqual({
+      data: { page: 1, q: undefined },
+      status: "success",
+    });
   });
 
-  it("returns { error: SearchDecodeError } for a malformed value", () => {
+  it("returns the error arm holding a SearchDecodeError for a malformed value", () => {
     const result = safeDecodeSearch(
       productRoute,
       new URLSearchParams("page=abc"),
     );
-    expect(result.data).toBeUndefined();
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
     expect(result.error).toBeInstanceOf(SearchDecodeError);
-    expect(result.error?.issues.map((issue) => issue.key)).toEqual(["page"]);
+    expect(result.error.issues.map((issue) => issue.key)).toEqual(["page"]);
   });
 
-  it("recovers via .catch() into { data } rather than { error }", () => {
+  it("recovers via .catch() into the success arm rather than the error arm", () => {
     const result = safeDecodeSearch(catchRoute, new URLSearchParams("page=x"));
-    expect(result).toEqual({ data: { page: 0 } });
+    expect(result).toEqual({ data: { page: 0 }, status: "success" });
   });
 
   it("rethrows a non-decode error (contract violation stays loud)", () => {
@@ -102,15 +105,15 @@ describe("safeDecodeSearch", () => {
 
   it("accepts a plain-object source (Next RSC searchParams shape)", () => {
     const result = safeDecodeSearch(productRoute, { page: "2", q: "hi" });
-    expect(result).toEqual({ data: { page: 2, q: "hi" } });
+    expect(result).toEqual({ data: { page: 2, q: "hi" }, status: "success" });
   });
 
   it("accepts an array-valued key in a plain-object source for an array codec", () => {
     const result = safeDecodeSearch(tagsRoute, { tags: ["a", "b"] });
-    expect(result).toEqual({ data: { tags: ["a", "b"] } });
+    expect(result).toEqual({ data: { tags: ["a", "b"] }, status: "success" });
   });
 
-  it("aggregates one issue per failed key into a single { error }", () => {
+  it("aggregates one issue per failed key into a single error arm", () => {
     const multiRoute = defineRoute("/multi", {
       search: { count: p.integer(), flag: p.boolean() },
     });
@@ -118,8 +121,10 @@ describe("safeDecodeSearch", () => {
       multiRoute,
       new URLSearchParams("count=abc&flag=nope"),
     );
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
     expect(result.error).toBeInstanceOf(SearchDecodeError);
-    expect(result.error?.issues.map((issue) => issue.key).sort()).toEqual([
+    expect(result.error.issues.map((issue) => issue.key).sort()).toEqual([
       "count",
       "flag",
     ]);
@@ -127,25 +132,26 @@ describe("safeDecodeSearch", () => {
 });
 
 describe("safeDecodeSearch with a rawSearch route (design-04)", () => {
-  it("returns { data } holding the schema's own output", () => {
+  it("returns the success arm holding the schema's own output", () => {
     const result = safeDecodeSearch(rawRoute, { page: "2", q: "hi" });
-    expect(result).toEqual({ data: { page: 2, q: "hi" } });
+    expect(result).toEqual({ data: { page: 2, q: "hi" }, status: "success" });
   });
 
-  it("returns { error: SearchDecodeError } when the schema reports issues", () => {
+  it("returns the error arm holding a SearchDecodeError when the schema reports issues", () => {
     const result = safeDecodeSearch(rawRoute, new URLSearchParams("page=2"));
-    expect(result.data).toBeUndefined();
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
     expect(result.error).toBeInstanceOf(SearchDecodeError);
-    expect(result.error?.issues.map((issue) => issue.key)).toEqual(["q"]);
+    expect(result.error.issues.map((issue) => issue.key)).toEqual(["q"]);
   });
 
-  it("a schema whose validate THROWS stays loud (ParamourError, not { error })", () => {
+  it("a schema whose validate THROWS stays loud (ParamourError, not the error arm)", () => {
     const route = defineRoute("/boom", { search: rawSearch(throwingSchema) });
     expect(() => safeDecodeSearch(route, {})).toThrow(ParamourError);
     expect(() => safeDecodeSearch(route, {})).toThrow(/validation threw/);
   });
 
-  it("an async schema throws loudly (design-02 D7), never { error }", () => {
+  it("an async schema throws loudly (design-02 D7), never the error arm", () => {
     const route = defineRoute("/async", { search: rawSearch(asyncSchema) });
     expect(() => safeDecodeSearch(route, {})).toThrow(ParamourError);
     expect(() => safeDecodeSearch(route, {})).toThrow(/synchronous/);
@@ -153,20 +159,22 @@ describe("safeDecodeSearch with a rawSearch route (design-04)", () => {
 });
 
 describe("safeDecodeParams", () => {
-  it("returns { data } for a valid params source", () => {
+  it("returns the success arm for a valid params source", () => {
     const result = safeDecodeParams(productRoute, { id: "42" });
-    expect(result).toEqual({ data: { id: 42 } });
-    expect(result.error).toBeUndefined();
+    expect(result).toEqual({ data: { id: 42 }, status: "success" });
   });
 
-  it("returns { error: ParamsDecodeError } for a malformed segment", () => {
+  it("returns the error arm holding a ParamsDecodeError for a malformed segment", () => {
     const result = safeDecodeParams(productRoute, { id: "not-a-number" });
-    expect(result.data).toBeUndefined();
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
     expect(result.error).toBeInstanceOf(ParamsDecodeError);
   });
 
-  it("returns { error } when a required segment is missing", () => {
+  it("returns the error arm when a required segment is missing", () => {
     const result = safeDecodeParams(productRoute, {});
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
     expect(result.error).toBeInstanceOf(ParamsDecodeError);
   });
 
@@ -178,21 +186,23 @@ describe("safeDecodeParams", () => {
 
   it("decodes a catch-all segment from its array source", () => {
     const result = safeDecodeParams(filesRoute, { seg: ["a", "b"] });
-    expect(result).toEqual({ data: { seg: ["a", "b"] } });
+    expect(result).toEqual({ data: { seg: ["a", "b"] }, status: "success" });
   });
 
   it("decodes an absent optional catch-all to an empty array", () => {
     const result = safeDecodeParams(docsRoute, {});
-    expect(result).toEqual({ data: { slug: [] } });
+    expect(result).toEqual({ data: { slug: [] }, status: "success" });
   });
 
-  it("aggregates one issue per failed segment into a single { error }", () => {
+  it("aggregates one issue per failed segment into a single error arm", () => {
     const pairRoute = defineRoute("/pair/[a]/[b]", {
       params: { a: p.integer(), b: p.integer() },
     });
     const result = safeDecodeParams(pairRoute, { a: "x", b: "y" });
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
     expect(result.error).toBeInstanceOf(ParamsDecodeError);
-    expect(result.error?.issues.map((issue) => issue.key).sort()).toEqual([
+    expect(result.error.issues.map((issue) => issue.key).sort()).toEqual([
       "a",
       "b",
     ]);

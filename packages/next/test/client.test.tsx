@@ -37,29 +37,36 @@ const rawRoute = defineRoute("/raw", {
 });
 
 describe("useSearch (smoke: useMemo ↔ useSearchParams wiring)", () => {
-  it("returns { data } for a valid search string", () => {
+  it("returns the success arm for a valid search string", () => {
     __setSearchParams(new URLSearchParams("page=2&q=hi"));
     const { result } = renderHook(() => useSearch(productRoute));
-    expect(result.current).toEqual({ data: { page: 2, q: "hi" } });
+    expect(result.current).toEqual({
+      data: { page: 2, q: "hi" },
+      status: "success",
+    });
   });
 
-  it("returns { error } for a malformed search string", () => {
+  it("returns the error arm for a malformed search string", () => {
     __setSearchParams(new URLSearchParams("page=abc"));
     const { result } = renderHook(() => useSearch(productRoute));
+    expect(result.current.status).toBe("error");
+    if (result.current.status !== "error") return;
     expect(result.current.error).toBeInstanceOf(SearchDecodeError);
   });
 });
 
 describe("useRouteParams (smoke: useMemo ↔ useParams wiring)", () => {
-  it("returns { data } for a valid params object", () => {
+  it("returns the success arm for a valid params object", () => {
     __setParams({ id: "42" });
     const { result } = renderHook(() => useRouteParams(productRoute));
-    expect(result.current).toEqual({ data: { id: 42 } });
+    expect(result.current).toEqual({ data: { id: 42 }, status: "success" });
   });
 
-  it("returns { error } for a malformed params object", () => {
+  it("returns the error arm for a malformed params object", () => {
     __setParams({ id: "nope" });
     const { result } = renderHook(() => useRouteParams(productRoute));
+    expect(result.current.status).toBe("error");
+    if (result.current.status !== "error") return;
     expect(result.current.error).toBeInstanceOf(ParamsDecodeError);
   });
 });
@@ -116,15 +123,21 @@ describe("catch-all params through useRouteParams", () => {
   it("decodes an array-valued catch-all segment", () => {
     __setParams({ slug: ["a", "b"] });
     const { result } = renderHook(() => useRouteParams(filesRoute));
-    expect(result.current).toEqual({ data: { slug: ["a", "b"] } });
+    expect(result.current).toEqual({
+      data: { slug: ["a", "b"] },
+      status: "success",
+    });
   });
 });
 
 describe("rawSearch routes through the search hooks", () => {
-  it("useSearch returns { data } holding the schema's output", () => {
+  it("useSearch returns the success arm holding the schema's output", () => {
     __setSearchParams(new URLSearchParams("page=2&q=hi"));
     const { result } = renderHook(() => useSearch(rawRoute));
-    expect(result.current).toEqual({ data: { page: 2, q: "hi" } });
+    expect(result.current).toEqual({
+      data: { page: 2, q: "hi" },
+      status: "success",
+    });
   });
 
   it("useSearchOrThrow returns the schema's output directly", () => {

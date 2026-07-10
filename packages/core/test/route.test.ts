@@ -154,8 +154,10 @@ describe("route parse methods (RL6)", () => {
 
   it("a missing params member decodes like an empty source, never crashes", async () => {
     const result = await route.safeParse({ searchParams: { q: "hi" } });
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
     expect(result.error).toBeInstanceOf(ParamsDecodeError);
-    expect(result.error?.issues).toEqual([
+    expect(result.error.issues).toEqual([
       { key: "id", message: "required route param is missing" },
     ]);
   });
@@ -207,28 +209,37 @@ describe("route parse methods (RL6)", () => {
     ).resolves.toEqual({ q: "hi" });
   });
 
-  it("safeParse returns data XOR error", async () => {
+  it("safeParse discriminates on status (PR12)", async () => {
     const ok = await route.safeParse({
       params: { id: "42" },
       searchParams: { q: "hi" },
     });
-    expect(ok.data).toEqual({ params: { id: 42 }, search: { q: "hi" } });
-    expect(ok.error).toBeUndefined();
+    expect(ok).toEqual({
+      data: { params: { id: 42 }, search: { q: "hi" } },
+      status: "success",
+    });
 
     const bad = await route.safeParse({
       params: { id: "nope" },
       searchParams: { q: "hi" },
     });
-    expect(bad.data).toBeUndefined();
+    expect(bad.status).toBe("error");
+    if (bad.status !== "error") return;
     expect(bad.error).toBeInstanceOf(ParamsDecodeError);
   });
 
   it("safeParseParams and safeParseSearch surface their half's error", async () => {
     const params = await route.safeParseParams({ params: { id: "nope" } });
-    expect(params.error).toBeInstanceOf(ParamsDecodeError);
+    expect(params.status).toBe("error");
+    if (params.status === "error") {
+      expect(params.error).toBeInstanceOf(ParamsDecodeError);
+    }
 
     const search = await route.safeParseSearch({ searchParams: {} });
-    expect(search.error).toBeInstanceOf(SearchDecodeError);
+    expect(search.status).toBe("error");
+    if (search.status === "error") {
+      expect(search.error).toBeInstanceOf(SearchDecodeError);
+    }
   });
 
   it("safe variants rethrow non-decode errors (source-contract violations)", async () => {
@@ -299,7 +310,8 @@ describe("route methods over a rawSearch config (design-04)", () => {
 
   it("safeParseSearch maps schema issues into the error arm", async () => {
     const result = await route.safeParseSearch({ searchParams: {} });
-    expect(result.data).toBeUndefined();
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
     expect(result.error).toBeInstanceOf(SearchDecodeError);
   });
 
@@ -308,6 +320,8 @@ describe("route methods over a rawSearch config (design-04)", () => {
       params: { id: "nope" },
       searchParams: {},
     });
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
     expect(result.error).toBeInstanceOf(ParamsDecodeError);
   });
 

@@ -201,12 +201,13 @@ export type RouteConfig<
 export interface RouteProps extends ParamsProps, SearchProps {}
 
 /**
- * Data-xor-error result shape (RL6, DESIGN §9 — not zod's `success` flag):
- * `if (result.error)` narrows both arms, because the error is always an
- * Error instance and hence truthy.
+ * Status-discriminated result shape (RL6, design-06 PR12 — unified with the
+ * pages hooks' `RouterResult`, which extends this union by one `pending`
+ * member): `if (result.status === "error")` narrows both arms, and both
+ * routers' results destructure identically.
  */
 export type SafeResult<T> =
-  { data: T; error?: never } | { data?: never; error: RouteDecodeError };
+  { data: T; status: "success" } | { error: RouteDecodeError; status: "error" };
 
 /**
  * Structural props contract for the search half (RL6). The wire record
@@ -334,19 +335,19 @@ async function rebrandRejection<T>(promise: Promise<T>): Promise<T> {
 }
 
 /**
- * Wraps a throwing parse into the data-xor-error shape (RL6). Only decode
- * failures become data; source-contract violations and rebranded foreign
- * errors stay loud.
+ * Wraps a throwing parse into the status-discriminated shape (RL6, PR12).
+ * Only decode failures become the `error` arm; source-contract violations
+ * and rebranded foreign errors stay loud.
  */
 async function safely<T>(run: () => Promise<T>): Promise<SafeResult<T>> {
   try {
-    return { data: await run() };
+    return { data: await run(), status: "success" };
   } catch (error) {
     if (
       error instanceof ParamsDecodeError ||
       error instanceof SearchDecodeError
     ) {
-      return { error };
+      return { error, status: "error" };
     }
     throw error;
   }

@@ -3,11 +3,11 @@ import type { RouteProps } from "paramour";
 import { filesRoute } from "./route.def";
 
 export default async function FilesPage(props: RouteProps) {
-  // safeParseParams: the params half alone, in data-xor-error form. A shape
-  // mismatch (e.g. hand-built props) surfaces as `error.issues`, one per key,
-  // rather than throwing.
+  // safeParseParams: the params half alone, discriminated on `status`. A
+  // shape mismatch (e.g. hand-built props) surfaces as `error.issues`, one
+  // per key, rather than throwing.
   const result = await filesRoute.safeParseParams(props);
-  if (result.error) {
+  if (result.status === "error") {
     return (
       <main>
         <h1>Bad file path</h1>

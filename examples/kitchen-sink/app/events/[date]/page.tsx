@@ -17,7 +17,7 @@ export default async function EventsPage(props: RouteProps) {
         <code>params.date</code> — <code>p.isoDate()</code> → a real{" "}
         <code>Date</code> ({date.toISOString()}).
       </p>
-      {search.error ? (
+      {search.status === "error" ? (
         <ul className="issues">
           {search.error.issues.map((issue) => (
             <li key={issue.key}>
