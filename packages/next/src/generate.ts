@@ -11,40 +11,53 @@ import { scanRoutes } from "./scan.js";
 
 /** Result of {@link checkArtifact}. */
 export interface CheckResult {
-  /** Routes on disk (scan) that the artifact lacks. */
-  appeared: string[];
-  /** Routes in the artifact that no longer exist on disk. */
-  disappeared: string[];
+  /** App-router drift — split per router so the report names it (PR9). */
+  app: RouterDrift;
   /** `true` when the artifact file does not exist at all. */
   missingFile: boolean;
+  /** Pages-router drift. */
+  pages: RouterDrift;
   /** `true` on a byte-identical artifact — the only non-drift state. */
   upToDate: boolean;
 }
 
-/** Inputs to one generation/check pass. */
+/** Inputs to one generation/check pass; either dir may be absent (PR1). */
 export interface GenerateInputs {
-  appDir: string;
+  appDir?: string | undefined;
   artifactPath: string;
   pageExtensions: readonly string[];
+  pagesDir?: string | undefined;
 }
 
 /** Result of {@link generate}. */
 export interface GenerateResult {
+  /** The freshly scanned app-route union (sorted). */
+  appRoutes: string[];
+  /** The freshly scanned pages-route union (sorted). */
+  pagesRoutes: string[];
   /** Prior artifact content, `null` when the file did not exist. */
   previousContent: null | string;
-  /** The freshly scanned route union (sorted, deduped). */
-  routes: string[];
   /** `false` on a byte-identical no-op (TR3 write-if-changed). */
   written: boolean;
 }
 
+/** One router's appeared/disappeared route paths (TR4/TR7 drift). */
+export interface RouterDrift {
+  /** Routes on disk (scan) that the artifact lacks. */
+  appeared: string[];
+  /** Routes in the artifact that no longer exist on disk. */
+  disappeared: string[];
+}
+
 /**
- * Reads route paths back out of a previously emitted artifact for drift
- * diffs (TR4/TR7). Only ever applied to text this package generated (TR3
- * deterministic form), so a line-anchored match on union members is exact,
- * not heuristic.
+ * Reads the per-router unions back out of a previously emitted artifact for
+ * drift diffs (TR4/TR7). Only ever applied to text this package generated
+ * (TR3 deterministic form), so line-anchored matches on the member headers
+ * and union members are exact, not heuristic. `\s*$` on both tolerates a
+ * CRLF-resaved artifact.
  */
-const UNION_MEMBER = /^\s*\| "(.*)";?$/gm;
+const MEMBER_HEADER = /^\s*(appRoutes|pagesRoutes):\s*$/;
+const UNION_MEMBER = /^\s*\| "(.*)";?\s*$/;
 
 /**
  * `--check` (TR7): scan to memory and byte-compare against disk — never
@@ -52,56 +65,106 @@ const UNION_MEMBER = /^\s*\| "(.*)";?$/gm;
  * CI-degrades-to-world-A case the committed file exists to prevent (TR3).
  */
 export function checkArtifact(inputs: GenerateInputs): CheckResult {
-  const routes = scanRoutes(inputs.appDir, inputs.pageExtensions);
+  const routes = scanRoutes(inputs, inputs.pageExtensions);
   const expected = emitArtifact(routes);
   const current = existsSync(inputs.artifactPath)
     ? readFileSync(inputs.artifactPath, "utf8")
     : null;
   if (current === expected) {
     return {
-      appeared: [],
-      disappeared: [],
+      app: { appeared: [], disappeared: [] },
       missingFile: false,
+      pages: { appeared: [], disappeared: [] },
       upToDate: true,
     };
   }
-  const previous = parseUnionPaths(current);
-  const fresh = new Set(routes);
+  const previous = parseArtifactRoutes(current);
   return {
-    appeared: routes.filter((path) => !previous.has(path)),
-    disappeared: [...previous].filter((path) => !fresh.has(path)),
+    app: diffRouter(routes.appRoutes, previous.appRoutes),
     missingFile: current === null,
+    pages: diffRouter(routes.pagesRoutes, previous.pagesRoutes),
     upToDate: false,
   };
 }
 
-/** The `  + /new` / `  - /old` lines of a drift report (TR4/TR7). */
+/**
+ * Per-router drift of a completed {@link generate} pass against the artifact
+ * it replaced — the wrapper's build-phase drift report (TR4).
+ */
+export function diffGenerated(result: GenerateResult): {
+  app: RouterDrift;
+  pages: RouterDrift;
+} {
+  const previous = parseArtifactRoutes(result.previousContent);
+  return {
+    app: diffRouter(result.appRoutes, previous.appRoutes),
+    pages: diffRouter(result.pagesRoutes, previous.pagesRoutes),
+  };
+}
+
+/**
+ * The `  + /new (app)` / `  - /old (pages)` lines of a drift report
+ * (TR4/TR7) — each line names the router its path moved in (PR9).
+ */
 export function formatRouteDiff(
-  appeared: readonly string[],
-  disappeared: readonly string[],
+  app: RouterDrift,
+  pages: RouterDrift,
 ): string[] {
   return [
-    ...appeared.map((path) => `  + ${path}`),
-    ...disappeared.map((path) => `  - ${path}`),
+    ...app.appeared.map((path) => `  + ${path} (app)`),
+    ...pages.appeared.map((path) => `  + ${path} (pages)`),
+    ...app.disappeared.map((path) => `  - ${path} (app)`),
+    ...pages.disappeared.map((path) => `  - ${path} (pages)`),
   ];
 }
 
 /** One generation pass: scan → emit → write-if-changed (TR3). */
 export function generate(inputs: GenerateInputs): GenerateResult {
-  const routes = scanRoutes(inputs.appDir, inputs.pageExtensions);
+  const routes = scanRoutes(inputs, inputs.pageExtensions);
   return {
-    routes,
+    ...routes,
     ...writeIfChanged(inputs.artifactPath, emitArtifact(routes)),
   };
 }
 
-/** Route paths in a previously emitted artifact; empty for a missing file. */
-export function parseUnionPaths(previousContent: null | string): Set<string> {
-  const paths = new Set<string>();
-  if (previousContent === null) return paths;
-  for (const match of previousContent.matchAll(UNION_MEMBER)) {
-    const [, path] = match;
-    if (path !== undefined) paths.add(path);
+/**
+ * Per-router route paths in a previously emitted artifact; both empty for a
+ * missing file or the empty merge.
+ */
+export function parseArtifactRoutes(previousContent: null | string): {
+  appRoutes: Set<string>;
+  pagesRoutes: Set<string>;
+} {
+  const appRoutes = new Set<string>();
+  const pagesRoutes = new Set<string>();
+  if (previousContent === null) return { appRoutes, pagesRoutes };
+  let current: Set<string> | undefined;
+  for (const line of previousContent.split("\n")) {
+    const header = MEMBER_HEADER.exec(line);
+    if (header !== null) {
+      current = header[1] === "appRoutes" ? appRoutes : pagesRoutes;
+      continue;
+    }
+    const member = UNION_MEMBER.exec(line);
+    if (member !== null) {
+      const [, path] = member;
+      if (path !== undefined) current?.add(path);
+      continue;
+    }
+    // Any other line ends the member block — union members are contiguous
+    // in the TR3 deterministic form.
+    current = undefined;
   }
-  return paths;
+  return { appRoutes, pagesRoutes };
+}
+
+function diffRouter(
+  fresh: readonly string[],
+  previous: ReadonlySet<string>,
+): RouterDrift {
+  const freshSet = new Set(fresh);
+  return {
+    appeared: fresh.filter((path) => !previous.has(path)),
+    disappeared: [...previous].filter((path) => !freshSet.has(path)),
+  };
 }

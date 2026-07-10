@@ -1,5 +1,11 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -7,6 +13,11 @@ import { emitArtifact } from "../src";
 import { watcherLockPath } from "../src/lock.js";
 import { type CliIo, runCli } from "../src/run-cli.js";
 import { makeTempDir, makeTree } from "./helpers.js";
+
+/** App-only emission — what most of this suite's fixtures produce. */
+function emitApp(appRoutes: readonly string[]): string {
+  return emitArtifact({ appRoutes, pagesRoutes: [] });
+}
 
 const originalCwd = process.cwd();
 const children: ChildProcess[] = [];
@@ -73,10 +84,10 @@ describe("paramour generate — one-shot (TR7)", () => {
     const run = cli(["generate"]);
     await expect(run.code).resolves.toBe(0);
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
-      emitArtifact(["/", "/about"]),
+      emitApp(["/", "/about"]),
     );
     expect(run.out).toEqual([expect.stringContaining("wrote")]);
-    expect(run.out[0]).toContain("2 routes");
+    expect(run.out[0]).toContain("2 app routes");
   });
 
   it("reports unchanged on a second run", async () => {
@@ -91,15 +102,66 @@ describe("paramour generate — one-shot (TR7)", () => {
     makeProject(["app/page.tsx"]);
     const run = cli(["generate"]);
     await expect(run.code).resolves.toBe(0);
-    expect(run.out[0]).toContain("(1 route)");
-    expect(run.out[0]).not.toContain("1 routes");
+    expect(run.out[0]).toContain("(1 app route)");
+    expect(run.out[0]).not.toContain("1 app routes");
   });
 
-  it("fails loudly (exit 2) when no app dir exists", async () => {
-    const root = makeProject(["src/pages/index.tsx"]);
+  it("generates a pages-only project through discovery", async () => {
+    const root = makeProject(["pages/index.tsx", "pages/legacy/[id].tsx"]);
+    const run = cli(["generate"]);
+    await expect(run.code).resolves.toBe(0);
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitArtifact({ appRoutes: [], pagesRoutes: ["/", "/legacy/[id]"] }),
+    );
+    expect(run.out[0]).toContain("2 pages routes");
+  });
+
+  it("generates a hybrid project with both members (PR1)", async () => {
+    const root = makeProject(["app/page.tsx", "pages/legacy.tsx"]);
+    const run = cli(["generate"]);
+    await expect(run.code).resolves.toBe(0);
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitArtifact({ appRoutes: ["/"], pagesRoutes: ["/legacy"] }),
+    );
+    expect(run.out[0]).toContain("1 app route, 1 pages route");
+  });
+
+  it("maps an app/pages collision to exit 2 without writing (PR9)", async () => {
+    const root = makeProject(["app/about/page.tsx", "pages/about.tsx"]);
     const run = cli(["generate"]);
     await expect(run.code).resolves.toBe(2);
-    expect(run.err).toEqual([expect.stringContaining("no app directory")]);
+    expect(run.err.join("\n")).toContain("collision");
+    expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
+  });
+
+  it("maps the populated-ignored-dir config error to exit 2 (spike-2 ruling)", async () => {
+    const root = makeProject(["app/page.tsx", "src/pages/index.tsx"]);
+    const run = cli(["generate"]);
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err.join("\n")).toContain("silently unreachable");
+    expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
+  });
+
+  it("passing both dirs explicitly bypasses discovery and its config error", async () => {
+    const root = makeProject(["app/page.tsx", "src/pages/legacy.tsx"]);
+    const run = cli([
+      "generate",
+      "--app-dir",
+      "app",
+      "--pages-dir",
+      join("src", "pages"),
+    ]);
+    await expect(run.code).resolves.toBe(0);
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitArtifact({ appRoutes: ["/"], pagesRoutes: ["/legacy"] }),
+    );
+  });
+
+  it("fails loudly (exit 2) when no route dir exists at all", async () => {
+    const root = makeProject(["lib/util.ts"]);
+    const run = cli(["generate"]);
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err).toEqual([expect.stringContaining("no route directory")]);
     expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
   });
 
@@ -109,6 +171,15 @@ describe("paramour generate — one-shot (TR7)", () => {
     await expect(run.code).resolves.toBe(2);
     expect(run.err).toEqual([
       expect.stringContaining("app directory not found"),
+    ]);
+  });
+
+  it("rejects a --pages-dir that does not exist (exit 2)", async () => {
+    makeProject(["pages/index.tsx"]);
+    const run = cli(["generate", "--pages-dir", "nope"]);
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err).toEqual([
+      expect.stringContaining("pages directory not found"),
     ]);
   });
 });
@@ -184,7 +255,7 @@ describe("paramour generate — config precedence (TR7 / §7.2)", () => {
     const run = cli(["generate"]);
     await expect(run.code).resolves.toBe(0);
     expect(readFileSync(join(root, "types", "routes.d.ts"), "utf8")).toBe(
-      emitArtifact(["/"]),
+      emitApp(["/"]),
     );
     expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
   });
@@ -210,9 +281,22 @@ describe("paramour generate — config precedence (TR7 / §7.2)", () => {
     ]);
     await expect(run.code).resolves.toBe(0);
     expect(readFileSync(join(root, "flag.d.ts"), "utf8")).toBe(
-      emitArtifact(["/", "/x"]),
+      emitApp(["/", "/x"]),
     );
     expect(existsSync(join(root, "cfg.d.ts"))).toBe(false);
+  });
+
+  it("honors a config-file pagesDir", async () => {
+    const root = makeProject(["legacy-pages/index.tsx"]);
+    writeFileSync(
+      join(root, "paramour.config.json"),
+      `{ "pagesDir": "legacy-pages" }`,
+    );
+    const run = cli(["generate"]);
+    await expect(run.code).resolves.toBe(0);
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitArtifact({ appRoutes: [], pagesRoutes: ["/"] }),
+    );
   });
 
   it("an invalid config file is exit 2 with the key named", async () => {
@@ -263,7 +347,7 @@ describe("paramour generate — config precedence (TR7 / §7.2)", () => {
 describe("paramour generate --check (TR7)", () => {
   it("exits 0 on a fresh artifact", async () => {
     const root = makeProject(["app/page.tsx"]);
-    writeFileSync(join(root, "paramour-env.d.ts"), emitArtifact(["/"]));
+    writeFileSync(join(root, "paramour-env.d.ts"), emitApp(["/"]));
     const run = cli(["generate", "--check"]);
     await expect(run.code).resolves.toBe(0);
     expect(run.out).toEqual([expect.stringContaining("up to date")]);
@@ -271,14 +355,14 @@ describe("paramour generate --check (TR7)", () => {
 
   it("exits 1 on drift with the +/- diff, without writing", async () => {
     const root = makeProject(["app/page.tsx", "app/new/page.tsx"]);
-    const stale = emitArtifact(["/", "/old"]);
+    const stale = emitApp(["/", "/old"]);
     writeFileSync(join(root, "paramour-env.d.ts"), stale);
     const run = cli(["generate", "--check"]);
     await expect(run.code).resolves.toBe(1);
     const err = run.err.join("\n");
     expect(err).toContain("out of date");
-    expect(err).toContain("  + /new");
-    expect(err).toContain("  - /old");
+    expect(err).toContain("  + /new (app)");
+    expect(err).toContain("  - /old (app)");
     expect(err).toContain("Run `paramour generate`");
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(stale);
   });
@@ -301,7 +385,7 @@ describe("paramour generate --check (TR7)", () => {
     // Same union, different bytes: the header line removed.
     writeFileSync(
       join(root, "paramour-env.d.ts"),
-      emitArtifact(["/"]).split("\n").slice(1).join("\n"),
+      emitApp(["/"]).split("\n").slice(1).join("\n"),
     );
     const run = cli(["generate", "--check"]);
     await expect(run.code).resolves.toBe(1);
@@ -323,7 +407,7 @@ describe("paramour generate --watch (TR5/TR6/TR7)", { retry: 2 }, () => {
     const artifact = join(root, "paramour-env.d.ts");
     const run = watchCli(["generate", "--watch"]);
     await vi.waitFor(() => {
-      expect(readFileSync(artifact, "utf8")).toBe(emitArtifact(["/"]));
+      expect(readFileSync(artifact, "utf8")).toBe(emitApp(["/"]));
     }, 5000);
     expect(readFileSync(watcherLockPath(root), "utf8")).toBe(
       String(process.pid),
@@ -331,9 +415,7 @@ describe("paramour generate --watch (TR5/TR6/TR7)", { retry: 2 }, () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
     makeTree(root, ["app/pricing/page.tsx"]);
     await vi.waitFor(() => {
-      expect(readFileSync(artifact, "utf8")).toBe(
-        emitArtifact(["/", "/pricing"]),
-      );
+      expect(readFileSync(artifact, "utf8")).toBe(emitApp(["/", "/pricing"]));
     }, 5000);
     controllers.splice(0).forEach((controller) => {
       controller.abort();
@@ -370,6 +452,33 @@ describe("paramour generate --watch (TR5/TR6/TR7)", { retry: 2 }, () => {
     expect(run.err.join("\n")).toMatch(/EISDIR|directory/i);
   });
 
+  it("keeps the last good artifact and keeps watching through a collision (PR9/TR5)", async () => {
+    const root = makeProject(["app/about/page.tsx", "pages/"]);
+    const artifact = join(root, "paramour-env.d.ts");
+    const good = emitArtifact({ appRoutes: ["/about"], pagesRoutes: [] });
+    const run = watchCli(["generate", "--watch"]);
+    await vi.waitFor(() => {
+      expect(readFileSync(artifact, "utf8")).toBe(good);
+    }, 5000);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    // Introduce an app/pages collision mid-watch: loud stderr, artifact
+    // untouched, watcher still running.
+    writeFileSync(join(root, "pages", "about.tsx"), "");
+    await vi.waitFor(() => {
+      expect(run.err.join("\n")).toContain("collision");
+    }, 5000);
+    expect(readFileSync(artifact, "utf8")).toBe(good);
+    expect(run.err.join("\n")).toContain("last good artifact");
+    // Fixing the collision regenerates — proof the watcher survived.
+    writeFileSync(join(root, "pages", "contact.tsx"), "");
+    rmSync(join(root, "pages", "about.tsx"));
+    await vi.waitFor(() => {
+      expect(readFileSync(artifact, "utf8")).toBe(
+        emitArtifact({ appRoutes: ["/about"], pagesRoutes: ["/contact"] }),
+      );
+    }, 5000);
+  });
+
   it("declines when a live process holds the lock, still generating (exit 0)", async () => {
     const root = makeProject(["app/page.tsx"]);
     const lockPath = watcherLockPath(root);
@@ -383,7 +492,7 @@ describe("paramour generate --watch (TR5/TR6/TR7)", { retry: 2 }, () => {
     );
     // Initial generation ran; the owner's lock is untouched (TR6).
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
-      emitArtifact(["/"]),
+      emitApp(["/"]),
     );
     expect(readFileSync(lockPath, "utf8")).toBe(String(owner));
   });

@@ -1,202 +1,179 @@
-import { symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { resolveAppDir, scanRoutes } from "../src";
+import { resolveRouteDirs, RouteCollisionError, scanRoutes } from "../src";
 import { makeTempDir, makeTree } from "./helpers.js";
 
-/** Build a tree in a temp dir and scan it in one step. */
-function scanTree(
-  entries: readonly string[],
-  pageExtensions?: readonly string[],
-): string[] {
-  const root = makeTempDir();
-  makeTree(root, entries);
-  return pageExtensions === undefined
-    ? scanRoutes(root)
-    : scanRoutes(root, pageExtensions);
-}
-
-describe("scanRoutes: page detection (TR2)", () => {
-  it("emits '/' for a root page", () => {
-    expect(scanTree(["page.tsx"])).toEqual(["/"]);
-  });
-
-  it("emits nested static pages, sorted, without trailing slashes", () => {
-    expect(scanTree(["blog/page.tsx", "about/page.tsx"])).toEqual([
-      "/about",
-      "/blog",
-    ]);
-  });
-
-  it("detects every default page extension", () => {
-    expect(
-      scanTree(["a/page.tsx", "b/page.ts", "c/page.jsx", "d/page.js"]),
-    ).toEqual(["/a", "/b", "/c", "/d"]);
-  });
-
-  it("ignores files that are not exactly page.<ext>", () => {
-    expect(
-      scanTree([
-        "x/layout.tsx",
-        "x/pages.tsx",
-        "x/page.test.tsx",
-        "x/page.tsx.bak",
-      ]),
-    ).toEqual([]);
-  });
-
-  it("matches page.<ext> case-sensitively", () => {
-    expect(scanTree(["x/Page.tsx"])).toEqual([]);
-  });
-
-  it("honors custom pageExtensions exclusively", () => {
-    expect(scanTree(["x/page.mdx", "y/page.tsx"], ["mdx"])).toEqual(["/x"]);
-  });
-
-  it("ignores route.ts handlers (TR2)", () => {
-    expect(scanTree(["api/route.ts"])).toEqual([]);
-  });
-
-  it("does not treat a directory named page.tsx as a page", () => {
-    expect(scanTree(["x/page.tsx/"])).toEqual([]);
-  });
-
-  it("emits both a page dir and its child page", () => {
-    expect(scanTree(["blog/page.tsx", "blog/[slug]/page.tsx"])).toEqual([
-      "/blog",
-      "/blog/[slug]",
-    ]);
-  });
-});
-
-describe("scanRoutes: dynamic segments verbatim (TR2/RL2)", () => {
-  it("preserves [id]", () => {
-    expect(scanTree(["product/[id]/page.tsx"])).toEqual(["/product/[id]"]);
-  });
-
-  it("preserves [...slug]", () => {
-    expect(scanTree(["docs/[...slug]/page.tsx"])).toEqual(["/docs/[...slug]"]);
-  });
-
-  it("preserves [[...slug]]", () => {
-    expect(scanTree(["docs/[[...slug]]/page.tsx"])).toEqual([
-      "/docs/[[...slug]]",
-    ]);
-  });
-});
-
-describe("scanRoutes: route groups (TR2)", () => {
-  it("strips (group) from the emitted path", () => {
-    expect(scanTree(["(marketing)/about/page.tsx"])).toEqual(["/about"]);
-  });
-
-  it("emits '/' for a group page collapsing to root", () => {
-    expect(scanTree(["(marketing)/page.tsx"])).toEqual(["/"]);
-  });
-
-  it("strips nested groups", () => {
-    expect(scanTree(["(a)/(b)/x/page.tsx"])).toEqual(["/x"]);
-  });
-
-  it("dedupes group collisions to one path", () => {
-    expect(scanTree(["(a)/x/page.tsx", "(b)/x/page.tsx"])).toEqual(["/x"]);
-  });
-});
-
-describe("scanRoutes: skipped subtrees (TR2)", () => {
-  it("skips @slot subtrees entirely, pages at any depth included", () => {
-    expect(scanTree(["@modal/page.tsx", "@modal/deep/page.tsx"])).toEqual([]);
-  });
-
-  it("skips interception subtrees for every marker form", () => {
-    expect(
-      scanTree([
-        "feed/(.)photo/page.tsx",
-        "feed/(..)photo/page.tsx",
-        "feed/(...)photo/page.tsx",
-        "feed/(..)(..)photo/page.tsx",
-      ]),
-    ).toEqual([]);
-  });
-
-  it("still emits the parent of an interception subtree", () => {
-    expect(scanTree(["feed/page.tsx", "feed/(.)photo/page.tsx"])).toEqual([
-      "/feed",
-    ]);
-  });
-
-  it("skips _private subtrees entirely, pages at any depth included", () => {
-    expect(scanTree(["_lib/page.tsx", "_lib/deep/page.tsx"])).toEqual([]);
-  });
-});
-
-describe("scanRoutes: error and traversal edges (TR2)", () => {
-  it("throws on a missing app dir (the caller-side guard is resolveAppDir)", () => {
-    const missing = join(makeTempDir(), "does-not-exist");
-    expect(() => scanRoutes(missing)).toThrow(/ENOENT/);
-  });
-
-  it.skipIf(process.platform === "win32")(
-    "does not follow a symlinked directory (TR2 v1 stance)",
-    () => {
-      const root = makeTempDir();
-      makeTree(root, ["app/", "outside/linked/page.tsx"]);
-      symlinkSync(join(root, "outside"), join(root, "app", "external"), "dir");
-      expect(scanRoutes(join(root, "app"))).toEqual([]);
-    },
-  );
-});
-
 /**
- * Pins for the group/interception regex edges: these names' classification is
- * exactly what `^\(.*\)$` (group: stripped) vs `^\(\.{1,3}\)` (interception:
- * skipped) produce today, guarding future regex refactors.
+ * Orchestrator suite (PR8/PR9, PR11 §2): joint dir discovery per the
+ * spike-2 ruling, hybrid scanning, and the cross-router collision paths.
  */
-describe("scanRoutes: group/interception regex edge pins (TR2)", () => {
-  it("(a)(b) matches the group regex and is stripped", () => {
-    expect(scanTree(["(a)(b)/x/page.tsx"])).toEqual(["/x"]);
+
+describe("resolveRouteDirs (spike-2 ruling)", () => {
+  it("finds root app/ and pages/ together (PR1 hybrid)", () => {
+    const root = makeTempDir();
+    makeTree(root, ["app/", "pages/"]);
+    expect(resolveRouteDirs(root)).toEqual({
+      appDir: join(root, "app"),
+      pagesDir: join(root, "pages"),
+    });
   });
 
-  it("() matches the group regex (empty name) and is stripped", () => {
-    expect(scanTree(["()/y/page.tsx"])).toEqual(["/y"]);
+  it("finds one root dir with the other absent", () => {
+    const root = makeTempDir();
+    makeTree(root, ["pages/"]);
+    expect(resolveRouteDirs(root)).toEqual({
+      appDir: undefined,
+      pagesDir: join(root, "pages"),
+    });
   });
 
-  it("(....) is NOT an interception marker (max 3 dots); it strips as a group", () => {
-    expect(scanTree(["(....)/z/page.tsx"])).toEqual(["/z"]);
+  it("falls back to src/ variants when no root dir exists", () => {
+    const root = makeTempDir();
+    makeTree(root, ["src/app/", "src/pages/"]);
+    expect(resolveRouteDirs(root)).toEqual({
+      appDir: join(root, "src", "app"),
+      pagesDir: join(root, "src", "pages"),
+    });
   });
 
-  it("composes group stripping with dynamic segments passed through verbatim", () => {
-    expect(
-      scanTree(["(shop)/product/[id]/reviews/[[...rest]]/page.tsx"]),
-    ).toEqual(["/product/[id]/reviews/[[...rest]]"]);
+  it("returns both undefined when no route dir exists at all", () => {
+    expect(resolveRouteDirs(makeTempDir())).toEqual({
+      appDir: undefined,
+      pagesDir: undefined,
+    });
   });
 
-  it("skip rules below a group still apply: @slot and (.)interception contribute nothing", () => {
-    expect(scanTree(["(g)/@slot/page.tsx", "(g)/(.)foo/page.tsx"])).toEqual([]);
+  it("ignores a plain file named app or pages", () => {
+    const root = makeTempDir();
+    makeTree(root, ["app", "pages"]);
+    expect(resolveRouteDirs(root)).toEqual({
+      appDir: undefined,
+      pagesDir: undefined,
+    });
+  });
+
+  it("a root dir disables src/ variants for BOTH routers (joint rule)", () => {
+    // Root app/ exists → src/pages is ignored even though no root pages/
+    // exists; an EMPTY ignored dir is fine (nothing is unreachable).
+    const root = makeTempDir();
+    makeTree(root, ["app/", "src/pages/"]);
+    expect(resolveRouteDirs(root)).toEqual({
+      appDir: join(root, "app"),
+      pagesDir: undefined,
+    });
+  });
+
+  it("errors on a populated ignored dir: app/ + src/pages with page files", () => {
+    const root = makeTempDir();
+    makeTree(root, ["app/page.tsx", "src/pages/index.tsx"]);
+    expect(() => resolveRouteDirs(root)).toThrow(/silently unreachable/);
+    expect(() => resolveRouteDirs(root)).toThrow(/src\/pages/);
+  });
+
+  it("errors on the mirror case: pages/ + src/app with page files", () => {
+    const root = makeTempDir();
+    makeTree(root, ["pages/index.tsx", "src/app/x/page.tsx"]);
+    expect(() => resolveRouteDirs(root)).toThrow(/src\/app/);
+  });
+
+  it("tolerates non-page files in an ignored src dir", () => {
+    // Only page files make the ignored dir hazardous; helpers and styles
+    // under src/pages don't route in the first place.
+    const root = makeTempDir();
+    makeTree(root, ["app/page.tsx", "src/pages/helpers.css"]);
+    expect(resolveRouteDirs(root)).toEqual({
+      appDir: join(root, "app"),
+      pagesDir: undefined,
+    });
+  });
+
+  it("treats a colliding ignored dir as populated (still the config error)", () => {
+    // The probe scan throws a RouteCollisionError; that still proves the
+    // ignored dir has page files, and the CONFIG error is the right one.
+    const root = makeTempDir();
+    makeTree(root, [
+      "app/page.tsx",
+      "src/pages/blog.tsx",
+      "src/pages/blog/index.tsx",
+    ]);
+    expect(() => resolveRouteDirs(root)).toThrow(/silently unreachable/);
+  });
+
+  it("honors custom pageExtensions in the populated probe", () => {
+    const root = makeTempDir();
+    makeTree(root, ["app/", "src/pages/index.mdx"]);
+    expect(resolveRouteDirs(root)).toMatchObject({ pagesDir: undefined });
+    expect(() => resolveRouteDirs(root, ["mdx"])).toThrow(
+      /silently unreachable/,
+    );
   });
 });
 
-describe("resolveAppDir (TR2)", () => {
-  it("prefers app/ when both exist", () => {
+describe("scanRoutes orchestrator (PR1/PR9)", () => {
+  it("scans a hybrid project into both unions", () => {
     const root = makeTempDir();
-    makeTree(root, ["app/", "src/app/"]);
-    expect(resolveAppDir(root)).toBe(join(root, "app"));
+    makeTree(root, [
+      "app/page.tsx",
+      "app/product/[id]/page.tsx",
+      "pages/legacy.tsx",
+      "pages/legacy/[id].tsx",
+    ]);
+    expect(
+      scanRoutes({
+        appDir: join(root, "app"),
+        pagesDir: join(root, "pages"),
+      }),
+    ).toEqual({
+      appRoutes: ["/", "/product/[id]"],
+      pagesRoutes: ["/legacy", "/legacy/[id]"],
+    });
   });
 
-  it("falls back to src/app/", () => {
+  it("returns an empty union for an absent dir", () => {
     const root = makeTempDir();
-    makeTree(root, ["src/app/"]);
-    expect(resolveAppDir(root)).toBe(join(root, "src", "app"));
+    makeTree(root, ["app/page.tsx"]);
+    expect(scanRoutes({ appDir: join(root, "app") })).toEqual({
+      appRoutes: ["/"],
+      pagesRoutes: [],
+    });
+    expect(scanRoutes({})).toEqual({ appRoutes: [], pagesRoutes: [] });
   });
 
-  it("returns undefined when neither exists", () => {
-    expect(resolveAppDir(makeTempDir())).toBeUndefined();
+  it("errors when a path exists in both routers (Next's conflicting-file error)", () => {
+    const root = makeTempDir();
+    makeTree(root, ["app/about/page.tsx", "pages/about.tsx"]);
+    const dirs = { appDir: join(root, "app"), pagesDir: join(root, "pages") };
+    expect(() => scanRoutes(dirs)).toThrow(RouteCollisionError);
+    expect(() => scanRoutes(dirs)).toThrow(/"\/about"/);
   });
 
-  it("ignores a plain file named app", () => {
+  it("names every colliding path, not just the first", () => {
     const root = makeTempDir();
-    makeTree(root, ["app"]);
-    expect(resolveAppDir(root)).toBeUndefined();
+    makeTree(root, [
+      "app/a/page.tsx",
+      "app/b/page.tsx",
+      "pages/a.tsx",
+      "pages/b.tsx",
+    ]);
+    expect(() =>
+      scanRoutes({ appDir: join(root, "app"), pagesDir: join(root, "pages") }),
+    ).toThrow(/"\/a", "\/b"/);
+  });
+
+  it("errors on a cross-router slug-name conflict on a shared prefix (PR9 structural)", () => {
+    const root = makeTempDir();
+    makeTree(root, ["app/x/[id]/page.tsx", "pages/x/[slug].tsx"]);
+    expect(() =>
+      scanRoutes({ appDir: join(root, "app"), pagesDir: join(root, "pages") }),
+    ).toThrow(RouteCollisionError);
+  });
+
+  it("errors on cross-router optional-catch-all specificity (PR9 structural)", () => {
+    const root = makeTempDir();
+    makeTree(root, ["app/docs/page.tsx", "pages/docs/[[...slug]].tsx"]);
+    expect(() =>
+      scanRoutes({ appDir: join(root, "app"), pagesDir: join(root, "pages") }),
+    ).toThrow(/same specificity/);
   });
 });

@@ -1,80 +1,107 @@
-import { readdirSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { join } from "node:path";
 
-/** Next's default `pageExtensions` — extensions only, no leading dot (TR2). */
-export const DEFAULT_PAGE_EXTENSIONS = ["tsx", "ts", "jsx", "js"] as const;
+import {
+  assertNoStructuralCollisions,
+  RouteCollisionError,
+} from "./collisions.js";
+import { DEFAULT_PAGE_EXTENSIONS, scanAppRoutes } from "./scan-app.js";
+import { scanPagesRoutes } from "./scan-pages.js";
 
 /**
- * Interception markers `(.)`/`(..)`/`(...)` (TR2, RL2 / §15.5). A prefix
- * match, so chained forms like `(..)(..)segment` are caught too; tested
- * BEFORE the route-group test so `(.)foo` is never misread as a group.
+ * The thin orchestrator over the two scanners (PR8): joint directory
+ * discovery, delegation, and the cross-router collision checks (PR9).
  */
-const INTERCEPTION_PREFIX = /^\(\.{1,3}\)/;
 
-/** Route groups `(group)` — stripped from the emitted path (TR2, RL2). */
-const ROUTE_GROUP = /^\(.*\)$/;
+/** The two route dirs of a project; either may be absent (PR1 hybrid). */
+export interface RouteDirs {
+  appDir?: string | undefined;
+  pagesDir?: string | undefined;
+}
 
-/**
- * The app dir is `app/` or `src/app/`, first that exists under the project
- * root (TR2); `undefined` when neither does. This is the caller-side guard —
- * `scanRoutes` itself lets a missing dir throw.
- */
-export function resolveAppDir(projectRoot: string): string | undefined {
-  for (const candidate of ["app", join("src", "app")]) {
-    const dir = join(projectRoot, candidate);
-    if (statSync(dir, { throwIfNoEntry: false })?.isDirectory()) return dir;
-  }
-  return undefined;
+/** Result of {@link scanRoutes} — the input shape of the PR9 artifact. */
+export interface ScanRoutesResult {
+  appRoutes: string[];
+  pagesRoutes: string[];
 }
 
 /**
- * Walk an app dir and return the sorted, deduped union of URL-shaped route
- * paths — exactly the strings `defineAppRoute` accepts (TR2, RL2). Pure
- * `fs.readdir` recursion; no dependency on Next internals.
+ * Joint route-dir discovery (spike-2 ruling). Next's documented rule is one
+ * decision, not two probes: `src/app` AND `src/pages` are both ignored
+ * whenever `app/` OR `pages/` exists at the project root. An ignored src dir
+ * that contains page files is a hard config error — Next silently serves
+ * none of those pages (and has shipped bugs in the mixed case,
+ * vercel/next.js#58728), so there is no valid state to warn about.
+ */
+export function resolveRouteDirs(
+  projectRoot: string,
+  pageExtensions: readonly string[] = DEFAULT_PAGE_EXTENSIONS,
+): RouteDirs {
+  const rootApp = dirIfExists(join(projectRoot, "app"));
+  const rootPages = dirIfExists(join(projectRoot, "pages"));
+  const srcApp = dirIfExists(join(projectRoot, "src", "app"));
+  const srcPages = dirIfExists(join(projectRoot, "src", "pages"));
+  if (rootApp === undefined && rootPages === undefined) {
+    return { appDir: srcApp, pagesDir: srcPages };
+  }
+  const winner = rootApp === undefined ? "pages/" : "app/";
+  const probes: [string | undefined, (dir: string) => string[], string][] = [
+    [srcApp, (dir) => scanAppRoutes(dir, pageExtensions), "src/app"],
+    [srcPages, (dir) => scanPagesRoutes(dir, pageExtensions), "src/pages"],
+  ];
+  for (const [dir, scan, label] of probes) {
+    if (dir === undefined) continue;
+    let populated: boolean;
+    try {
+      populated = scan(dir).length > 0;
+    } catch {
+      // A collision inside the ignored dir still proves it has page files —
+      // which is the only fact the probe needs.
+      populated = true;
+    }
+    if (populated) {
+      throw new Error(
+        `${label} contains page files, but Next ignores src/ route directories whenever app/ or pages/ exists at the project root (here: ${winner}) — those pages are silently unreachable. Move ${label} to the project root, or the root ${winner} directory under src/; explicit --app-dir/--pages-dir flags bypass this discovery.`,
+      );
+    }
+  }
+  return { appDir: rootApp, pagesDir: rootPages };
+}
+
+/**
+ * Scan whichever route dirs exist and return both route unions (PR1). After
+ * each scanner's own intra-router checks, two cross-router passes run (PR9):
+ * a path in BOTH unions is Next's "Conflicting app and page file" build
+ * error, and the structural pass re-runs over the merged, labeled union so
+ * shared-prefix slug conflicts and cross-router optional-catch-all
+ * specificity are caught too.
  */
 export function scanRoutes(
-  appDir: string,
+  dirs: RouteDirs,
   pageExtensions: readonly string[] = DEFAULT_PAGE_EXTENSIONS,
-): string[] {
-  const out = new Set<string>();
-  const pageFileNames = new Set(pageExtensions.map((ext) => `page.${ext}`));
-  walk(appDir, [], pageFileNames, out);
-  // Code-unit sort, never localeCompare — locale independence feeds TR3's
-  // byte-identical-on-every-OS guarantee.
-  return [...out].sort();
+): ScanRoutesResult {
+  const appRoutes =
+    dirs.appDir === undefined ? [] : scanAppRoutes(dirs.appDir, pageExtensions);
+  const pagesRoutes =
+    dirs.pagesDir === undefined
+      ? []
+      : scanPagesRoutes(dirs.pagesDir, pageExtensions);
+  const appSet = new Set(appRoutes);
+  const shared = pagesRoutes.filter((path) => appSet.has(path));
+  if (shared.length > 0) {
+    throw new RouteCollisionError(
+      `route collision between app/ and pages/: ${shared.map((path) => `"${path}"`).join(", ")} — Next fails the build on conflicting app and page files (PR9)`,
+    );
+  }
+  assertNoStructuralCollisions([
+    ...appRoutes.map((path) => ({ path, router: "app" as const })),
+    ...pagesRoutes.map((path) => ({ path, router: "pages" as const })),
+  ]);
+  return { appRoutes, pagesRoutes };
 }
 
-function walk(
-  dir: string,
-  urlSegments: readonly string[],
-  pageFileNames: ReadonlySet<string>,
-  out: Set<string>,
-): void {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isFile()) {
-      // Exact, case-sensitive `page.<ext>` match (TR2). `route.ts` handlers
-      // need no special-casing — they never match (handler typing is §14).
-      if (pageFileNames.has(entry.name)) {
-        out.add(urlSegments.length === 0 ? "/" : `/${urlSegments.join("/")}`);
-      }
-      continue;
-    }
-    // Symlinked directories are deliberately not followed (TR2 v1 stance).
-    if (!entry.isDirectory()) continue;
-    const name = entry.name;
-    // TR2 skip rules: private folders, parallel slots, interception routes —
-    // each skips the entire subtree, pages at any depth included.
-    if (name.startsWith("_")) continue;
-    if (name.startsWith("@")) continue;
-    if (INTERCEPTION_PREFIX.test(name)) continue;
-    if (ROUTE_GROUP.test(name)) {
-      // Group stripped: recurse with the SAME segments. `out` being a Set
-      // dedupes `(a)/x` + `(b)/x` collisions — Next's own build error (TR2).
-      walk(join(dir, name), urlSegments, pageFileNames, out);
-      continue;
-    }
-    // Dynamic segments `[id]` / `[...slug]` / `[[...slug]]` pass through
-    // verbatim (TR2, RL2 URL-shaped literals).
-    walk(join(dir, name), [...urlSegments, name], pageFileNames, out);
-  }
+function dirIfExists(path: string): string | undefined {
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory()
+    ? path
+    : undefined;
 }

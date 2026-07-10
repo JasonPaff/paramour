@@ -1,14 +1,14 @@
 import { type FSWatcher, statSync, watch } from "node:fs";
 import { resolve } from "node:path";
 
-/** Handle returned by {@link watchAppDir}. */
-export interface AppDirWatcher {
+/** Handle returned by {@link watchRouteDirs}. */
+export interface RouteDirsWatcher {
   /** Stop watching and drop any pending debounced rescan. Idempotent. */
   close(): void;
 }
 
-/** Options for {@link watchAppDir}. */
-export interface WatchAppDirOptions {
+/** Options for {@link watchRouteDirs}. */
+export interface WatchRouteDirsOptions {
   /** Debounce window in milliseconds; defaults to {@link DEFAULT_DEBOUNCE_MS}. */
   debounceMs?: number;
   /**
@@ -30,22 +30,28 @@ export interface WatchAppDirOptions {
 export const DEFAULT_DEBOUNCE_MS = 100;
 
 /**
- * Directory names whose subtrees are ignored if they ever fall under the
+ * Directory names whose subtrees are ignored if they ever fall under a
  * watched root (TR5).
  */
 const IGNORED_SEGMENTS = new Set([".next", "node_modules"]);
 
 /**
- * Debounced full-rescan watcher over an app dir (TR5). Because a scan is
- * milliseconds (TR2), no event fidelity is needed: any event → debounce →
- * `onRescan`. Native `fs.watch({ recursive: true })`, no chokidar; this
- * start/close interface is the seam chokidar would drop in behind if the
- * spike finds a platform hole.
+ * Debounced full-rescan watcher over the route dirs — both of them in a
+ * hybrid project (PR8), sharing one debounce so an editor operation touching
+ * both coalesces into a single rescan. Because a scan is milliseconds (TR2),
+ * no event fidelity is needed: any event → debounce → `onRescan`. Native
+ * `fs.watch({ recursive: true })`, no chokidar; this start/close interface
+ * is the seam chokidar would drop in behind if a platform hole appears.
+ *
+ * A missing dir is skipped — not watched, not an error (PR8): callers pass
+ * the dirs discovery resolved, so absence here is a raced deletion, and dev
+ * continuing in stale-types mode is exactly TR5's posture. Genuine watch
+ * startup failures still surface through `onError`.
  */
-export function watchAppDir(
-  appDir: string,
-  options: WatchAppDirOptions,
-): AppDirWatcher {
+export function watchRouteDirs(
+  dirs: readonly string[],
+  options: WatchRouteDirsOptions,
+): RouteDirsWatcher {
   const {
     debounceMs = DEFAULT_DEBOUNCE_MS,
     ignorePaths = [],
@@ -67,33 +73,39 @@ export function watchAppDir(
     }, debounceMs);
   };
 
-  let watcher: FSWatcher;
-  try {
-    // Linux's userland recursive watcher (Node <= 24.18.0,
-    // internal/fs/recursive_watch.js) swallows ENOENT under the default
-    // throwIfNoEntry — a missing dir silently never watches, with no throw
-    // and no 'error' event. Stat first so startup failure is synchronous on
-    // every platform.
-    statSync(appDir);
-    watcher = watch(appDir, { recursive: true }, (_eventType, filename) => {
-      // `filename` can be null (platform-dependent); with nothing to filter
-      // on, err toward rescanning — a spurious pass is a no-op write (TR3).
-      if (filename !== null) {
-        if (ignored.has(resolve(appDir, filename))) return;
-        // Windows reports backslash-joined relative paths; split on both.
-        const segments = filename.split(/[/\\]/);
-        if (segments.some((segment) => IGNORED_SEGMENTS.has(segment))) return;
-      }
-      schedule();
+  const watchers: FSWatcher[] = [];
+  for (const dir of dirs) {
+    let watcher: FSWatcher;
+    try {
+      // Linux's userland recursive watcher (Node <= 24.18.0,
+      // internal/fs/recursive_watch.js) swallows ENOENT under the default
+      // throwIfNoEntry — a missing dir silently never watches, with no throw
+      // and no 'error' event. Stat first so the missing-dir skip is
+      // synchronous and identical on every platform.
+      if (statSync(dir, { throwIfNoEntry: false }) === undefined) continue;
+      watcher = watch(dir, { recursive: true }, (_eventType, filename) => {
+        // `filename` can be null (platform-dependent); with nothing to
+        // filter on, err toward rescanning — a spurious pass is a no-op
+        // write (TR3).
+        if (filename !== null) {
+          if (ignored.has(resolve(dir, filename))) return;
+          // Windows reports backslash-joined relative paths; split on both.
+          const segments = filename.split(/[/\\]/);
+          if (segments.some((segment) => IGNORED_SEGMENTS.has(segment))) return;
+        }
+        schedule();
+      });
+    } catch (error) {
+      // TR5: watcher failure is non-fatal — dev continues in stale-types
+      // mode, and the other dir's watcher (if any) keeps running.
+      onError?.(error);
+      continue;
+    }
+    watcher.on("error", (error) => {
+      onError?.(error);
     });
-  } catch (error) {
-    // TR5: watcher failure is non-fatal — dev continues in stale-types mode.
-    onError?.(error);
-    return { close: () => undefined };
+    watchers.push(watcher);
   }
-  watcher.on("error", (error) => {
-    onError?.(error);
-  });
 
   let closed = false;
   return {
@@ -101,7 +113,7 @@ export function watchAppDir(
       if (closed) return;
       closed = true;
       clearTimeout(timer);
-      watcher.close();
+      for (const watcher of watchers) watcher.close();
     },
   };
 }

@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { type AppDirWatcher, watchAppDir } from "../src";
+import { type RouteDirsWatcher, watchRouteDirs } from "../src";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /**
@@ -17,7 +17,7 @@ const DEBOUNCE_MS = 50;
 /** Long enough for a debounce to have fired if an event was seen. */
 const SETTLE_MS = 300;
 
-const watchers: AppDirWatcher[] = [];
+const watchers: RouteDirsWatcher[] = [];
 
 afterEach(() => {
   for (const watcher of watchers.splice(0)) watcher.close();
@@ -35,15 +35,15 @@ function settle(ms = SETTLE_MS): Promise<void> {
 
 /** Start a watcher (auto-closed after the test) and let it spin up. */
 async function startWatcher(
-  appDir: string,
-  options: Partial<Parameters<typeof watchAppDir>[1]> = {},
+  dirs: readonly string[],
+  options: Partial<Parameters<typeof watchRouteDirs>[1]> = {},
 ): Promise<{
   onError: ReturnType<typeof vi.fn>;
   onRescan: ReturnType<typeof vi.fn>;
 }> {
   const onError = vi.fn();
   const onRescan = vi.fn();
-  const watcher = watchAppDir(appDir, {
+  const watcher = watchRouteDirs(dirs, {
     debounceMs: DEBOUNCE_MS,
     onError,
     onRescan,
@@ -55,17 +55,31 @@ async function startWatcher(
   return { onError, onRescan };
 }
 
-describe("watchAppDir (TR5)", { retry: 2 }, () => {
+describe("watchRouteDirs (TR5/PR8)", { retry: 2 }, () => {
   it("fires a rescan when a file appears under the app dir", async () => {
     const appDir = makeTempDir();
-    const { onRescan } = await startWatcher(appDir);
+    const { onRescan } = await startWatcher([appDir]);
     writeFileSync(join(appDir, "page.tsx"), "");
+    await expectRescan(onRescan);
+  });
+
+  it("watches both route dirs of a hybrid project (PR8)", async () => {
+    const root = makeTempDir();
+    makeTree(root, ["app/", "pages/"]);
+    const { onRescan } = await startWatcher([
+      join(root, "app"),
+      join(root, "pages"),
+    ]);
+    writeFileSync(join(root, "pages", "legacy.tsx"), "");
+    await expectRescan(onRescan);
+    onRescan.mockClear();
+    writeFileSync(join(root, "app", "page.tsx"), "");
     await expectRescan(onRescan);
   });
 
   it("coalesces an event storm into a single rescan", async () => {
     const appDir = makeTempDir();
-    const { onRescan } = await startWatcher(appDir, { debounceMs: 150 });
+    const { onRescan } = await startWatcher([appDir], { debounceMs: 150 });
     for (let i = 0; i < 10; i++) {
       writeFileSync(join(appDir, `file-${String(i)}.tsx`), "");
     }
@@ -74,10 +88,24 @@ describe("watchAppDir (TR5)", { retry: 2 }, () => {
     expect(onRescan).toHaveBeenCalledTimes(1);
   });
 
+  it("shares one debounce across dirs: a burst touching both rescans once", async () => {
+    const root = makeTempDir();
+    makeTree(root, ["app/", "pages/"]);
+    const { onRescan } = await startWatcher(
+      [join(root, "app"), join(root, "pages")],
+      { debounceMs: 150 },
+    );
+    writeFileSync(join(root, "app", "page.tsx"), "");
+    writeFileSync(join(root, "pages", "legacy.tsx"), "");
+    await expectRescan(onRescan);
+    await settle();
+    expect(onRescan).toHaveBeenCalledTimes(1);
+  });
+
   it("sees events in nested subdirectories (recursive)", async () => {
     const appDir = makeTempDir();
     makeTree(appDir, ["products/[id]/"]);
-    const { onRescan } = await startWatcher(appDir);
+    const { onRescan } = await startWatcher([appDir]);
     writeFileSync(join(appDir, "products", "[id]", "page.tsx"), "");
     await expectRescan(onRescan);
   });
@@ -85,7 +113,7 @@ describe("watchAppDir (TR5)", { retry: 2 }, () => {
   it("ignores events for the artifact path (feedback loop)", async () => {
     const appDir = makeTempDir();
     const artifact = join(appDir, "paramour-env.d.ts");
-    const { onRescan } = await startWatcher(appDir, {
+    const { onRescan } = await startWatcher([appDir], {
       ignorePaths: [artifact],
     });
     writeFileSync(artifact, "// generated");
@@ -96,7 +124,7 @@ describe("watchAppDir (TR5)", { retry: 2 }, () => {
   it("ignores node_modules and .next subtrees", async () => {
     const appDir = makeTempDir();
     makeTree(appDir, [".next/", "node_modules/"]);
-    const { onRescan } = await startWatcher(appDir);
+    const { onRescan } = await startWatcher([appDir]);
     writeFileSync(join(appDir, "node_modules", "dep.js"), "");
     writeFileSync(join(appDir, ".next", "trace.json"), "");
     await settle();
@@ -106,7 +134,7 @@ describe("watchAppDir (TR5)", { retry: 2 }, () => {
   it("routes a throwing onRescan to onError and stays alive", async () => {
     const appDir = makeTempDir();
     const boom = new Error("regenerate failed");
-    const { onError, onRescan } = await startWatcher(appDir);
+    const { onError, onRescan } = await startWatcher([appDir]);
     onRescan.mockImplementationOnce(() => {
       throw boom;
     });
@@ -124,7 +152,10 @@ describe("watchAppDir (TR5)", { retry: 2 }, () => {
   it("stops delivering rescans after close(), and double-close is safe", async () => {
     const appDir = makeTempDir();
     const onRescan = vi.fn();
-    const watcher = watchAppDir(appDir, { debounceMs: DEBOUNCE_MS, onRescan });
+    const watcher = watchRouteDirs([appDir], {
+      debounceMs: DEBOUNCE_MS,
+      onRescan,
+    });
     await settle(100);
     watcher.close();
     watcher.close();
@@ -138,7 +169,7 @@ describe("watchAppDir (TR5)", { retry: 2 }, () => {
     const onRescan = vi.fn();
     // A debounce window long enough that the FS event lands well before it
     // elapses, so close() races only the timer, not event delivery.
-    const watcher = watchAppDir(appDir, { debounceMs: 1000, onRescan });
+    const watcher = watchRouteDirs([appDir], { debounceMs: 1000, onRescan });
     watchers.push(watcher);
     await settle(100);
     writeFileSync(join(appDir, "page.tsx"), "");
@@ -150,22 +181,36 @@ describe("watchAppDir (TR5)", { retry: 2 }, () => {
     expect(onRescan).not.toHaveBeenCalled();
   });
 
-  it("treats startup failure as non-fatal: onError fires, no throw", () => {
-    const appDir = join(makeTempDir(), "does-not-exist");
+  it("skips a missing dir silently — not watched, not an error (PR8)", async () => {
+    // Callers pass what discovery resolved; a dir gone by watch time is a
+    // raced deletion and dev continues in stale-types mode (TR5). The
+    // present dir still watches.
+    const root = makeTempDir();
+    makeTree(root, ["app/"]);
+    const missing = join(root, "pages-does-not-exist");
+    const { onError, onRescan } = await startWatcher([
+      join(root, "app"),
+      missing,
+    ]);
+    expect(onError).not.toHaveBeenCalled();
+    writeFileSync(join(root, "app", "page.tsx"), "");
+    await expectRescan(onRescan);
+  });
+
+  it("watches nothing (and reports nothing) when every dir is missing", () => {
+    const missing = join(makeTempDir(), "does-not-exist");
     const onError = vi.fn();
     const onRescan = vi.fn();
-    // Synchronous on every platform: watchAppDir stats the dir up front
-    // because Linux's userland recursive watcher swallows ENOENT entirely.
-    const watcher = watchAppDir(appDir, { onError, onRescan });
+    const watcher = watchRouteDirs([missing], { onError, onRescan });
     watchers.push(watcher);
-    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
     // The no-op handle is still closeable.
     watcher.close();
   });
 
   it("filters chains: an ignored dir created at watch time never rescans", async () => {
     const appDir = makeTempDir();
-    const { onRescan } = await startWatcher(appDir);
+    const { onRescan } = await startWatcher([appDir]);
     // Creating the ignored dir itself is also an ignored event.
     mkdirSync(join(appDir, "node_modules"));
     await settle();
