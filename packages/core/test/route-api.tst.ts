@@ -272,13 +272,16 @@ test("props are structural and MaybePromise-valued (RL6)", () => {
   }>().type.toBeAssignableTo<ParamsProps>();
 });
 
-test("SafeResult: if (result.error) narrows both arms (RL6)", () => {
+test("SafeResult: the status discriminant narrows both arms (RL6, PR12)", () => {
   const result = {} as SafeResult<{ id: number }>;
-  if (result.error) {
+  if (result.status === "error") {
     expect(result.error).type.toBe<RouteDecodeError>();
-    expect(result.data).type.toBe<undefined>();
+    // The success payload does not exist on the error arm at all.
+    expect(result).type.not.toHaveProperty("data");
   } else {
+    expect(result.status).type.toBe<"success">();
     expect(result.data).type.toBe<{ id: number }>();
+    expect(result).type.not.toHaveProperty("error");
   }
 });
 

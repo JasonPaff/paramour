@@ -6,20 +6,20 @@ import { productRoute } from "./route.def";
 
 // Client-side twin of the server parse in page.tsx (DESIGN §9). The hooks are
 // a useMemo over Next's useParams()/useSearchParams(): no loading state, and a
-// malformed URL surfaces as `{ error }` rather than throwing — the component
-// renders a fallback instead of crashing.
+// malformed URL surfaces as the `status: "error"` arm rather than throwing —
+// the component renders a fallback instead of crashing.
 export function ParamsPanel() {
   const params = useRouteParams(productRoute);
   const search = useSearch(productRoute);
 
-  if (params.error) {
+  if (params.status === "error") {
     return (
       <p className="alert" role="alert">
         params: {params.error.message}
       </p>
     );
   }
-  if (search.error) {
+  if (search.status === "error") {
     return (
       <p className="alert" role="alert">
         search: {search.error.message}

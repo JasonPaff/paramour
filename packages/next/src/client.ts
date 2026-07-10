@@ -22,8 +22,9 @@ import { useMemo } from "react";
  * re-decode on the rare fresh reference is cheap and pure.
  *
  * Two surfaces per half, mirroring core's server `parse` vs `safeParse`:
- * - `useSearch` / `useRouteParams` return the `SafeResult` union (`data` xor
- *   `error`) — a user editing the URL never crashes the component.
+ * - `useSearch` / `useRouteParams` return the `SafeResult` union
+ *   (discriminated on `status`, PR12) — a user editing the URL never crashes
+ *   the component.
  * - `useSearchOrThrow` / `useRouteParamsOrThrow` throw the decode error in
  *   render, to the nearest client error boundary.
  *
@@ -31,7 +32,7 @@ import { useMemo } from "react";
  * decoders (design-03 RL6 — `@paramour/next` is a sanctioned consumer).
  */
 
-/** Decoded route params as a `SafeResult` (`{ data } | { error }`). */
+/** Decoded route params as a `SafeResult` (discriminated on `status`, PR12). */
 export function useRouteParams<R extends AnyRoute>(
   route: R,
 ): SafeResult<InferRouteParams<R>> {
@@ -50,7 +51,7 @@ export function useRouteParamsOrThrow<R extends AnyRoute>(
   return useMemo(() => decodeParams(route, params), [route, params]);
 }
 
-/** Decoded search params as a `SafeResult` (`{ data } | { error }`). */
+/** Decoded search params as a `SafeResult` (discriminated on `status`, PR12). */
 export function useSearch<R extends AnyRoute>(
   route: R,
 ): SafeResult<SearchOutputOf<R["~search"]>> {

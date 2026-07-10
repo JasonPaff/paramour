@@ -18,20 +18,20 @@ import {
  * async-schema misuse (design-02 D7) stay loud and propagate unchanged.
  */
 
-/** Decoded route params as a `SafeResult` (`{ data } | { error }`). */
+/** Decoded route params as a `SafeResult` (discriminated on `status`, PR12). */
 export function safeDecodeParams<R extends AnyRoute>(
   route: R,
   source: ParamsSource,
 ): SafeResult<InferRouteParams<R>> {
   try {
-    return { data: decodeParams(route, source) };
+    return { data: decodeParams(route, source), status: "success" };
   } catch (error) {
-    if (error instanceof ParamsDecodeError) return { error };
+    if (error instanceof ParamsDecodeError) return { error, status: "error" };
     throw error;
   }
 }
 
-/** Decoded search params as a `SafeResult` (`{ data } | { error }`). */
+/** Decoded search params as a `SafeResult` (discriminated on `status`, PR12). */
 export function safeDecodeSearch<R extends AnyRoute>(
   route: R,
   source: SearchSource,
@@ -46,9 +46,10 @@ export function safeDecodeSearch<R extends AnyRoute>(
       data: decodeSearch(route["~search"], source) as SearchOutputOf<
         R["~search"]
       >,
+      status: "success",
     };
   } catch (error) {
-    if (error instanceof SearchDecodeError) return { error };
+    if (error instanceof SearchDecodeError) return { error, status: "error" };
     throw error;
   }
 }

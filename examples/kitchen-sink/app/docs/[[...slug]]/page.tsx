@@ -4,11 +4,11 @@ import type { RouteProps } from "paramour";
 import { docsRoute } from "./route.def";
 
 export default async function DocsPage(props: RouteProps) {
-  // safeParse never throws on decode errors: data XOR error. A malformed URL
-  // (/docs?page=not-a-number) becomes a 404 instead of reaching an error
-  // boundary. `result.error` narrows both arms (the error is always truthy).
+  // safeParse never throws on decode errors: the union discriminates on
+  // `status`. A malformed URL (/docs?page=not-a-number) becomes a 404 instead
+  // of reaching an error boundary.
   const result = await docsRoute.safeParse(props);
-  if (result.error) notFound();
+  if (result.status === "error") notFound();
 
   const { params, search } = result.data;
 
