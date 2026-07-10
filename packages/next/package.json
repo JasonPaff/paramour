@@ -8,9 +8,13 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./client": {
-      "types": "./dist/client.d.ts",
-      "default": "./dist/client.js"
+    "./app": {
+      "types": "./dist/app.d.ts",
+      "default": "./dist/app.js"
+    },
+    "./pages": {
+      "types": "./dist/pages.d.ts",
+      "default": "./dist/pages.js"
     }
   },
   "bin": {
@@ -43,7 +47,7 @@
     "typescript": "^6.0.3",
     "zod": "^4.4.3"
   },
-  "description": "Next.js integration for paramour: withTypedRoutes, client hooks, PageProps glue, and the codegen CLI.",
+  "description": "Next.js integration for paramour: withTypedRoutes, App and Pages Router hooks, PageProps glue, and the codegen CLI.",
   "author": "Jason Paff <jasonpaff@gmail.com>",
   "license": "MIT",
   "repository": {

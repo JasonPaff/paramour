@@ -21,6 +21,12 @@ const packageManifest = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ) as PackageManifest;
 
+// The hook-gating tests (PR11 §3) map @paramour-js/next's subpaths the same
+// way, so their module identity is pinned by the same tripwire.
+const nextPackageManifest = JSON.parse(
+  readFileSync(new URL("../../next/package.json", import.meta.url), "utf8"),
+) as PackageManifest;
+
 const registryTsconfig = readFileSync(
   new URL("../tsconfig.tstyche.registry.json", import.meta.url),
   "utf8",
@@ -43,5 +49,29 @@ describe("registry suite targets the real module identity", () => {
         "tsconfig.tstyche.registry.json's paths mapping to match, then " +
         "update this guard",
     ).toBe("./dist/index.d.ts");
+  });
+
+  it("paths-maps the @paramour-js/next hook entries to their built types (PR11 §3)", () => {
+    expect(registryTsconfig).toContain(
+      '"@paramour-js/next/app": ["../next/dist/app.d.ts"]',
+    );
+    expect(registryTsconfig).toContain(
+      '"@paramour-js/next/pages": ["../next/dist/pages.d.ts"]',
+    );
+  });
+
+  it("the published hook types entries are the files the suite certifies", () => {
+    expect(
+      nextPackageManifest.exports?.["./app"]?.types,
+      "@paramour-js/next's ./app types entry moved — retarget " +
+        "tsconfig.tstyche.registry.json's paths mapping to match, then " +
+        "update this guard",
+    ).toBe("./dist/app.d.ts");
+    expect(
+      nextPackageManifest.exports?.["./pages"]?.types,
+      "@paramour-js/next's ./pages types entry moved — retarget " +
+        "tsconfig.tstyche.registry.json's paths mapping to match, then " +
+        "update this guard",
+    ).toBe("./dist/pages.d.ts");
   });
 });

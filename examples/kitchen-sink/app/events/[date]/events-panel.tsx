@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  useRouteParamsOrThrow,
-  useSearchOrThrow,
-} from "@paramour-js/next/client";
+import { useRouteParamsOrThrow, useSearchOrThrow } from "@paramour-js/next/app";
 
 import { eventsRoute } from "./route.def";
 

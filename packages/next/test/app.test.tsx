@@ -15,7 +15,7 @@ import {
   useRouteParamsOrThrow,
   useSearch,
   useSearchOrThrow,
-} from "../src/client.js";
+} from "../src/app.js";
 import { __setParams, __setSearchParams } from "./stubs/next-navigation.js";
 
 const productRoute = defineAppRoute("/product/[id]", {

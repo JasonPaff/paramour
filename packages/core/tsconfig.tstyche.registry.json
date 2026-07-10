@@ -7,9 +7,19 @@
   // declaration emit preserves ParamourRegister augmentation for real
   // consumers. Requires `pnpm build` first; registry-target.test.ts guards
   // this mapping against drifting from the published exports.
+  //
+  // The @paramour-js/next hook entries are mapped the same way (design-06
+  // PR3/PR11 §3) — built d.ts, not src — so the hook-gating tests see the
+  // hooks exactly as consumers do, through declaration emit. A paths
+  // mapping instead of a devDependency: core → next would be a workspace
+  // dependency cycle, and the suite needs only types.
   "extends": "./tsconfig.tstyche.json",
   "compilerOptions": {
-    "paths": { "paramour": ["./dist/index.d.ts"] }
+    "paths": {
+      "@paramour-js/next/app": ["../next/dist/app.d.ts"],
+      "@paramour-js/next/pages": ["../next/dist/pages.d.ts"],
+      "paramour": ["./dist/index.d.ts"]
+    }
   },
   "include": ["test-registry"]
 }

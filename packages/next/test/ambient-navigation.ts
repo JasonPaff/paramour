@@ -9,10 +9,10 @@
  * compiles `src/` into `dist/` — an assertion module there would ship.
  *
  * The ambient is where paramour states what it believes `next/navigation`
- * returns, and `client.ts` forwards those values straight into core's
+ * returns, and `app.ts` forwards those values straight into core's
  * decoders. So the ambient must be EXACTLY `ParamsSource`: any narrower and
  * the hooks read real params through a type that lies about them (real Next's
- * `Params` admits `undefined`); any wider and `client.ts` stops compiling.
+ * `Params` admits `undefined`); any wider and `app.ts` stops compiling.
  *
  * `examples/next-compat` owns the other half — that *real* Next still returns
  * something assignable to `ParamsSource` — on every supported major.

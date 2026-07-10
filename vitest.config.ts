@@ -3,15 +3,19 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    // `next/navigation` is stubbed for the client-hook render tests so no real
-    // Next is materialized in the workspace (peer-only by design). Scoped to
-    // that one specifier — no other test imports it.
+    // `next/navigation` and `next/router` are stubbed for the app/pages
+    // hook render tests so no real Next is materialized in the workspace
+    // (peer-only by design). Scoped to those two specifiers — no other test
+    // imports them.
     alias: {
       "next/navigation": fileURLToPath(
         new URL(
           "./packages/next/test/stubs/next-navigation.ts",
           import.meta.url,
         ),
+      ),
+      "next/router": fileURLToPath(
+        new URL("./packages/next/test/stubs/next-router.ts", import.meta.url),
       ),
     },
     include: ["packages/*/test/**/*.test.{ts,tsx}"],
