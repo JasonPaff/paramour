@@ -71,6 +71,24 @@ describe("useRouteParams (smoke: useMemo ↔ useParams wiring)", () => {
   });
 });
 
+describe("useParams() null outside an App-Router tree (hybrid pages render)", () => {
+  it("useRouteParams degrades null to a SafeResult error, not a crash", () => {
+    __setParams(null);
+    const { result } = renderHook(() => useRouteParams(productRoute));
+    expect(result.current.status).toBe("error");
+    if (result.current.status !== "error") return;
+    // A null context reads as every-param-missing, the documented error class.
+    expect(result.current.error).toBeInstanceOf(ParamsDecodeError);
+  });
+
+  it("useRouteParamsOrThrow throws the documented ParamsDecodeError on null", () => {
+    __setParams(null);
+    expect(() => renderHook(() => useRouteParamsOrThrow(productRoute))).toThrow(
+      ParamsDecodeError,
+    );
+  });
+});
+
 describe("*OrThrow variants throw to the error boundary", () => {
   it("useSearchOrThrow throws on a malformed URL", () => {
     __setSearchParams(new URLSearchParams("page=abc"));

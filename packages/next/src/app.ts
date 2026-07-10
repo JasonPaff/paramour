@@ -37,22 +37,35 @@ import { useMemo } from "react";
  * different state cardinality (`@paramour-js/next/pages`).
  */
 
-/** Decoded route params as a `SafeResult` (discriminated on `status`, PR12). */
+/**
+ * Decoded route params as a `SafeResult` (discriminated on `status`, PR12).
+ *
+ * `useParams()` returns `null` outside an App-Router tree — including the
+ * initial render of every pages-router page in a hybrid app — so a `null`
+ * context degrades to an empty source (`{}`): required params surface as
+ * ordinary "missing" decode issues (a `SafeResult` error arm), never a crash.
+ * Core keeps its loud throw for genuinely non-object sources from plain-JS
+ * callers; the null tolerance lives here at the adapter.
+ */
 export function useRouteParams<R extends AnyAppRoute>(
   route: R,
 ): SafeResult<InferRouteParams<R>> {
-  const params = useParams();
+  const params = useParams() ?? {};
   return useMemo(() => safeDecodeParams(route, params), [route, params]);
 }
 
 /**
  * Decoded route params, or a thrown {@link ParamsDecodeError} (→ nearest
  * client error boundary) on a malformed URL.
+ *
+ * A `null` `useParams()` (outside an App-Router tree, e.g. a hybrid app's
+ * pages-router initial render) degrades to `{}` so required params throw the
+ * documented {@link ParamsDecodeError}, not an undocumented error class.
  */
 export function useRouteParamsOrThrow<R extends AnyAppRoute>(
   route: R,
 ): InferRouteParams<R> {
-  const params = useParams();
+  const params = useParams() ?? {};
   return useMemo(() => decodeParams(route, params), [route, params]);
 }
 

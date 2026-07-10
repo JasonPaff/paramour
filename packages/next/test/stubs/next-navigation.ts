@@ -6,10 +6,14 @@
  * the hooks read.
  */
 
-let currentParams: Record<string, string | string[]> = {};
+let currentParams: null | Record<string, string | string[]> = {};
 let currentSearchParams = new URLSearchParams();
 
-export function __setParams(value: Record<string, string | string[]>): void {
+// `null` mirrors next/navigation's real return outside an App-Router tree
+// (e.g. a hybrid app's pages-router initial render — Next issue #48058 family).
+export function __setParams(
+  value: null | Record<string, string | string[]>,
+): void {
   currentParams = value;
 }
 
@@ -17,7 +21,7 @@ export function __setSearchParams(value: URLSearchParams): void {
   currentSearchParams = value;
 }
 
-export function useParams(): Record<string, string | string[]> {
+export function useParams(): null | Record<string, string | string[]> {
   return currentParams;
 }
 
