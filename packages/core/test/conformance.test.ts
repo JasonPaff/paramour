@@ -440,11 +440,9 @@ describe("decode-side hygiene", () => {
 
   it("an explicit undefined encode input for an optional key is omitted, never the text 'undefined'", () => {
     const config = { q: p.string().optional() };
-    expect(
-      encodeSearch(config, {
-        q: undefined,
-      } as unknown as InferSearchInput<typeof config>),
-    ).toEqual([]);
+    // No cast: InferSearchInput admits explicit undefined on omittable keys
+    // — the type-level twin of the S3 omission this test pins.
+    expect(encodeSearch(config, { q: undefined })).toEqual([]);
   });
 
   it("a failing array ELEMENT at encode time is a SerializeError", () => {

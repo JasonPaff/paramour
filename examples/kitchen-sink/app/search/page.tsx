@@ -1,8 +1,8 @@
 import { permanentRedirect, redirect } from "next/navigation";
-import { href, type InferSearchInput, type RouteProps } from "paramour";
+import { href, type RouteProps } from "paramour";
 
 import { productsRoute } from "../products/[id]/route.def";
-import { productsListRoute, productsListSearch } from "../products/route.def";
+import { productsListRoute } from "../products/route.def";
 import { searchRoute } from "./route.def";
 
 // A static route reading searchParams must opt into dynamic rendering (same
@@ -29,10 +29,9 @@ export default async function SearchPage(props: RouteProps) {
     permanentRedirect(href(productsRoute, { params: { id: product } }));
   }
 
-  // Vocabulary translation: keyword→q, tag→tags. Anything equal to a
-  // value-form default would elide on the way out (D8), so the built URL is
-  // already canonical.
-  const search: InferSearchInput<typeof productsListSearch> = { tags: tag };
-  if (keyword !== undefined) search.q = keyword;
-  redirect(href(productsListRoute, { search }));
+  // Vocabulary translation: keyword→q, tag→tags. An undefined keyword flows
+  // straight through — explicit undefined is a second spelling of absence
+  // (S3) — and anything equal to a value-form default elides on the way out
+  // (D8), so the built URL is already canonical.
+  redirect(href(productsListRoute, { search: { q: keyword, tags: tag } }));
 }

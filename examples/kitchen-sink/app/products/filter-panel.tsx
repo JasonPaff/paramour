@@ -254,17 +254,10 @@ function Filters({ data }: { data: FilterOutput }) {
   );
 }
 
-// Decode output ≠ href input under exactOptionalPropertyTypes: useSearch
-// hands back optional keys as `T | undefined` (always present), while
-// href()'s search input wants absent keys actually absent. Conditional
-// assignment bridges the two — a spread would not compile.
+// Decode output flows into href input wholesale: optional keys admit an
+// explicit undefined (a second spelling of absence — the key is omitted on
+// encode, S3), so a spread is the whole bridge. The copy exists only because
+// apply()/applyPage() mutate their draft.
 function toInput(data: FilterOutput): FilterInput {
-  const input: FilterInput = {
-    page: data.page,
-    sort: data.sort,
-    tags: data.tags,
-  };
-  if (data.inStock !== undefined) input.inStock = data.inStock;
-  if (data.q !== undefined) input.q = data.q;
-  return input;
+  return { ...data };
 }

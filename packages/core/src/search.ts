@@ -17,12 +17,17 @@ import { runStandardSchemaSync } from "./schema.js";
  * href-input side (design-02 D4): required presence stays required;
  * optional and defaulted keys may be omitted. Array (arity-"many") keys may
  * also be omitted: absent and [] are the same wire state (S6/P6), so
- * requiring `tags: []` ceremony would be pure noise.
+ * requiring `tags: []` ceremony would be pure noise. Omittable keys also
+ * admit an EXPLICIT `undefined` — encodeSearch already treats that value as
+ * absent (S3), and without the `| undefined` widening a decoded
+ * {@link InferSearchOutput} (every key present, optional presence as
+ * `| undefined`) could not flow back into href under
+ * `exactOptionalPropertyTypes` without key-by-key reassembly.
  */
 export type InferSearchInput<S extends SearchConfig> = {
   [K in Exclude<keyof S, OptionalInputKeys<S>>]: OutputOf<S[K]>;
 } & {
-  [K in OptionalInputKeys<S>]?: OutputOf<S[K]>;
+  [K in OptionalInputKeys<S>]?: OutputOf<S[K]> | undefined;
 };
 
 /**

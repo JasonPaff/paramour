@@ -128,17 +128,43 @@ test("search input side: defaulted and optional keys may be omitted", () => {
   >();
 });
 
-test("search input side: explicit undefined is banned under exactOptionalPropertyTypes", () => {
+test("search input side: omittable keys admit explicit undefined", () => {
   const config = {
     page: p.integer().default(1),
     q: p.string(),
     sort: p.enum(["price", "rating"]).optional(),
+    tags: p.stringArray(),
   };
-  // Omission is the only spelling of absence — `?:` without `| undefined`.
-  expect<{ page: undefined; q: string }>().type.not.toBeAssignableTo<
+  // Explicit undefined on a defaulted/optional/many key is a second spelling
+  // of absence — encodeSearch already omits the key for that value (S3), so
+  // the input type admits it. This is what lets a decoded InferSearchOutput
+  // (optional presence as `| undefined`) flow straight back into href under
+  // exactOptionalPropertyTypes (middleware canonicalization, form state).
+  expect<{ page: undefined; q: string }>().type.toBeAssignableTo<
     InferSearchInput<typeof config>
   >();
-  expect<{ q: string; sort: undefined }>().type.not.toBeAssignableTo<
+  expect<{ q: string; sort: undefined }>().type.toBeAssignableTo<
+    InferSearchInput<typeof config>
+  >();
+  expect<{ q: string; tags: undefined }>().type.toBeAssignableTo<
+    InferSearchInput<typeof config>
+  >();
+  // A REQUIRED key never accepts undefined — absence there is an error, and
+  // encodeSearch throws SerializeError at runtime to match.
+  expect<{ q: undefined }>().type.not.toBeAssignableTo<
+    InferSearchInput<typeof config>
+  >();
+});
+
+test("search input side: decoded output round-trips into the input type", () => {
+  const config = {
+    page: p.integer().default(1),
+    sort: p.enum(["price", "rating"]).optional(),
+    tags: p.stringArray(),
+  };
+  // The decode→href round-trip: every-key-present output (optional presence
+  // contributing `| undefined`) assigns to the input side wholesale.
+  expect<InferSearchOutput<typeof config>>().type.toBeAssignableTo<
     InferSearchInput<typeof config>
   >();
 });
