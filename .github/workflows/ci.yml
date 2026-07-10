@@ -27,6 +27,11 @@ jobs:
       # and the examples resolve the packages' dist types, and pnpm's
       # topological order builds core → next → example-basic.
       - run: pnpm build
+      # Relink workspace bins: the first install couldn't create the examples'
+      # `paramour` shims because the bin target (packages/next/dist/cli.js)
+      # only exists after the build. A second install is a fast no-op that
+      # just recreates the links.
+      - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
       # Negative suite: examples/type-errors must fail tsc with EXACTLY its
