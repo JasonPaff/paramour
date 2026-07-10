@@ -216,6 +216,7 @@ code {
   margin-bottom: 0;
 }
 
+.panel .hint,
 .section .hint {
   margin: 1rem 0 0;
   color: var(--muted);
@@ -444,7 +445,8 @@ code {
   font-size: 0.75rem;
 }
 
-.field input {
+.field input,
+.field select {
   width: 100%;
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--line-strong);
@@ -455,10 +457,28 @@ code {
   font-size: 0.8125rem;
 }
 
-.field input:focus-visible {
+.field input:focus-visible,
+.field select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-color: transparent;
+}
+
+/* Tag-filter checkboxes on /products. */
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 0.7rem;
+}
+
+.checks label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
 }
 
 .btn {
@@ -475,6 +495,24 @@ code {
 .btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  border-color: var(--line-strong);
+  color: var(--fg);
+}
+
+/* Prev/next pager on /products. */
+.pager {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
 }
 
 /* ---------- issue lists / alerts ---------- */

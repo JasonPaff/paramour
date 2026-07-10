@@ -9,7 +9,7 @@ import { docsRoute } from "./docs/[[...slug]]/route.def";
 import { eventsRoute } from "./events/[date]/route.def";
 import { filesRoute } from "./files/[...path]/route.def";
 import { findRoute } from "./find/route.def";
-import { productsRoute } from "./products/[id]/route.def";
+import { productsListRoute } from "./products/route.def";
 import { homeRoute } from "./route.def";
 import { serializeRoute } from "./serialize/route.def";
 
@@ -25,7 +25,10 @@ const links = [
   {
     label: "Products",
     prefix: "/products",
-    to: href(productsRoute, { params: { id: 42 } }),
+    // The list route: no params, and every search key is omittable, so
+    // href() needs no arguments at all. /search is deliberately NOT here — a
+    // tab that instantly redirects away could never render as active.
+    to: href(productsListRoute),
   },
   { label: "Docs", prefix: "/docs", to: href(docsRoute) },
   {

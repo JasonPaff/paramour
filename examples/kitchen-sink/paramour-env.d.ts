@@ -9,7 +9,9 @@ declare module "paramour" {
       | "/events/[date]"
       | "/files/[...path]"
       | "/find"
+      | "/products"
       | "/products/[id]"
+      | "/search"
       | "/serialize";
     pagesRoutes:
       | "/legacy";

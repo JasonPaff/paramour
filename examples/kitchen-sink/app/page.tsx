@@ -6,6 +6,8 @@ import { eventsRoute } from "./events/[date]/route.def";
 import { filesRoute } from "./files/[...path]/route.def";
 import { findRoute } from "./find/route.def";
 import { productsRoute } from "./products/[id]/route.def";
+import { productsListRoute } from "./products/route.def";
+import { searchRoute } from "./search/route.def";
 import { serializeRoute } from "./serialize/route.def";
 
 // The hub: one href()-built link per demo route, each annotated with the
@@ -59,6 +61,54 @@ export default function HomePage() {
             <span className="pill">.optional()</span>
             <span className="pill">.catch()</span>
             <span className="pill">parse</span>
+          </div>
+        </li>
+
+        <li className="card">
+          <Link
+            className="card__path"
+            href={href(productsListRoute, {
+              search: { sort: "price", tags: ["usb-c"] },
+            })}
+          >
+            /products?sort=price&amp;tags=usb-c
+          </Link>
+          <p>
+            URL-as-state: a filter form that round-trips through the URL.{" "}
+            <code>useSearch</code> reads, <code>router.replace(href(...))</code>{" "}
+            writes, and defaults elide on the way out.
+          </p>
+          <div className="pills">
+            <span className="pill">useSearch</span>
+            <span className="pill">useRouter().replace</span>
+            <span className="pill">router.push</span>
+            <span className="pill">InferSearchInput</span>
+            <span className="pill">D8 elision</span>
+            <span className="pill">scroll: false</span>
+          </div>
+        </li>
+
+        <li className="card">
+          <Link
+            className="card__path"
+            href={href(searchRoute, {
+              search: { keyword: "cable", tag: ["usb-c"] },
+            })}
+          >
+            /search?keyword=cable
+          </Link>
+          <p>
+            A legacy URL that never renders: the server decodes the old
+            vocabulary and forwards it to /products — or, for a moved{" "}
+            <Link href={href(searchRoute, { search: { product: 4 } })}>
+              deep link
+            </Link>
+            , permanently to /products/4.
+          </p>
+          <div className="pills">
+            <span className="pill">redirect()</span>
+            <span className="pill">permanentRedirect()</span>
+            <span className="pill">safeParseSearch</span>
           </div>
         </li>
 
@@ -172,6 +222,13 @@ export default function HomePage() {
           {/* safeParse → notFound() instead of an error boundary. */}
           <a href="/docs?page=not-a-number">/docs?page=not-a-number</a>
           <span>a malformed search param becomes a 404.</span>
+        </li>
+        <li className="chip">
+          {/* The safe hook's error arm renders a reset link, not a crash. */}
+          <a href="/products?inStock=maybe">/products?inStock=maybe</a>
+          <span>
+            fails the boolean grammar; the filter form offers a reset.
+          </span>
         </li>
       </ul>
     </main>
