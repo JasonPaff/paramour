@@ -3,15 +3,10 @@ import "paramour";
 
 declare module "paramour" {
   interface ParamourRegister {
-    appRoutes:
-      | "/"
-      | "/docs/[[...slug]]"
-      | "/events/[date]"
-      | "/files/[...path]"
-      | "/find"
-      | "/products/[id]"
-      | "/serialize";
     pagesRoutes:
-      | "/legacy";
+      | "/"
+      | "/find"
+      | "/legacy/[id]"
+      | "/products/[id]";
   }
 }

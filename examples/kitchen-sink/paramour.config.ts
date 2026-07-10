@@ -10,4 +10,5 @@ export default {
   appDir: "app",
   outFile: "paramour-env.d.ts",
   pageExtensions: ["tsx", "ts", "jsx", "js"],
+  pagesDir: "pages",
 } satisfies ParamourConfig;
