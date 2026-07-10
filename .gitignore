@@ -29,7 +29,7 @@ pnpm-debug.log*
 .vscode/
 
 # local claude settings (shared settings stay tracked)
-.claude/settings.local.json
+#.claude/settings.local.json
 
 # ignore docs stored in claude
 .claude/docs/**/*
