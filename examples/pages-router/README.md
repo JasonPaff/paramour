@@ -21,6 +21,11 @@ What it demonstrates:
   GSSP product page is `isReady` from its first render and never shows it.
 - **Typed links** — every `<Link>` is fed by `href(route, { params, search
 })`; `href()` is router-agnostic.
+- **Imperative navigation** — `href()` output feeds `next/router`'s
+  `push`/`replace` directly (`Href` is a string subtype). The `/find` form
+  replaces the URL on submit and the three-state hooks re-decode it; the
+  product page's prev/next buttons `router.push` to a sibling `[id]`, running
+  `getServerSideProps` again.
 - **Codegen** — `next.config.ts` wraps the config with
   `withTypedRoutes(config, { strict: true })`. The committed
   `paramour-env.d.ts` registers a `pagesRoutes` union, narrowing

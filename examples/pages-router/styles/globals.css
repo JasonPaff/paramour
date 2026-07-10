@@ -387,3 +387,50 @@ code {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  border-color: var(--line-strong);
+  color: var(--fg);
+}
+
+/* ---------- forms (the find form, the product pager) ---------- */
+
+.field {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0 0 0.7rem;
+}
+
+.field span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.field input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.pager {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}

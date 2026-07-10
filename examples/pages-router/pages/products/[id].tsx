@@ -1,4 +1,6 @@
 import type { GetServerSideProps, InferGetServerSidePropsType } from "next";
+import { useRouter } from "next/router";
+import { href } from "paramour";
 
 import { ProductPanel } from "../../components/product-panel";
 import { productRoute } from "../../lib/routes";
@@ -30,6 +32,8 @@ export default function ProductPage({
   page,
   q,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  const router = useRouter();
+
   return (
     <main>
       <h1>Product #{id}</h1>
@@ -56,6 +60,31 @@ export default function ProductPage({
         <dd>{q ?? "(not provided — optional)"}</dd>
       </dl>
       <ProductPanel />
+      <p className="eyebrow">Imperative navigation</p>
+      {/* router.push takes Url | string, and Href is a string subtype, so
+          the branded href() output flows in with no cast. Each push runs
+          getServerSideProps again and re-decodes the new URL. */}
+      <div className="pager">
+        <button
+          className="btn"
+          disabled={id <= 1}
+          onClick={() => {
+            void router.push(href(productRoute, { params: { id: id - 1 } }));
+          }}
+          type="button"
+        >
+          ← Product #{id - 1}
+        </button>
+        <button
+          className="btn"
+          onClick={() => {
+            void router.push(href(productRoute, { params: { id: id + 1 } }));
+          }}
+          type="button"
+        >
+          Product #{id + 1} →
+        </button>
+      </div>
     </main>
   );
 }

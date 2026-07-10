@@ -1,4 +1,4 @@
-import { definePagesRoute, p } from "paramour";
+import { definePagesRoute, p, type SearchConfig } from "paramour";
 
 // One module for every route definition. The colocated route.def.ts pattern
 // from the App Router examples is impossible here BY DESIGN: under pages/,
@@ -7,15 +7,17 @@ import { definePagesRoute, p } from "paramour";
 // route.def.ts would become the route /products/route.def. Definitions live
 // outside the scanned dir instead.
 
-export const findRoute = definePagesRoute("/find", {
-  search: {
-    // Numeric on purpose: /find?max=not-a-number is the client-side decode
-    // failure demo (the hooks' error arm; strings alone can never fail).
-    max: p.integer().optional(),
-    q: p.string().optional(),
-    tag: p.stringArray(),
-  },
-});
+// Exported on its own so the find form can name its input type with
+// InferSearchInput<typeof findSearch>.
+export const findSearch = {
+  // Numeric on purpose: /find?max=not-a-number is the client-side decode
+  // failure demo (the hooks' error arm; strings alone can never fail).
+  max: p.integer().optional(),
+  q: p.string().optional(),
+  tag: p.stringArray(),
+} satisfies SearchConfig;
+
+export const findRoute = definePagesRoute("/find", { search: findSearch });
 
 export const homeRoute = definePagesRoute("/", {});
 

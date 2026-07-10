@@ -1,5 +1,6 @@
 import { useSearch } from "@paramour-js/next/pages";
 
+import { FindForm } from "../components/find-form";
 import { findRoute } from "../lib/routes";
 
 // No data fetching, so Next statically optimizes this page: the first client
@@ -19,7 +20,9 @@ export default function FindPage() {
         <code>useSearch</code>. On a hard load the router starts{" "}
         <code>pending</code>; try{" "}
         <code>/find?q=cable&amp;tag=audio&amp;tag=usb&amp;max=5</code>, and{" "}
-        <code>/find?max=not-a-number</code> for the error arm.
+        <code>/find?max=not-a-number</code> for the error arm. Or edit the form
+        below — it replaces the URL with <code>router.replace(href(...))</code>{" "}
+        and the hook re-decodes it.
       </p>
 
       {search.status === "pending" ? (
@@ -33,24 +36,32 @@ export default function FindPage() {
           ))}
         </ul>
       ) : (
-        <dl className="kv">
-          <dt>
-            <code>search.q</code> — <code>p.string().optional()</code>
-          </dt>
-          <dd>{search.data.q ?? "(absent)"}</dd>
-          <dt>
-            <code>search.tag</code> — <code>p.stringArray()</code>
-          </dt>
-          <dd>
-            {search.data.tag.length > 0
-              ? search.data.tag.join(", ")
-              : "(absent decodes to [])"}
-          </dd>
-          <dt>
-            <code>search.max</code> — <code>p.integer().optional()</code>
-          </dt>
-          <dd>{search.data.max ?? "(absent)"}</dd>
-        </dl>
+        <>
+          <dl className="kv">
+            <dt>
+              <code>search.q</code> — <code>p.string().optional()</code>
+            </dt>
+            <dd>{search.data.q ?? "(absent)"}</dd>
+            <dt>
+              <code>search.tag</code> — <code>p.stringArray()</code>
+            </dt>
+            <dd>
+              {search.data.tag.length > 0
+                ? search.data.tag.join(", ")
+                : "(absent decodes to [])"}
+            </dd>
+            <dt>
+              <code>search.max</code> — <code>p.integer().optional()</code>
+            </dt>
+            <dd>{search.data.max ?? "(absent)"}</dd>
+          </dl>
+          {/* Keyed on the decoded values so back/forward remounts the
+              uncontrolled inputs with the URL's state. */}
+          <FindForm
+            current={search.data}
+            key={`${search.data.q ?? ""}|${String(search.data.max)}`}
+          />
+        </>
       )}
     </main>
   );
