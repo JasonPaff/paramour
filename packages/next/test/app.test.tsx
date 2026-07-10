@@ -135,6 +135,68 @@ describe("memoization is keyed on the Next hook's reference", () => {
     expect(result.current).not.toBe(first);
     expect(result.current).toEqual(first);
   });
+
+  it("useRouteParams returns the identical result object across rerenders with the same params", () => {
+    __setParams({ id: "42" });
+    const { rerender, result } = renderHook(() => useRouteParams(productRoute));
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("useRouteParams recomputes when a NEW params object with identical content arrives", () => {
+    __setParams({ id: "42" });
+    const { rerender, result } = renderHook(() => useRouteParams(productRoute));
+    const first = result.current;
+    __setParams({ id: "42" });
+    rerender();
+    expect(result.current).not.toBe(first);
+    expect(result.current).toEqual(first);
+  });
+
+  it("useRouteParamsOrThrow returns the identical decoded object across rerenders with the same params", () => {
+    __setParams({ id: "42" });
+    const { rerender, result } = renderHook(() =>
+      useRouteParamsOrThrow(productRoute),
+    );
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("useRouteParamsOrThrow recomputes when a NEW params object with identical content arrives", () => {
+    __setParams({ id: "42" });
+    const { rerender, result } = renderHook(() =>
+      useRouteParamsOrThrow(productRoute),
+    );
+    const first = result.current;
+    __setParams({ id: "42" });
+    rerender();
+    expect(result.current).not.toBe(first);
+    expect(result.current).toEqual(first);
+  });
+
+  it("useSearchOrThrow returns the identical decoded object across rerenders with the same URLSearchParams", () => {
+    __setSearchParams(new URLSearchParams("page=2&q=hi"));
+    const { rerender, result } = renderHook(() =>
+      useSearchOrThrow(productRoute),
+    );
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("useSearchOrThrow recomputes when a NEW URLSearchParams with identical text arrives", () => {
+    __setSearchParams(new URLSearchParams("page=2&q=hi"));
+    const { rerender, result } = renderHook(() =>
+      useSearchOrThrow(productRoute),
+    );
+    const first = result.current;
+    __setSearchParams(new URLSearchParams("page=2&q=hi"));
+    rerender();
+    expect(result.current).not.toBe(first);
+    expect(result.current).toEqual(first);
+  });
 });
 
 describe("catch-all params through useRouteParams", () => {
@@ -162,5 +224,36 @@ describe("rawSearch routes through the search hooks", () => {
     __setSearchParams(new URLSearchParams("page=2&q=hi"));
     const { result } = renderHook(() => useSearchOrThrow(rawRoute));
     expect(result.current).toEqual({ page: 2, q: "hi" });
+  });
+
+  it("useSearch surfaces a foreign (zod) failure as the SearchDecodeError arm", () => {
+    // Required `q` is absent, so the zod schema rejects — the foreign error
+    // must reach the hook wiring already branded as SearchDecodeError.
+    __setSearchParams(new URLSearchParams("page=2"));
+    const { result } = renderHook(() => useSearch(rawRoute));
+    expect(result.current.status).toBe("error");
+    if (result.current.status !== "error") return;
+    expect(result.current.error).toBeInstanceOf(SearchDecodeError);
+  });
+
+  it("useSearchOrThrow throws the branded SearchDecodeError on a foreign failure", () => {
+    __setSearchParams(new URLSearchParams("page=2"));
+    expect(() => renderHook(() => useSearchOrThrow(rawRoute))).toThrow(
+      SearchDecodeError,
+    );
+  });
+});
+
+describe("defaults and absent optionals decode through the search hooks", () => {
+  it("useSearch fills the default and omits the absent optional on empty search", () => {
+    __setSearchParams(new URLSearchParams());
+    const { result } = renderHook(() => useSearch(productRoute));
+    expect(result.current).toEqual({ data: { page: 1 }, status: "success" });
+  });
+
+  it("useSearchOrThrow returns the default-filled object on empty search", () => {
+    __setSearchParams(new URLSearchParams());
+    const { result } = renderHook(() => useSearchOrThrow(productRoute));
+    expect(result.current).toEqual({ page: 1 });
   });
 });

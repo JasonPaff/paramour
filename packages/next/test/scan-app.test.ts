@@ -29,6 +29,17 @@ describe("scanAppRoutes: page detection (TR2)", () => {
     ]);
   });
 
+  it("sorts by code unit, not locale ('/Z' < '/a' < '/é')", () => {
+    // Uppercase precedes lowercase by code unit; a locale-aware sort would
+    // interleave them (/a before /Z), so this discriminates the two — the
+    // /about-before-/blog case above cannot (scan-app.ts:100).
+    expect(scanTree(["a/page.tsx", "Z/page.tsx", "é/page.tsx"])).toEqual([
+      "/Z",
+      "/a",
+      "/é",
+    ]);
+  });
+
   it("detects every default page extension", () => {
     expect(
       scanTree(["a/page.tsx", "b/page.ts", "c/page.jsx", "d/page.js"]),

@@ -14,6 +14,7 @@
     "lint:fix": "eslint . --fix --cache",
     "test": "vitest run",
     "test:types": "tstyche",
+    "test:types:next": "tstyche --config ./tstyche.next.json",
     "test:types:registry": "tstyche --config ./tstyche.registry.json",
     "typecheck": "pnpm -r run typecheck"
   },
