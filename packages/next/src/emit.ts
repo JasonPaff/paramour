@@ -38,10 +38,15 @@ export function emitArtifact(routes: EmitRoutes): string {
   const members = (["appRoutes", "pagesRoutes"] as const).flatMap((member) => {
     const sorted = [...new Set(routes[member])].sort();
     if (sorted.length === 0) return [];
-    // The union's closing `;` attaches to the last member line.
+    // The union's closing `;` attaches to the last member line. Paths go
+    // through JSON.stringify, not raw `"${path}"`: a dirname may legally
+    // contain a quote or backslash (Linux/macOS), which unescaped would emit
+    // invalid TS or silently declare the wrong route. JSON string escaping is
+    // a subset of TS string-literal escaping (output stays valid TS) and is
+    // deterministic, so TR3's byte-identity guarantee holds.
     return [
       `    ${member}:`,
-      `${sorted.map((path) => `      | "${path}"`).join("\n")};`,
+      `${sorted.map((path) => `      | ${JSON.stringify(path)}`).join("\n")};`,
     ];
   });
   if (members.length === 0) {

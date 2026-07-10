@@ -80,6 +80,35 @@ declare module "paramour" {
     expect(content).not.toContain("Routes:");
     expect(content).not.toContain("never");
   });
+
+  it("escapes quotes and backslashes into valid TS string literals (bug 7)", () => {
+    // Legal POSIX dirnames may contain " or \; interpolated raw they'd emit a
+    // TS syntax error (broken quote) or a spurious escape (\b = backspace).
+    // Each emitted literal is valid JSON, hence valid TS, and round-trips to
+    // the original path.
+    for (const path of ['/a"b', "/a\\b", "/c\\td"]) {
+      const line = emitApp([path])
+        .split("\n")
+        .find((l) => l.trimStart().startsWith("|"));
+      expect(line).toBeDefined();
+      // Drop the leading `| ` and the union's trailing `;` on the last member.
+      const literal = (line ?? "")
+        .trim()
+        .replace(/^\|\s*/, "")
+        .replace(/;$/, "");
+      expect(JSON.parse(literal)).toBe(path);
+    }
+  });
+
+  it("pins the exact escaped bytes for a quote and a backslash (bug 7)", () => {
+    expect(emitApp(['/a"b'])).toContain('| "/a\\"b"');
+    expect(emitApp(["/a\\b"])).toContain('| "/a\\\\b"');
+  });
+
+  it("emits byte-identical output for an ordinary path (no regression)", () => {
+    // The common case must be unchanged by the JSON.stringify escaping.
+    expect(emitApp(["/product/[id]"])).toContain('| "/product/[id]"');
+  });
 });
 
 describe("writeIfChanged (TR3)", () => {
