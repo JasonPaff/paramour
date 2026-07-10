@@ -296,8 +296,9 @@ export function encodeParams<R extends AnyRoute>(
 
 /**
  * Tokenizes a path literal into segments, throwing ParamourError on every
- * RL1 rejection. Shared by defineRoute (define-time validation) and the
- * R-rule runtime here, so encode/decode never re-derive segment kinds.
+ * RL1 rejection. Shared by the route constructors (define-time validation)
+ * and the R-rule runtime here, so encode/decode never re-derive segment
+ * kinds.
  */
 export function tokenizePath(path: string): PathSegment[] {
   // RL1: either would corrupt href's fixed path–query–fragment assembly (RL4).
@@ -396,9 +397,9 @@ function encodeSegmentValue(
 }
 
 /**
- * Unreachable through defineRoute's typed config; a plain-JS caller can omit
- * a param codec — or a hand-built route can lack `~params` entirely — which
- * is a config-contract failure, not a decode issue.
+ * Unreachable through the constructors' typed configs; a plain-JS caller can
+ * omit a param codec — or a hand-built route can lack `~params` entirely —
+ * which is a config-contract failure, not a decode issue.
  */
 function requireCodec(
   config: Record<string, AnyCodec | undefined> | undefined,
@@ -415,7 +416,7 @@ function requireCodec(
 }
 
 /**
- * A route's tokenized segments: defineRoute computes them once at define
+ * A route's tokenized segments: the constructors compute them once at define
  * time (`~segments`); a hand-built route lacking them falls back to
  * tokenizing here, so the plain-JS contract is identical either way.
  */

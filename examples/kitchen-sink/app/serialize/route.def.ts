@@ -1,4 +1,4 @@
-import { defineRoute } from "paramour";
+import { defineAppRoute } from "paramour";
 
 // A static route hosting the client-side serialization playground.
-export const serializeRoute = defineRoute("/serialize", {});
+export const serializeRoute = defineAppRoute("/serialize", {});

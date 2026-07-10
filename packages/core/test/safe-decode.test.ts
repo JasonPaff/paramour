@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
-  defineRoute,
+  defineAppRoute,
   p,
   ParamourError,
   ParamsDecodeError,
@@ -14,7 +14,7 @@ import {
   SearchDecodeError,
 } from "../src";
 
-const productRoute = defineRoute("/product/[id]", {
+const productRoute = defineAppRoute("/product/[id]", {
   params: { id: p.integer() },
   search: {
     page: p.integer().default(1),
@@ -22,23 +22,23 @@ const productRoute = defineRoute("/product/[id]", {
   },
 });
 
-const catchRoute = defineRoute("/items", {
+const catchRoute = defineAppRoute("/items", {
   search: { page: p.integer().catch(0) },
 });
 
-const tagsRoute = defineRoute("/tags", {
+const tagsRoute = defineAppRoute("/tags", {
   search: { tags: p.stringArray() },
 });
 
-const filesRoute = defineRoute("/files/[...seg]", {
+const filesRoute = defineAppRoute("/files/[...seg]", {
   params: { seg: p.string() },
 });
 
-const docsRoute = defineRoute("/docs/[[...slug]]", {
+const docsRoute = defineAppRoute("/docs/[[...slug]]", {
   params: { slug: p.string() },
 });
 
-const rawRoute = defineRoute("/raw", {
+const rawRoute = defineAppRoute("/raw", {
   search: rawSearch(
     z.object({ page: z.coerce.number().optional(), q: z.string() }),
   ),
@@ -114,7 +114,7 @@ describe("safeDecodeSearch", () => {
   });
 
   it("aggregates one issue per failed key into a single error arm", () => {
-    const multiRoute = defineRoute("/multi", {
+    const multiRoute = defineAppRoute("/multi", {
       search: { count: p.integer(), flag: p.boolean() },
     });
     const result = safeDecodeSearch(
@@ -146,13 +146,15 @@ describe("safeDecodeSearch with a rawSearch route (design-04)", () => {
   });
 
   it("a schema whose validate THROWS stays loud (ParamourError, not the error arm)", () => {
-    const route = defineRoute("/boom", { search: rawSearch(throwingSchema) });
+    const route = defineAppRoute("/boom", {
+      search: rawSearch(throwingSchema),
+    });
     expect(() => safeDecodeSearch(route, {})).toThrow(ParamourError);
     expect(() => safeDecodeSearch(route, {})).toThrow(/validation threw/);
   });
 
   it("an async schema throws loudly (design-02 D7), never the error arm", () => {
-    const route = defineRoute("/async", { search: rawSearch(asyncSchema) });
+    const route = defineAppRoute("/async", { search: rawSearch(asyncSchema) });
     expect(() => safeDecodeSearch(route, {})).toThrow(ParamourError);
     expect(() => safeDecodeSearch(route, {})).toThrow(/synchronous/);
   });
@@ -195,7 +197,7 @@ describe("safeDecodeParams", () => {
   });
 
   it("aggregates one issue per failed segment into a single error arm", () => {
-    const pairRoute = defineRoute("/pair/[a]/[b]", {
+    const pairRoute = defineAppRoute("/pair/[a]/[b]", {
       params: { a: p.integer(), b: p.integer() },
     });
     const result = safeDecodeParams(pairRoute, { a: "x", b: "y" });

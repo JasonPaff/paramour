@@ -1,6 +1,6 @@
-import { defineRoute, p } from "paramour";
+import { defineAppRoute, p } from "paramour";
 
-export const productRoute = defineRoute("/product/[id]", {
+export const productRoute = defineAppRoute("/product/[id]", {
   params: { id: p.integer() },
   search: {
     page: p.integer().default(1),

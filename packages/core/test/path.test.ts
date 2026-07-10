@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPath,
   decodeParams,
-  defineRoute,
+  defineAppRoute,
   encodeParams,
   p,
   ParamourError,
@@ -13,7 +13,7 @@ import {
 
 describe("encodeParams / buildPath (RL5)", () => {
   it("R1: a single param is serialized, encoded, and substituted", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
     });
     expect(encodeParams(route, { id: 42 })).toEqual(["product", "42"]);
@@ -21,17 +21,19 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("R1: segment values are percent-encoded (%20 for space, %2F for /)", () => {
-    const route = defineRoute("/tag/[name]", { params: { name: p.string() } });
+    const route = defineAppRoute("/tag/[name]", {
+      params: { name: p.string() },
+    });
     expect(buildPath(route, { name: "a b/c" })).toBe("/tag/a%20b%2Fc");
   });
 
   it("static segments are emitted verbatim, never re-encoded (RL2)", () => {
-    const route = defineRoute("/über/[id]", { params: { id: p.string() } });
+    const route = defineAppRoute("/über/[id]", { params: { id: p.string() } });
     expect(buildPath(route, { id: "x" })).toBe("/über/x");
   });
 
   it("R2: catch-all elements are encoded independently and joined with /", () => {
-    const route = defineRoute("/files/[...seg]", {
+    const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string() },
     });
     expect(encodeParams(route, { seg: ["a", "b c", "d/e"] })).toEqual([
@@ -46,7 +48,7 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("R3: a required catch-all given [] is a SerializeError", () => {
-    const route = defineRoute("/files/[...seg]", {
+    const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string() },
     });
     expect(() => buildPath(route, { seg: [] })).toThrow(SerializeError);
@@ -54,7 +56,7 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("R3: an optional catch-all given [] or absent vanishes with its slash", () => {
-    const route = defineRoute("/docs/[[...slug]]", {
+    const route = defineAppRoute("/docs/[[...slug]]", {
       params: { slug: p.string() },
     });
     expect(buildPath(route, {})).toBe("/docs");
@@ -63,14 +65,16 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("R3: a fully-elided root optional catch-all yields /", () => {
-    const route = defineRoute("/[[...all]]", { params: { all: p.string() } });
+    const route = defineAppRoute("/[[...all]]", {
+      params: { all: p.string() },
+    });
     expect(buildPath(route, {})).toBe("/");
   });
 
   it('R4: "" as a segment value or catch-all element is a SerializeError', () => {
-    const single = defineRoute("/user/[id]", { params: { id: p.string() } });
+    const single = defineAppRoute("/user/[id]", { params: { id: p.string() } });
     expect(() => buildPath(single, { id: "" })).toThrow(SerializeError);
-    const catchAll = defineRoute("/files/[...seg]", {
+    const catchAll = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string() },
     });
     expect(() => buildPath(catchAll, { seg: ["a", ""] })).toThrow(
@@ -83,25 +87,25 @@ describe("encodeParams / buildPath (RL5)", () => {
       parse: (raw) => raw,
       serialize: () => undefined as unknown as string,
     });
-    const route = defineRoute("/x/[id]", { params: { id: sneaky } });
+    const route = defineAppRoute("/x/[id]", { params: { id: sneaky } });
     expect(() => buildPath(route, { id: "v" })).toThrow(SerializeError);
     expect(() => buildPath(route, { id: "v" })).toThrow(/must return a string/);
   });
 
   it("a missing required param is a SerializeError", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
     });
     expect(() => buildPath(route, {} as never)).toThrow(SerializeError);
     expect(() => buildPath(route, {} as never)).toThrow(/is missing/);
-    const catchAll = defineRoute("/files/[...seg]", {
+    const catchAll = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string() },
     });
     expect(() => buildPath(catchAll, {} as never)).toThrow(/is missing/);
   });
 
   it("a non-array for a catch-all is a SerializeError", () => {
-    const route = defineRoute("/files/[...seg]", {
+    const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string() },
     });
     expect(() => buildPath(route, { seg: "a" } as never)).toThrow(
@@ -110,7 +114,7 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("a non-object params input fails loud", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
     });
     expect(() => encodeParams(route, null as never)).toThrow(SerializeError);
@@ -120,12 +124,12 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("a lone surrogate in a segment value is branded (S7)", () => {
-    const route = defineRoute("/x/[id]", { params: { id: p.string() } });
+    const route = defineAppRoute("/x/[id]", { params: { id: p.string() } });
     expect(() => buildPath(route, { id: "\uD800" })).toThrow(SerializeError);
   });
 
   it("a missing codec for a dynamic segment is a loud ParamourError", () => {
-    const route = defineRoute("/x/[id]", {} as never);
+    const route = defineAppRoute("/x/[id]", {} as never);
     expect(() => buildPath(route, { id: "1" })).toThrow(/declares no codec/);
   });
 
@@ -136,18 +140,18 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("the root route builds /", () => {
-    const root = defineRoute("/", {});
+    const root = defineAppRoute("/", {});
     expect(buildPath(root, {})).toBe("/");
     expect(encodeParams(root, {})).toEqual([]);
   });
 
   it("a static route ignores junk input keys", () => {
-    const route = defineRoute("/about", {});
+    const route = defineAppRoute("/about", {});
     expect(buildPath(route, { junk: 1 } as never)).toBe("/about");
   });
 
   it("an optional catch-all given a non-array non-undefined is a SerializeError", () => {
-    const route = defineRoute("/docs/[[...slug]]", {
+    const route = defineAppRoute("/docs/[[...slug]]", {
       params: { slug: p.string() },
     });
     expect(() => buildPath(route, { slug: "a" } as never)).toThrow(
@@ -156,7 +160,7 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("class instances exposing params via prototype getters encode (readInputValue parity with search)", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
     });
     // A literal getter, not a readonly field: a value living on the class
@@ -172,7 +176,7 @@ describe("encodeParams / buildPath (RL5)", () => {
   });
 
   it("a throwing prototype getter on a params input is a SerializeError", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
     });
     class Boom {
@@ -187,7 +191,7 @@ describe("encodeParams / buildPath (RL5)", () => {
 
 describe("decodeParams (RL7)", () => {
   it("decodes singles per codec grammar; unknown keys are ignored", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
     });
     // Next includes parent-layout params; they are never read.
@@ -197,7 +201,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("decodes catch-alls element-wise (D6)", () => {
-    const route = defineRoute("/blog/[...slug]", {
+    const route = defineAppRoute("/blog/[...slug]", {
       params: { slug: p.string() },
     });
     expect(decodeParams(route, { slug: ["a", "b"] })).toEqual({
@@ -206,19 +210,19 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("an absent optional catch-all normalizes to [] (D6)", () => {
-    const route = defineRoute("/docs/[[...slug]]", {
+    const route = defineAppRoute("/docs/[[...slug]]", {
       params: { slug: p.string() },
     });
     expect(decodeParams(route, {})).toEqual({ slug: [] });
   });
 
   it("a static route decodes to {} whatever the source contains", () => {
-    const route = defineRoute("/about", {});
+    const route = defineAppRoute("/about", {});
     expect(decodeParams(route, { anything: "x" })).toEqual({});
   });
 
   it("a missing required key is an issue, and .catch() cannot recover it", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer().catch(0) },
     });
     expect(() => decodeParams(route, {})).toThrow(ParamsDecodeError);
@@ -228,7 +232,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("[id] given an array is a shape issue, not catchable (RL7)", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer().catch(0) },
     });
     expect(() => decodeParams(route, { id: ["1", "2"] })).toThrow(
@@ -240,7 +244,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("a catch-all given a string is a shape issue, not catchable (RL7)", () => {
-    const route = defineRoute("/files/[...seg]", {
+    const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string().catch("x") },
     });
     expect(() => decodeParams(route, { seg: "a" })).toThrow(ParamsDecodeError);
@@ -250,7 +254,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("a non-string element is a shape issue with its index (RL7)", () => {
-    const route = defineRoute("/files/[...seg]", {
+    const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string().catch("x") },
     });
     expect(() =>
@@ -259,7 +263,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("a present-but-empty required catch-all is an issue (mirrors R3)", () => {
-    const route = defineRoute("/files/[...seg]", {
+    const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string() },
     });
     expect(() => decodeParams(route, { seg: [] })).toThrow(ParamsDecodeError);
@@ -269,14 +273,14 @@ describe("decodeParams (RL7)", () => {
   });
 
   it(".catch() recovers a single param per key", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer().catch(7) },
     });
     expect(decodeParams(route, { id: "nope" })).toEqual({ id: 7 });
   });
 
   it(".catch() recovers catch-all elements ELEMENT-WISE (RL7)", () => {
-    const route = defineRoute("/files/[...n]", {
+    const route = defineAppRoute("/files/[...n]", {
       params: { n: p.integer().catch(0) },
     });
     expect(decodeParams(route, { n: ["1", "x", "3"] })).toEqual({
@@ -285,7 +289,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("an uncaught element failure is an issue carrying its index", () => {
-    const route = defineRoute("/files/[...n]", {
+    const route = defineAppRoute("/files/[...n]", {
       params: { n: p.integer() },
     });
     expect(() => decodeParams(route, { n: ["1", "x", "3"] })).toThrow(
@@ -297,7 +301,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("aggregates issues across keys like decodeSearch", () => {
-    const route = defineRoute("/org/[orgId]/repo/[repoId]", {
+    const route = defineAppRoute("/org/[orgId]/repo/[repoId]", {
       params: { orgId: p.integer(), repoId: p.integer() },
     });
     let caught: unknown;
@@ -315,7 +319,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("a non-object source fails loud, not as a decode issue", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
     });
     expect(() => decodeParams(route, null as never)).toThrow(ParamourError);
@@ -325,19 +329,19 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("a missing codec for a dynamic segment is a loud ParamourError", () => {
-    const route = defineRoute("/x/[id]", {} as never);
+    const route = defineAppRoute("/x/[id]", {} as never);
     expect(() => decodeParams(route, { id: "1" })).toThrow(/declares no codec/);
   });
 
   it("an optional catch-all PRESENT as [] decodes to [] (twin of the absent case)", () => {
-    const route = defineRoute("/docs/[[...slug]]", {
+    const route = defineAppRoute("/docs/[[...slug]]", {
       params: { slug: p.string() },
     });
     expect(decodeParams(route, { slug: [] })).toEqual({ slug: [] });
   });
 
   it("a [__proto__] segment decodes to an own property (pollution defense parity with search)", () => {
-    const route = defineRoute("/x/[__proto__]", {
+    const route = defineAppRoute("/x/[__proto__]", {
       params: { ["__proto__"]: p.string() },
     });
     const source = JSON.parse('{"__proto__":"v"}') as Record<string, string>;
@@ -358,7 +362,7 @@ describe("decodeParams (RL7)", () => {
         serialize: (value) => value,
       })
       .catch("fb");
-    const route = defineRoute("/x/[id]", { params: { id: codec } });
+    const route = defineAppRoute("/x/[id]", { params: { id: codec } });
     expect(() => decodeParams(route, { id: "v" })).toThrow(SerializeError);
     expect(() => decodeParams(route, { id: "v" })).toThrow(
       "config-side failure",
@@ -366,7 +370,7 @@ describe("decodeParams (RL7)", () => {
   });
 
   it("impure catch-all index getters cannot smuggle junk past validation (copy-first parity with search)", () => {
-    const route = defineRoute("/files/[...seg]", {
+    const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string() },
     });
     let reads = 0;

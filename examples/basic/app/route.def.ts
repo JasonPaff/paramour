@@ -1,3 +1,3 @@
-import { defineRoute } from "paramour";
+import { defineAppRoute } from "paramour";
 
-export const homeRoute = defineRoute("/", {});
+export const homeRoute = defineAppRoute("/", {});

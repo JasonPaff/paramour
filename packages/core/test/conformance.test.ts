@@ -12,7 +12,7 @@ import {
   buildSearchString,
   decodeParams,
   decodeSearch,
-  defineRoute,
+  defineAppRoute,
   encodeParams,
   encodeSearch,
   p,
@@ -194,13 +194,15 @@ describe("byte-layer serialization", () => {
 
 describe("route param segments", () => {
   it('C16: serializing "" into [id] is a serialization error (R4)', () => {
-    const route = defineRoute("/user/[id]", { params: { id: p.string() } });
+    const route = defineAppRoute("/user/[id]", { params: { id: p.string() } });
     expect(() => buildPath(route, { id: "" })).toThrow(SerializeError);
     expect(() => encodeParams(route, { id: "" })).toThrow(SerializeError);
   });
 
   it("C17: catch-all elements encode %2F and decode element-wise (R2/R5)", () => {
-    const route = defineRoute("/[...slug]", { params: { slug: p.string() } });
+    const route = defineAppRoute("/[...slug]", {
+      params: { slug: p.string() },
+    });
     expect(buildPath(route, { slug: ["a/b", "c"] })).toBe("/a%2Fb/c");
     // Decode side receives Next's already-decoded values (R5); the %2F E2E
     // pin against Next itself is wire-spec open item 1 (@paramour/next).

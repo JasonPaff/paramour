@@ -1,10 +1,10 @@
-import { defineRoute, p } from "paramour";
+import { defineAppRoute, p } from "paramour";
 
 import { csvList } from "../../../lib/codecs";
 import { coords } from "../../../lib/schemas";
 
 // Date/time, JSON, and custom codecs, plus the FACTORY forms of the modifiers.
-export const eventsRoute = defineRoute("/events/[date]", {
+export const eventsRoute = defineAppRoute("/events/[date]", {
   params: {
     // p.isoDate — strict YYYY-MM-DD, round-trip validated (rejects Feb 30),
     // decodes to a Date. Its href-input type is therefore a Date, not a string.

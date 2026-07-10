@@ -137,7 +137,7 @@ export function decodeSearch<S extends SearchSlot>(
   // The conditional SearchSlot doesn't narrow inside the generic body once
   // the RawSearch branch returns (S stays a generic type parameter); this
   // cast unifies the two branches at the one chokepoint (same move as
-  // defineRoute's config cast). tsc requires the cast (isRawSearch's `is
+  // routeData's config cast). tsc requires the cast (isRawSearch's `is
   // RawSearch<...>` guard doesn't narrow a generic-typed parameter's negative
   // branch); no-unnecessary-type-assertion mis-flags it as redundant for this
   // exact generic-parameter-plus-user-guard shape.

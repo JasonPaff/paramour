@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import {
-  defineRoute,
+  defineAppRoute,
   href,
   p,
   ParamourError,
@@ -12,56 +12,60 @@ import {
   SearchDecodeError,
 } from "../src";
 
-describe("defineRoute define-time validation (RL1/RL2)", () => {
+describe("defineAppRoute define-time validation (RL1/RL2)", () => {
   it("rejects a ? anywhere in the literal", () => {
-    expect(() => defineRoute("/search?q=1", {})).toThrow(ParamourError);
-    expect(() => defineRoute("/search?q=1", {})).toThrow(
+    expect(() => defineAppRoute("/search?q=1", {})).toThrow(ParamourError);
+    expect(() => defineAppRoute("/search?q=1", {})).toThrow(
       /must not contain "\?"/,
     );
   });
 
   it("rejects a # anywhere in the literal", () => {
-    expect(() => defineRoute("/docs#top", {})).toThrow(ParamourError);
-    expect(() => defineRoute("/docs#top", {})).toThrow(/must not contain "#"/);
+    expect(() => defineAppRoute("/docs#top", {})).toThrow(ParamourError);
+    expect(() => defineAppRoute("/docs#top", {})).toThrow(
+      /must not contain "#"/,
+    );
   });
 
   it("rejects a path not starting with /", () => {
-    expect(() => defineRoute("about", {})).toThrow(ParamourError);
-    expect(() => defineRoute("about", {})).toThrow(/must start with "\/"/);
+    expect(() => defineAppRoute("about", {})).toThrow(ParamourError);
+    expect(() => defineAppRoute("about", {})).toThrow(/must start with "\/"/);
   });
 
   it("rejects a trailing slash", () => {
-    expect(() => defineRoute("/docs/", {})).toThrow(ParamourError);
-    expect(() => defineRoute("/docs/", {})).toThrow(/must not end with "\/"/);
+    expect(() => defineAppRoute("/docs/", {})).toThrow(ParamourError);
+    expect(() => defineAppRoute("/docs/", {})).toThrow(
+      /must not end with "\/"/,
+    );
   });
 
   it('accepts "/" itself', () => {
-    expect(() => defineRoute("/", {})).not.toThrow();
+    expect(() => defineAppRoute("/", {})).not.toThrow();
   });
 
   it("rejects an empty segment", () => {
-    expect(() => defineRoute("/a//b", {})).toThrow(ParamourError);
-    expect(() => defineRoute("/a//b", {})).toThrow(/empty segment/);
+    expect(() => defineAppRoute("/a//b", {})).toThrow(ParamourError);
+    expect(() => defineAppRoute("/a//b", {})).toThrow(/empty segment/);
   });
 
   it("rejects a duplicate param name (types silently collapse the key)", () => {
     expect(() =>
-      defineRoute("/a/[id]/b/[id]", { params: { id: p.string() } }),
+      defineAppRoute("/a/[id]/b/[id]", { params: { id: p.string() } }),
     ).toThrow(ParamourError);
     expect(() =>
-      defineRoute("/a/[id]/b/[id]", { params: { id: p.string() } }),
+      defineAppRoute("/a/[id]/b/[id]", { params: { id: p.string() } }),
     ).toThrow(/declares param "id" more than once/);
   });
 
   it("rejects a non-final catch-all", () => {
     expect(() =>
-      defineRoute("/a/[...rest]/b", { params: { rest: p.string() } }),
+      defineAppRoute("/a/[...rest]/b", { params: { rest: p.string() } }),
     ).toThrow(/must be the final segment/);
   });
 
   it("rejects a non-final optional catch-all", () => {
     expect(() =>
-      defineRoute("/a/[[...rest]]/b", { params: { rest: p.string() } }),
+      defineAppRoute("/a/[[...rest]]/b", { params: { rest: p.string() } }),
     ).toThrow(/must be the final segment/);
   });
 
@@ -74,35 +78,39 @@ describe("defineRoute define-time validation (RL1/RL2)", () => {
       "/x/[[...]]",
       "/x/[a[b]]",
     ]) {
-      expect(() => defineRoute(path, {})).toThrow(ParamourError);
-      expect(() => defineRoute(path, {})).toThrow(/malformed dynamic segment/);
+      expect(() => defineAppRoute(path, {})).toThrow(ParamourError);
+      expect(() => defineAppRoute(path, {})).toThrow(
+        /malformed dynamic segment/,
+      );
     }
   });
 
   it("rejects a (group) segment — paths are URL-shaped (RL2)", () => {
-    expect(() => defineRoute("/(marketing)/about", {})).toThrow(ParamourError);
-    expect(() => defineRoute("/(marketing)/about", {})).toThrow(
+    expect(() => defineAppRoute("/(marketing)/about", {})).toThrow(
+      ParamourError,
+    );
+    expect(() => defineAppRoute("/(marketing)/about", {})).toThrow(
       /route-group folder name/,
     );
   });
 
   it("rejects an @slot segment — paths are URL-shaped (RL2)", () => {
-    expect(() => defineRoute("/@modal/photo", {})).toThrow(ParamourError);
-    expect(() => defineRoute("/@modal/photo", {})).toThrow(
+    expect(() => defineAppRoute("/@modal/photo", {})).toThrow(ParamourError);
+    expect(() => defineAppRoute("/@modal/photo", {})).toThrow(
       /parallel-route slot/,
     );
   });
 
   it("accepts valid static, dynamic, and catch-all paths", () => {
-    expect(() => defineRoute("/about", {})).not.toThrow();
+    expect(() => defineAppRoute("/about", {})).not.toThrow();
     expect(() =>
-      defineRoute("/product/[id]", { params: { id: p.integer() } }),
+      defineAppRoute("/product/[id]", { params: { id: p.integer() } }),
     ).not.toThrow();
     expect(() =>
-      defineRoute("/blog/[...slug]", { params: { slug: p.string() } }),
+      defineAppRoute("/blog/[...slug]", { params: { slug: p.string() } }),
     ).not.toThrow();
     expect(() =>
-      defineRoute("/docs/[[...slug]]", { params: { slug: p.string() } }),
+      defineAppRoute("/docs/[[...slug]]", { params: { slug: p.string() } }),
     ).not.toThrow();
   });
 });
@@ -111,28 +119,28 @@ describe("route object shape (RL1)", () => {
   it("exposes the path literal and ~-prefixed configs", () => {
     const params = { id: p.integer() };
     const search = { q: p.string() };
-    const route = defineRoute("/product/[id]", { params, search });
+    const route = defineAppRoute("/product/[id]", { params, search });
     expect(route.path).toBe("/product/[id]");
     expect(route["~params"]).toBe(params);
     expect(route["~search"]).toBe(search);
   });
 
   it("normalizes an omitted search config to {}", () => {
-    const route = defineRoute("/product/[id]", {
+    const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
     });
     expect(route["~search"]).toEqual({});
   });
 
   it("normalizes a static route's params to {}", () => {
-    const route = defineRoute("/about", {});
+    const route = defineAppRoute("/about", {});
     expect(route["~params"]).toEqual({});
     expect(route["~search"]).toEqual({});
   });
 });
 
 describe("route parse methods (RL6)", () => {
-  const route = defineRoute("/product/[id]", {
+  const route = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },
     search: { q: p.string() },
   });
@@ -169,7 +177,7 @@ describe("route parse methods (RL6)", () => {
   });
 
   it("a static route parses empty props to empty halves", async () => {
-    const about = defineRoute("/about", {});
+    const about = defineAppRoute("/about", {});
     await expect(about.parse({})).resolves.toEqual({ params: {}, search: {} });
   });
 
@@ -281,9 +289,9 @@ describe("route parse methods (RL6)", () => {
 
 describe("route methods over a rawSearch config (design-04)", () => {
   // The full method surface must reach the rawSearch decode branch through
-  // defineRoute's ~search wiring — raw-search.test.ts calls decodeSearch
-  // directly, which would miss a defineRoute wiring regression.
-  const route = defineRoute("/shop/[id]", {
+  // defineAppRoute's ~search wiring — raw-search.test.ts calls decodeSearch
+  // directly, which would miss a defineAppRoute wiring regression.
+  const route = defineAppRoute("/shop/[id]", {
     params: { id: p.integer() },
     search: rawSearch(
       z.object({ page: z.coerce.number().optional(), q: z.string() }),

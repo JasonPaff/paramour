@@ -3,7 +3,7 @@ import "paramour";
 
 declare module "paramour" {
   interface ParamourRegister {
-    routes:
+    appRoutes:
       | "/"
       | "/docs/[[...slug]]"
       | "/events/[date]"

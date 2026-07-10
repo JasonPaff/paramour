@@ -1,6 +1,6 @@
-import { defineRoute, p } from "paramour";
+import { defineAppRoute, p } from "paramour";
 
-export const docsRoute = defineRoute("/docs/[[...slug]]", {
+export const docsRoute = defineAppRoute("/docs/[[...slug]]", {
   params: { slug: p.string() },
   search: { page: p.integer().optional() },
 });
