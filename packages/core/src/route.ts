@@ -418,7 +418,12 @@ export function definePagesRoute<
         paramNames,
       );
       // PR10: params first — same morally-a-404 rule as the app surface.
-      const decodedParams = decodeParams(route, paramsSource);
+      // R5: pages sources (ctx.params / ctx.query) are already percent-decoded
+      // by Node's querystring layer, so skip core's decode to avoid a
+      // double-decode (App-Router's decodeParams keeps the default).
+      const decodedParams = decodeParams(route, paramsSource, {
+        percentDecode: false,
+      });
       return {
         params: decodedParams,
         search: decodeSearch(route["~search"], searchSource),

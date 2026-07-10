@@ -18,6 +18,22 @@ import {
 import { encodeComponent, readInputValue } from "./search.js";
 
 /**
+ * Decode-policy knob for {@link decodeParams} / {@link safeDecodeParams} (R5).
+ * `percentDecode` defaults to `true` — the App-Router reality, where Next
+ * hands the `params` prop / `useParams()` surface percent-ENCODED values
+ * (issues #48058/#64952), so core owns the decode. The pages surfaces are the
+ * exception: `useRouter().query` and `getServerSideProps` `ctx.params`/`query`
+ * have ALREADY been percent-decoded by Node's querystring layer, so those
+ * entry points pass `{ percentDecode: false }` to avoid a double-decode
+ * (`/product/a%2520b` → `"a%20b"` from Node → must survive, not decode again).
+ * Optional-with-default under `exactOptionalPropertyTypes`: absent or a plain
+ * `boolean`, never `undefined`.
+ */
+export interface DecodeParamsOptions {
+  readonly percentDecode?: boolean;
+}
+
+/**
  * Encode-input side of a route's params (RL3's href-input column): `[id]` →
  * `Out` (required), `[...slug]` → `Out[]` (required — `[]` is an R3
  * serialization error), `[[...slug]]` → `Out[]` with an OPTIONAL key, per
@@ -33,8 +49,13 @@ export type InferParamsInput<R extends AnyRoute> = {
 };
 
 /**
- * Decoded value-layer params source (wire spec §1, R5): the shape of Next's
- * `params` prop. Values are already percent-decoded by the platform.
+ * Value-layer params source (wire spec §1, R5): the shape of Next's `params`
+ * prop and `useParams()` return. Contrary to the byte-layer's usual "platform
+ * already decoded it" stance, Next hands the App-Router surfaces percent-ENCODED
+ * values (Next issues #48058/#64952 — only route.ts handlers decode), so core
+ * owns the decode in {@link decodeParams} before applying codec grammars. The
+ * pages surfaces are the exception (already Node-decoded); they opt out via
+ * {@link DecodeParamsOptions}'s `percentDecode: false`.
  */
 export type ParamsSource = Record<string, string | string[] | undefined>;
 
@@ -81,6 +102,7 @@ export function buildPath<R extends AnyRoute>(
 export function decodeParams<R extends AnyRoute>(
   route: R,
   source: ParamsSource,
+  options?: DecodeParamsOptions,
 ): InferRouteParams<R> {
   // The TS contract forbids non-object sources, but plain-JS callers reach
   // here; fail branded and loud — a bad source is a contract violation, not
@@ -91,6 +113,9 @@ export function decodeParams<R extends AnyRoute>(
       `params source must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
     );
   }
+  // R5: App-Router surfaces arrive percent-encoded (decode by default); pages
+  // surfaces arrive already-decoded and opt out via `{ percentDecode: false }`.
+  const percentDecode = options?.percentDecode ?? true;
   const config = route["~params"] as
     Record<string, AnyCodec | undefined> | undefined;
   const issues: Issue[] = [];
@@ -121,8 +146,12 @@ export function decodeParams<R extends AnyRoute>(
           message: `expected a single segment value, got ${Array.isArray(value) ? "an array" : typeof value}`,
         });
       } else {
+        // R5: App-Router surfaces arrive percent-encoded; core decodes before
+        // the codec grammar sees the string (malformed → raw fallback). Pages
+        // surfaces are already-decoded, so `percentDecode: false` skips this.
+        const decoded = percentDecode ? percentDecodeSegment(value) : value;
         try {
-          entries.push([segment.name, codec["~parseElement"](value)]);
+          entries.push([segment.name, codec["~parseElement"](decoded)]);
         } catch (error) {
           // Per-key recovery, as in decodeSearch: .catch() only ever
           // recovers parse *failures* (D2), never absence or shape.
@@ -184,8 +213,12 @@ export function decodeParams<R extends AnyRoute>(
         failed = true;
         continue;
       }
+      // R5: decode each element before the codec grammar; R2's %2F round-trip
+      // (an element containing "/") is restored here (malformed → raw). Pages
+      // surfaces are already-decoded, so `percentDecode: false` skips this.
+      const decoded = percentDecode ? percentDecodeSegment(element) : element;
       try {
-        parsed.push(codec["~parseElement"](element));
+        parsed.push(codec["~parseElement"](decoded));
       } catch (error) {
         // Element-wise recovery (RL7, forced by D6): the codec describes ONE
         // element, so a .catch() fallback is element-typed — each failing
@@ -284,8 +317,9 @@ export function encodeParams<R extends AnyRoute>(
       );
     }
     // R2: each element is encoded independently; an element containing "/"
-    // becomes %2F and must round-trip as a single element (the E2E decode
-    // caveat is wire-spec open item 1, owned by @paramour/next).
+    // becomes %2F and round-trips as a single element — core's decodeParams
+    // restores it via percentDecodeSegment (R5), since Next hands the encoded
+    // value straight back on the params surface (wire-spec open item 1).
     for (const element of value) {
       segments.push(encodeSegmentValue(codec, segment.name, element));
     }
@@ -394,6 +428,24 @@ function encodeSegmentValue(
   }
   // Byte layer: encodeComponent brands lone-surrogate URIErrors (S7).
   return encodeComponent(serialized);
+}
+
+/**
+ * Percent-decodes one segment string on the decode side (R5). Next hands the
+ * `params`/`useParams()` surfaces percent-encoded values (issues #48058/#64952),
+ * so `/product/a%20b` arrives as `"a%20b"` and must become `"a b"` before the
+ * codec grammar runs. A malformed sequence (e.g. raw `"%zz"`, which makes
+ * `decodeURIComponent` throw `URIError`) falls back to the RAW string unchanged
+ * — it matches what the user typed and what Next serves, and never becomes a
+ * decode issue. If Next ever ships its own fix for #48058/#64952 and starts
+ * handing already-decoded values, this becomes a double-decode hazard to revisit.
+ */
+function percentDecodeSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 /**

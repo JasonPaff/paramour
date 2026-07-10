@@ -1,7 +1,11 @@
 import type { AnyRoute, InferRouteParams, SafeResult } from "./route.js";
 
 import { ParamsDecodeError, SearchDecodeError } from "./errors.js";
-import { decodeParams, type ParamsSource } from "./path.js";
+import {
+  decodeParams,
+  type DecodeParamsOptions,
+  type ParamsSource,
+} from "./path.js";
 import {
   decodeSearch,
   type SearchOutputOf,
@@ -22,9 +26,10 @@ import {
 export function safeDecodeParams<R extends AnyRoute>(
   route: R,
   source: ParamsSource,
+  options?: DecodeParamsOptions,
 ): SafeResult<InferRouteParams<R>> {
   try {
-    return { data: decodeParams(route, source), status: "success" };
+    return { data: decodeParams(route, source, options), status: "success" };
   } catch (error) {
     if (error instanceof ParamsDecodeError) return { error, status: "error" };
     throw error;

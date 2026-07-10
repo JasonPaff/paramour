@@ -54,8 +54,10 @@ export function useRouteParams<R extends AnyPagesRoute>(
   return useMemo(() => {
     if (!isReady) return PENDING;
     // The merged query is a legal params source as-is: decodeParams reads
-    // only the route's own segment names, never unknown keys.
-    return safeDecodeParams(route, query);
+    // only the route's own segment names, never unknown keys. R5: next/router
+    // has already percent-decoded `query`, so skip core's decode to avoid a
+    // double-decode (`/product/a%2520b` → `"a%20b"` must survive as-is).
+    return safeDecodeParams(route, query, { percentDecode: false });
   }, [isReady, query, route]);
 }
 

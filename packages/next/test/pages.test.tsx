@@ -101,6 +101,23 @@ describe("useSearch subtracts the route's path params from router.query (PR5)", 
   });
 });
 
+describe("query values arrive already percent-decoded (R5, no double-decode)", () => {
+  it("a %20-bearing param survives as the literal string next/router hands back", () => {
+    // next/router has already decoded query, so /product/a%2520b delivers
+    // "a%20b" here — useRouteParams passes percentDecode: false and it must
+    // survive, not double-decode to "a b".
+    const slugRoute = definePagesRoute("/product/[slug]", {
+      params: { slug: p.string() },
+    });
+    __setQuery({ slug: "a%20b" });
+    const { result } = renderHook(() => useRouteParams(slugRoute));
+    expect(result.current).toEqual({
+      data: { slug: "a%20b" },
+      status: "success",
+    });
+  });
+});
+
 describe("query value shapes (PR11 §4)", () => {
   it("catch-all param arrives as string[]", () => {
     __setQuery({ slug: ["a", "b"] });

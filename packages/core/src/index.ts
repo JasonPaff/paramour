@@ -21,6 +21,7 @@ export { p } from "./p.js";
 export {
   buildPath,
   decodeParams,
+  type DecodeParamsOptions,
   encodeParams,
   type ParamsSource,
 } from "./path.js";

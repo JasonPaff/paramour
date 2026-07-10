@@ -54,11 +54,14 @@ const queryRecordOf = (link: string): Record<string, string | string[]> => {
   return record;
 };
 
-/** The platform's byte-layer job (wire spec §1): percent-decode segments. */
+/**
+ * Models Next's params surface (wire spec R5): unlike search params, Next
+ * splits the path into segments but hands them back percent-ENCODED (issues
+ * #48058/#64952) — core's decodeParams owns the decode. So this splits on "/"
+ * WITHOUT decoding; the "/"-as-%2F encoding keeps splitting element-safe.
+ */
 const simulateNextDecode = (builtPath: string): string[] =>
-  builtPath === "/"
-    ? []
-    : builtPath.slice(1).split("/").map(decodeURIComponent);
+  builtPath === "/" ? [] : builtPath.slice(1).split("/");
 
 /** decodeParams ∘ platform ∘ buildPath for the single-`[v]` routes. */
 const roundtripV = <Out>(

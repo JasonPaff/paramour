@@ -172,6 +172,25 @@ describe("parseContext (PR10)", () => {
       productRoute.parseContext({ params: 5 as never, query: {} }),
     ).toThrow(ParamourError);
   });
+
+  it("params arrive already percent-decoded: a %20-bearing value is NOT decoded again (R5)", () => {
+    // Node's querystring layer has already decoded ctx.params/ctx.query, so
+    // /product/a%2520b hands "a%20b" here — parseContext passes
+    // percentDecode: false and it survives, never double-decoding to "a b".
+    const slugRoute = definePagesRoute("/product/[slug]", {
+      params: { slug: p.string() },
+    });
+    expect(
+      slugRoute.parseContext({
+        params: { slug: "a%20b" },
+        query: { slug: "a%20b" },
+      }).params,
+    ).toEqual({ slug: "a%20b" });
+    // Same when params is absent and the value is extracted from query.
+    expect(slugRoute.parseContext({ query: { slug: "a%20b" } }).params).toEqual(
+      { slug: "a%20b" },
+    );
+  });
 });
 
 describe("safeParseContext (PR10/PR12)", () => {

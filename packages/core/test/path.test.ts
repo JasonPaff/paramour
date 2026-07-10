@@ -380,4 +380,81 @@ describe("decodeParams (RL7)", () => {
     });
     expect(decodeParams(route, { seg: tampered })).toEqual({ seg: ["x"] });
   });
+
+  it("percent-decodes a single param before the codec grammar (R5, Next #48058)", () => {
+    const route = defineAppRoute("/product/[id]", {
+      params: { id: p.string() },
+    });
+    // Next hands the params surface encoded; core owns the decode.
+    expect(decodeParams(route, { id: "a%20b" })).toEqual({ id: "a b" });
+  });
+
+  it("an already-plain single param passes through decode unchanged (R5)", () => {
+    const route = defineAppRoute("/product/[id]", {
+      params: { id: p.string() },
+    });
+    expect(decodeParams(route, { id: "plain" })).toEqual({ id: "plain" });
+  });
+
+  it("percent-decodes catch-all elements, restoring a %2F element (R2/R5)", () => {
+    const route = defineAppRoute("/files/[...slug]", {
+      params: { slug: p.string() },
+    });
+    // A "/"-bearing element arrives as one %2F-encoded slot and round-trips
+    // back to a single "a/b" element (mirrors conformance C17).
+    expect(decodeParams(route, { slug: ["a%2Fb", "c%20d"] })).toEqual({
+      slug: ["a/b", "c d"],
+    });
+  });
+
+  it("a malformed percent sequence falls back to the raw string (R5, no issue)", () => {
+    const route = defineAppRoute("/product/[id]", {
+      params: { id: p.string() },
+    });
+    // decodeURIComponent("%zz") throws URIError → raw fallback, never an issue.
+    expect(decodeParams(route, { id: "%zz" })).toEqual({ id: "%zz" });
+  });
+
+  it("a malformed catch-all element falls back to raw, siblings still decode (R5)", () => {
+    const route = defineAppRoute("/files/[...slug]", {
+      params: { slug: p.string() },
+    });
+    expect(decodeParams(route, { slug: ["%zz", "a%20b"] })).toEqual({
+      slug: ["%zz", "a b"],
+    });
+  });
+
+  it("percentDecode: false leaves a single param undecoded (R5, pages already-decoded)", () => {
+    const route = defineAppRoute("/product/[id]", {
+      params: { id: p.string() },
+    });
+    // Pages surfaces are Node-decoded already: "a%20b" must survive as-is,
+    // not double-decode to "a b".
+    expect(
+      decodeParams(route, { id: "a%20b" }, { percentDecode: false }),
+    ).toEqual({ id: "a%20b" });
+  });
+
+  it("percentDecode: false leaves catch-all elements undecoded (R5)", () => {
+    const route = defineAppRoute("/files/[...slug]", {
+      params: { slug: p.string() },
+    });
+    expect(
+      decodeParams(
+        route,
+        { slug: ["a%2Fb", "c%20d"] },
+        { percentDecode: false },
+      ),
+    ).toEqual({ slug: ["a%2Fb", "c%20d"] });
+  });
+
+  it("percentDecode omitted (or true) still decodes — the App-Router default (R5)", () => {
+    const route = defineAppRoute("/product/[id]", {
+      params: { id: p.string() },
+    });
+    expect(decodeParams(route, { id: "a%20b" }, {})).toEqual({ id: "a b" });
+    expect(
+      decodeParams(route, { id: "a%20b" }, { percentDecode: true }),
+    ).toEqual({ id: "a b" });
+  });
 });

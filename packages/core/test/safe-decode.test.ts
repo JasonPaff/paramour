@@ -209,4 +209,20 @@ describe("safeDecodeParams", () => {
       "b",
     ]);
   });
+
+  it("decodes by default (App-Router surface) but passes percentDecode: false through (R5)", () => {
+    const slugRoute = defineAppRoute("/product/[slug]", {
+      params: { slug: p.string() },
+    });
+    // Default: App-Router surfaces arrive encoded, core decodes.
+    expect(safeDecodeParams(slugRoute, { slug: "a%20b" })).toEqual({
+      data: { slug: "a b" },
+      status: "success",
+    });
+    // Pages surfaces are already Node-decoded: skip the decode so "a%20b"
+    // survives as-is rather than double-decoding to "a b".
+    expect(
+      safeDecodeParams(slugRoute, { slug: "a%20b" }, { percentDecode: false }),
+    ).toEqual({ data: { slug: "a%20b" }, status: "success" });
+  });
 });

@@ -245,9 +245,11 @@ describe("route param segments", () => {
       params: { slug: p.string() },
     });
     expect(buildPath(route, { slug: ["a/b", "c"] })).toBe("/a%2Fb/c");
-    // Decode side receives Next's already-decoded values (R5); the %2F E2E
-    // pin against Next itself is wire-spec open item 1 (@paramour/next).
-    expect(decodeParams(route, { slug: ["a/b", "c"] })).toEqual({
+    // Decode side: Next hands the params surface percent-ENCODED (R5, Next
+    // #48058/#64952), so the %2F element arrives as one "a%2Fb" slot and core
+    // restores "a/b" as a single element — the E2E pin against Next's own
+    // segment-splitting is the residual of wire-spec open item 1.
+    expect(decodeParams(route, { slug: ["a%2Fb", "c"] })).toEqual({
       slug: ["a/b", "c"],
     });
   });
