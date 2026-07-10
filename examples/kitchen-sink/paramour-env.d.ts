@@ -11,5 +11,7 @@ declare module "paramour" {
       | "/find"
       | "/products/[id]"
       | "/serialize";
+    pagesRoutes:
+      | "/legacy";
   }
 }

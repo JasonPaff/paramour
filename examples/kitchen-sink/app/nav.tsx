@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { href } from "paramour";
 
+import { legacyRoute } from "../lib/legacy.def";
 import { docsRoute } from "./docs/[[...slug]]/route.def";
 import { eventsRoute } from "./events/[date]/route.def";
 import { filesRoute } from "./files/[...path]/route.def";
@@ -44,6 +45,12 @@ const links = [
     to: href(findRoute, { search: { q: "cable" } }),
   },
   { label: "Serialize", prefix: "/serialize", to: href(serializeRoute) },
+  {
+    label: "Legacy",
+    prefix: "/legacy",
+    // A pages route in an app/ nav (PR1): href() is router-agnostic.
+    to: href(legacyRoute, { search: { ref: "nav" } }),
+  },
 ];
 
 export function Nav() {
@@ -52,8 +59,14 @@ export function Nav() {
   return (
     <nav className="tabs">
       {links.map(({ label, prefix, to }) => {
+        // In a hybrid app Next types usePathname() as string | null (it can
+        // legally render under the Pages Router, where it has no App Router
+        // pathname). This nav only ever mounts under app/, so null just
+        // means "no active tab".
         const active =
-          prefix === "/" ? pathname === "/" : pathname.startsWith(prefix);
+          prefix === "/"
+            ? pathname === "/"
+            : (pathname?.startsWith(prefix) ?? false);
         return (
           <Link
             aria-current={active ? "page" : undefined}

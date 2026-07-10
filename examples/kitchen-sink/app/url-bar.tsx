@@ -12,8 +12,13 @@ export function UrlBar() {
   const searchParams = useSearchParams();
   const hash = useHash();
 
-  const segments = pathname.split("/").filter((segment) => segment !== "");
-  const pairs = [...searchParams.entries()];
+  // Hybrid app: Next types both hooks as nullable (they can legally render
+  // under the Pages Router). This bar only ever mounts under app/, so null
+  // simply renders as an empty URL.
+  const segments = (pathname ?? "")
+    .split("/")
+    .filter((segment) => segment !== "");
+  const pairs = [...(searchParams ?? new URLSearchParams()).entries()];
 
   return (
     <div className="wire">

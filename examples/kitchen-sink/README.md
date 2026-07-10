@@ -1,9 +1,10 @@
 # examples/kitchen-sink
 
-Exercises **every** paramour surface in one Next.js App Router app —
-typechecked and built in CI. Where `examples/basic` is the minimal tour, this
-is the exhaustive one. It also depends on [Zod](https://zod.dev) to show
-Standard Schema integration (Zod v4 implements Standard Schema natively).
+Exercises **every** paramour surface in one hybrid Next.js app — an App
+Router tree plus one Pages Router route beside it — typechecked and built in
+CI. Where `examples/basic` is the minimal tour, this is the exhaustive one.
+It also depends on [Zod](https://zod.dev) to show Standard Schema integration
+(Zod v4 implements Standard Schema natively).
 
 ## What each route demonstrates
 
@@ -16,6 +17,7 @@ Standard Schema integration (Zod v4 implements Standard Schema natively).
 | `/events/[date]`    | `p.isoDate` param; `p.timestamp`/`p.json`(+schema)/`p.custom` search; **factory** `.default(() => …)` and `.catch(() => …)`; `parseParams` + `safeParseSearch`; throwing client hooks (`useRouteParamsOrThrow`/`useSearchOrThrow`)                                                                         |
 | `/find`             | `rawSearch(schema)` whole-object escape hatch; `parseSearch`                                                                                                                                                                                                                                               |
 | `/serialize`        | interactive `buildPath`/`encodeParams`/`decodeParams`/`encodeSearch`/`decodeSearch`/`buildSearchString`/`searchToString`, and the error hierarchy (`ParamourError`, `ParseError` vs `SerializeError`, `ParamsDecodeError`/`SearchDecodeError` + `.issues`)                                                 |
+| `/legacy`           | the hybrid route (design-06 PR1): a `pages/` route beside `app/`; `definePagesRoute`; three-state `useSearch` from `@paramour-js/next/pages`; one artifact registering `appRoutes` **and** `pagesRoutes`; `href()` across the router boundary                                                              |
 
 Shared pieces live in `lib/`: `schemas.ts` (the Zod validators) and `codecs.ts`
 (a `p.custom` CSV codec and a standalone `SearchConfig` for the playground).
