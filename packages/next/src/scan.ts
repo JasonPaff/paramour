@@ -25,12 +25,6 @@ export interface ScanRoutesResult {
   pagesRoutes: string[];
 }
 
-function dirIfExists(path: string): string | undefined {
-  return statSync(path, { throwIfNoEntry: false })?.isDirectory()
-    ? path
-    : undefined;
-}
-
 /**
  * Joint route-dir discovery (spike-2 ruling). Next's documented rule is one
  * decision, not two probes: `src/app` AND `src/pages` are both ignored
@@ -104,4 +98,10 @@ export function scanRoutes(
     ...pagesRoutes.map((path) => ({ path, router: "pages" as const })),
   ]);
   return { appRoutes, pagesRoutes };
+}
+
+function dirIfExists(path: string): string | undefined {
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory()
+    ? path
+    : undefined;
 }

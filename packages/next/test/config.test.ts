@@ -109,6 +109,14 @@ describe("loadConfigFile (TR7 / §7.2)", () => {
     );
   });
 
+  it("accepts pagesDir (PR8)", async () => {
+    const root = makeProject({
+      "paramour.config.json": `{ "pagesDir": "legacy-pages" }`,
+    });
+    const loaded = await loadConfigFile(root);
+    expect(loaded?.config).toEqual({ pagesDir: "legacy-pages" });
+  });
+
   it("rejects unknown keys (typo protection)", async () => {
     const root = makeProject({
       "paramour.config.json": `{ "pagesExtensions": ["tsx"] }`,
@@ -123,6 +131,7 @@ describe("loadConfigFile (TR7 / §7.2)", () => {
       [`{ "appDir": 42 }`, /`appDir` must be a non-empty string/],
       [`{ "appDir": "" }`, /`appDir` must be a non-empty string/],
       [`{ "outFile": "" }`, /`outFile` must be a non-empty string/],
+      [`{ "pagesDir": 42 }`, /`pagesDir` must be a non-empty string/],
       [
         `{ "pageExtensions": "tsx" }`,
         /`pageExtensions` must be a non-empty array/,

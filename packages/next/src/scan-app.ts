@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -18,19 +18,6 @@ const INTERCEPTION_PREFIX = /^\(\.{1,3}\)/;
 
 /** Route groups `(group)` — stripped from the emitted path (TR2, RL2). */
 const ROUTE_GROUP = /^\(.*\)$/;
-
-/**
- * The app dir is `app/` or `src/app/`, first that exists under the project
- * root (TR2); `undefined` when neither does. This is the caller-side guard —
- * `scanAppRoutes` itself lets a missing dir throw.
- */
-export function resolveAppDir(projectRoot: string): string | undefined {
-  for (const candidate of ["app", join("src", "app")]) {
-    const dir = join(projectRoot, candidate);
-    if (statSync(dir, { throwIfNoEntry: false })?.isDirectory()) return dir;
-  }
-  return undefined;
-}
 
 /**
  * Walk an app dir and return the sorted union of URL-shaped route paths —

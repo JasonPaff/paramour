@@ -7,12 +7,14 @@ import { join } from "node:path";
  * inference. `.ts`/`.mjs` files default-export this object.
  */
 export interface ParamourConfig {
-  /** App dir, relative to the project root; default: TR2 discovery. */
+  /** App dir, relative to the project root; default: joint discovery (PR8). */
   appDir?: string;
   /** Artifact path, relative to the project root (TR3 escape hatch). */
   outFile?: string;
   /** Page extensions, no leading dot; default: Next's four. */
   pageExtensions?: string[];
+  /** Pages dir, relative to the project root; default: joint discovery (PR8). */
+  pagesDir?: string;
 }
 
 /** @internal Discovery order at the project root (TR7) — first match wins. */
@@ -68,7 +70,7 @@ export async function loadConfigFile(
 }
 
 /**
- * Hand-rolled validation: a 3-key schema can afford to reject unknown keys —
+ * Hand-rolled validation: a 4-key schema can afford to reject unknown keys —
  * a silently ignored `pagesExtensions` typo is exactly the footgun this
  * prevents. Throws with the file and key named; the CLI maps it to exit 2.
  */
@@ -80,7 +82,8 @@ function validateConfig(value: unknown, sourceName: string): ParamourConfig {
   for (const [key, entry] of Object.entries(value)) {
     switch (key) {
       case "appDir":
-      case "outFile": {
+      case "outFile":
+      case "pagesDir": {
         if (typeof entry !== "string" || entry === "") {
           throw new Error(
             `${sourceName}: \`${key}\` must be a non-empty string`,

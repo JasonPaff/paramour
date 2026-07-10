@@ -2,7 +2,7 @@ import { symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { resolveAppDir, RouteCollisionError, scanAppRoutes } from "../src";
+import { RouteCollisionError, scanAppRoutes } from "../src";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /** Build a tree in a temp dir and scan it in one step. */
@@ -254,29 +254,5 @@ describe("scanAppRoutes: group/interception regex edge pins (TR2)", () => {
 
   it("skip rules below a group still apply: @slot and (.)interception contribute nothing", () => {
     expect(scanTree(["(g)/@slot/page.tsx", "(g)/(.)foo/page.tsx"])).toEqual([]);
-  });
-});
-
-describe("resolveAppDir (TR2)", () => {
-  it("prefers app/ when both exist", () => {
-    const root = makeTempDir();
-    makeTree(root, ["app/", "src/app/"]);
-    expect(resolveAppDir(root)).toBe(join(root, "app"));
-  });
-
-  it("falls back to src/app/", () => {
-    const root = makeTempDir();
-    makeTree(root, ["src/app/"]);
-    expect(resolveAppDir(root)).toBe(join(root, "src", "app"));
-  });
-
-  it("returns undefined when neither exists", () => {
-    expect(resolveAppDir(makeTempDir())).toBeUndefined();
-  });
-
-  it("ignores a plain file named app", () => {
-    const root = makeTempDir();
-    makeTree(root, ["app"]);
-    expect(resolveAppDir(root)).toBeUndefined();
   });
 });

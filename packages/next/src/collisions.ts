@@ -1,3 +1,9 @@
+/** A scanned route path labeled with the router that produced it (PR9). */
+export interface ScannedRoute {
+  path: string;
+  router: "app" | "pages";
+}
+
 /**
  * Route-collision failure mode (PR9): states Next itself refuses to build
  * have no valid artifact, so the scanners throw instead of emitting one.
@@ -8,12 +14,6 @@
  */
 export class RouteCollisionError extends Error {
   override name = "RouteCollisionError";
-}
-
-/** A scanned route path labeled with the router that produced it (PR9). */
-export interface ScannedRoute {
-  path: string;
-  router: "app" | "pages";
 }
 
 /**
@@ -30,12 +30,6 @@ const OPTIONAL_CATCH_ALL = /^\[\[\.\.\..+\]\]$/;
  */
 const DYNAMIC_SEGMENT =
   /^(?:\[\[\.\.\.(?<optional>.+)\]\]|\[\.\.\.(?<catchAll>.+)\]|\[(?<plain>[^[\].]+)\])$/;
-
-function dynamicKind(segment: string): "catchAll" | "plain" | undefined {
-  const groups = DYNAMIC_SEGMENT.exec(segment)?.groups;
-  if (groups === undefined) return undefined;
-  return groups["plain"] === undefined ? "catchAll" : "plain";
-}
 
 /**
  * PR9's structural collisions — same detection pass, non-equal strings. Two
@@ -94,4 +88,10 @@ export function assertNoStructuralCollisions(
       }
     }
   }
+}
+
+function dynamicKind(segment: string): "catchAll" | "plain" | undefined {
+  const groups = DYNAMIC_SEGMENT.exec(segment)?.groups;
+  if (groups === undefined) return undefined;
+  return groups.plain === undefined ? "catchAll" : "plain";
 }

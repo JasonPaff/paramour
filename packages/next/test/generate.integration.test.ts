@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   emitArtifact,
-  resolveAppDir,
-  scanAppRoutes,
+  resolveRouteDirs,
+  scanRoutes,
   writeIfChanged,
 } from "../src";
 import { makeTempDir, makeTree } from "./helpers.js";
@@ -18,7 +18,8 @@ import { makeTempDir, makeTree } from "./helpers.js";
  * scan → emit → write pipeline, then type-checks a consumer twice with the
  * compiler API: without the artifact in the program (world A: any literal
  * accepted via the RL8 `string` fallback) and with it (world B: unregistered
- * literals fail at `defineAppRoute`).
+ * literals fail at the constructors, per router and cross-router — PR9's
+ * two-member artifact drives both).
  */
 
 // The "paramour" specifier is paths-mapped to src (winning over core's
@@ -33,10 +34,12 @@ const typesRoot = fileURLToPath(
   new URL("../node_modules/@types", import.meta.url),
 );
 
-const CONSUMER = `import { defineAppRoute } from "paramour";
+const CONSUMER = `import { defineAppRoute, definePagesRoute } from "paramour";
 
 export const good = defineAppRoute("/about", {});
+export const goodPages = definePagesRoute("/legacy", {});
 export const bad = defineAppRoute("/nope", {});
+export const crossRouter = defineAppRoute("/legacy", {});
 `;
 
 function checkProgram(rootNames: readonly string[]): string[] {
@@ -79,12 +82,18 @@ describe("generated artifact flips defineAppRoute verification on (TR3/RL8)", ()
   // program creation is the slow part anyway.
   beforeEach(() => {
     const projectRoot = makeTempDir();
-    makeTree(projectRoot, ["app/page.tsx", "app/about/page.tsx"]);
+    makeTree(projectRoot, [
+      "app/page.tsx",
+      "app/about/page.tsx",
+      "pages/legacy.tsx",
+    ]);
 
-    const appDir = resolveAppDir(projectRoot);
-    if (appDir === undefined) throw new Error("app dir not resolved");
-    const routes = scanAppRoutes(appDir);
-    expect(routes).toEqual(["/", "/about"]);
+    const dirs = resolveRouteDirs(projectRoot);
+    const routes = scanRoutes(dirs);
+    expect(routes).toEqual({
+      appRoutes: ["/", "/about"],
+      pagesRoutes: ["/legacy"],
+    });
 
     artifactPath = join(projectRoot, "paramour-env.d.ts");
     expect(writeIfChanged(artifactPath, emitArtifact(routes)).written).toBe(
@@ -101,13 +110,15 @@ describe("generated artifact flips defineAppRoute verification on (TR3/RL8)", ()
     expect(checkProgram([consumerPath])).toEqual([]);
   }, 30_000);
 
-  it("world B — artifact in the program: unregistered literal rejected", () => {
+  it("world B — artifact in the program: unregistered and cross-router literals rejected", () => {
     const diagnostics = checkProgram([artifactPath, consumerPath]);
-    // Exactly one diagnostic also proves "/about" still compiles.
-    expect(diagnostics).toHaveLength(1);
-    const [diagnostic] = diagnostics;
-    expect(diagnostic).toContain("consumer.ts");
-    expect(diagnostic).toContain("TS2345");
-    expect(diagnostic).toContain('"/nope"');
+    // Exactly two diagnostics also proves "/about" and "/legacy" still
+    // compile through their own constructors: "/nope" is registered nowhere,
+    // and "/legacy" is a pages route handed to defineAppRoute (PR9's
+    // per-router members doing their job).
+    expect(diagnostics).toHaveLength(2);
+    expect(diagnostics.join("\n")).toContain("TS2345");
+    expect(diagnostics.join("\n")).toContain('"/nope"');
+    expect(diagnostics.join("\n")).toContain('"/legacy"');
   }, 30_000);
 });

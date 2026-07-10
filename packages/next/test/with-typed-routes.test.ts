@@ -10,6 +10,11 @@ import {
 } from "../src/with-typed-routes.js";
 import { makeTempDir, makeTree } from "./helpers.js";
 
+/** App-only emission — what this suite's fixtures produce. */
+function emitApp(appRoutes: readonly string[]): string {
+  return emitArtifact({ appRoutes, pagesRoutes: [] });
+}
+
 /**
  * TR4 suite. Values duplicated from next/constants on purpose — the phase
  * strings ARE the contract the wrapper dispatches on (hermeticity ruling).
@@ -96,12 +101,12 @@ describe("withTypedRoutes phase dispatch (TR4)", () => {
     expect(userConfig).toHaveBeenCalledExactlyOnceWith(PHASE_BUILD, ctx);
     // The resolved config's pageExtensions drove the scan.
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
-      emitArtifact(["/"]),
+      emitApp(["/"]),
     );
   });
 
-  it("warns once and skips generation when no app dir exists", async () => {
-    const root = makeProject(["src/pages/index.tsx"]);
+  it("warns once and skips generation when no route dir exists", async () => {
+    const root = makeProject(["lib/util.ts"]);
     const warn = silenceWarn();
     const config = withTypedRoutes({});
     await config(PHASE_DEV, {});
@@ -110,8 +115,34 @@ describe("withTypedRoutes phase dispatch (TR4)", () => {
     expect(devWatcherCountForTests()).toBe(0);
     // Two evaluations, one log line (TR5 log-once).
     expect(warn).toHaveBeenCalledExactlyOnceWith(
-      expect.stringContaining("no app directory"),
+      expect.stringContaining("no route directory"),
     );
+  });
+
+  it("generates a pages-only project through discovery", async () => {
+    const root = makeProject(["pages/legacy.tsx"]);
+    silenceWarn();
+    await withTypedRoutes({})(PHASE_BUILD, {});
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitArtifact({ appRoutes: [], pagesRoutes: ["/legacy"] }),
+    );
+  });
+
+  it("generates a hybrid project with both members (PR1)", async () => {
+    const root = makeProject(["app/page.tsx", "pages/legacy.tsx"]);
+    silenceWarn();
+    await withTypedRoutes({})(PHASE_BUILD, {});
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitArtifact({ appRoutes: ["/"], pagesRoutes: ["/legacy"] }),
+    );
+  });
+
+  it("throws the populated-ignored-dir config error from config evaluation (spike-2 ruling)", async () => {
+    makeProject(["app/page.tsx", "src/pages/index.tsx"]);
+    await expect(withTypedRoutes({})(PHASE_DEV, {})).rejects.toThrow(
+      /silently unreachable/,
+    );
+    expect(devWatcherCountForTests()).toBe(0);
   });
 });
 
@@ -121,7 +152,7 @@ describe("withTypedRoutes build phase (TR4)", () => {
     const warn = silenceWarn();
     await withTypedRoutes({})(PHASE_BUILD, {});
     const artifact = join(root, "paramour-env.d.ts");
-    expect(readFileSync(artifact, "utf8")).toBe(emitArtifact(["/", "/about"]));
+    expect(readFileSync(artifact, "utf8")).toBe(emitApp(["/", "/about"]));
     expect(warn).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining("was missing"),
     );
@@ -131,7 +162,7 @@ describe("withTypedRoutes build phase (TR4)", () => {
 
   it("is silent when the committed artifact is already fresh", async () => {
     const root = makeProject(["app/page.tsx"]);
-    writeFileSync(join(root, "paramour-env.d.ts"), emitArtifact(["/"]));
+    writeFileSync(join(root, "paramour-env.d.ts"), emitApp(["/"]));
     const warn = silenceWarn();
     await withTypedRoutes({})(PHASE_BUILD, {});
     expect(warn).not.toHaveBeenCalled();
@@ -139,7 +170,7 @@ describe("withTypedRoutes build phase (TR4)", () => {
 
   it("names appeared and disappeared paths in the drift warning", async () => {
     const root = makeProject(["app/page.tsx", "app/new/page.tsx"]);
-    writeFileSync(join(root, "paramour-env.d.ts"), emitArtifact(["/", "/old"]));
+    writeFileSync(join(root, "paramour-env.d.ts"), emitApp(["/", "/old"]));
     const warn = silenceWarn();
     await withTypedRoutes({})(PHASE_BUILD, {});
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("out of date"));
@@ -149,13 +180,13 @@ describe("withTypedRoutes build phase (TR4)", () => {
 
   it("strict: true turns drift into a rejection, after correcting the file", async () => {
     const root = makeProject(["app/page.tsx", "app/new/page.tsx"]);
-    writeFileSync(join(root, "paramour-env.d.ts"), emitArtifact(["/", "/old"]));
+    writeFileSync(join(root, "paramour-env.d.ts"), emitApp(["/", "/old"]));
     await expect(
       withTypedRoutes({}, { strict: true })(PHASE_BUILD, {}),
     ).rejects.toThrow(/out of date/);
     // The build fails but the artifact is left corrected on disk.
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
-      emitArtifact(["/", "/new"]),
+      emitApp(["/", "/new"]),
     );
   });
 
@@ -186,7 +217,16 @@ describe("withTypedRoutes build phase (TR4)", () => {
     ).rejects.toThrow(/was missing/);
     // The build fails but the artifact was generated before the throw.
     expect(existsSync(artifact)).toBe(true);
-    expect(readFileSync(artifact, "utf8")).toBe(emitArtifact(["/"]));
+    expect(readFileSync(artifact, "utf8")).toBe(emitApp(["/"]));
+  });
+
+  it("throws on an app/pages collision even without strict (PR9)", async () => {
+    const root = makeProject(["app/about/page.tsx", "pages/about.tsx"]);
+    await expect(withTypedRoutes({})(PHASE_BUILD, {})).rejects.toThrow(
+      /collision/,
+    );
+    // No artifact was written for the unbuildable state.
+    expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
   });
 
   it("honors the wrapped config's pageExtensions and the outFile option", async () => {
@@ -198,7 +238,7 @@ describe("withTypedRoutes build phase (TR4)", () => {
     )(PHASE_BUILD, {});
     expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
     expect(readFileSync(join(root, "types", "routes.d.ts"), "utf8")).toBe(
-      emitArtifact(["/"]),
+      emitApp(["/"]),
     );
   });
 });
@@ -209,7 +249,7 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
     const config = withTypedRoutes({});
     await config(PHASE_DEV, {});
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
-      emitArtifact(["/"]),
+      emitApp(["/"]),
     );
     expect(devWatcherCountForTests()).toBe(1);
     expect(
@@ -221,6 +261,31 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
     // Spike-#1 census: Turbopack dev invokes the config function twice in
     // the same process — the singleton must absorb the second call.
     await config(PHASE_DEV, {});
+    expect(devWatcherCountForTests()).toBe(1);
+  });
+
+  it("throws on an app/pages collision at dev startup (PR9: config evaluation)", async () => {
+    makeProject(["app/about/page.tsx", "pages/about.tsx"]);
+    await expect(withTypedRoutes({})(PHASE_DEV, {})).rejects.toThrow(
+      /collision/,
+    );
+  });
+
+  it("treats a collision DURING watch as non-fatal: loud log, last good artifact intact (PR9/TR5)", async () => {
+    const root = makeProject(["app/about/page.tsx", "pages/"]);
+    const artifact = join(root, "paramour-env.d.ts");
+    const good = emitArtifact({ appRoutes: ["/about"], pagesRoutes: [] });
+    const warn = silenceWarn();
+    await withTypedRoutes({})(PHASE_DEV, {});
+    expect(readFileSync(artifact, "utf8")).toBe(good);
+    await settle(150); // let the platform watcher become active
+    writeFileSync(join(root, "pages", "about.tsx"), "");
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("last good artifact"),
+      );
+    }, 5000);
+    expect(readFileSync(artifact, "utf8")).toBe(good);
     expect(devWatcherCountForTests()).toBe(1);
   });
 
@@ -248,7 +313,7 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
     makeTree(root, ["app/pricing/page.tsx"]);
     await vi.waitFor(() => {
       expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
-        emitArtifact(["/", "/pricing"]),
+        emitApp(["/", "/pricing"]),
       );
     }, 5000);
   });
@@ -266,7 +331,7 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
     await expect(withTypedRoutes(config)(PHASE_DEV, {})).resolves.toBe(config);
     // Generation itself succeeded; only the watcher fell into stale-types mode.
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
-      emitArtifact(["/"]),
+      emitApp(["/"]),
     );
     expect(devWatcherCountForTests()).toBe(0);
     expect(warn).toHaveBeenCalledWith(
@@ -290,7 +355,7 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
     const warn = silenceWarn();
     await withTypedRoutes({})(PHASE_DEV, {});
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
-      emitArtifact(["/"]),
+      emitApp(["/"]),
     );
     expect(devWatcherCountForTests()).toBe(0);
     expect(warn).toHaveBeenCalledWith(

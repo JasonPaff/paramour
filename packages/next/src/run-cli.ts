@@ -2,20 +2,23 @@ import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { RouteCollisionError } from "./collisions.js";
 import { loadConfigFile } from "./config.js";
 import {
   checkArtifact,
   formatRouteDiff,
   generate,
   type GenerateInputs,
+  type GenerateResult,
 } from "./generate.js";
 import {
   type AcquireLockResult,
   acquireWatcherLock,
   watcherLockPath,
 } from "./lock.js";
-import { DEFAULT_PAGE_EXTENSIONS, resolveAppDir } from "./scan-app.js";
-import { watchAppDir } from "./watch.js";
+import { DEFAULT_PAGE_EXTENSIONS } from "./scan-app.js";
+import { resolveRouteDirs } from "./scan.js";
+import { watchRouteDirs } from "./watch.js";
 
 /** @internal I/O seams for tests; defaults write to the console. */
 export interface CliIo {
@@ -31,29 +34,32 @@ interface CliFlags {
   check: boolean;
   "out-file"?: string;
   "page-extensions"?: string;
+  "pages-dir"?: string;
   watch: boolean;
 }
 
 const USAGE = [
   "Usage: paramour generate [options]",
   "",
-  "Generate paramour-env.d.ts from the app directory.",
+  "Generate paramour-env.d.ts from the app and pages directories.",
   "",
   "Options:",
-  "  --app-dir <dir>           app directory (default: app/ or src/app/)",
+  "  --app-dir <dir>           app directory (default: discovered app/ or src/app/)",
   "  --check                   verify the artifact is current; exit 1 on drift, never writes",
   "  --help, -h                show this help",
   "  --out-file <file>         artifact path (default: paramour-env.d.ts)",
   "  --page-extensions <list>  comma-separated, no leading dots (default: tsx,ts,jsx,js)",
-  "  --watch                   regenerate on app-dir changes",
+  "  --pages-dir <dir>         pages directory (default: discovered pages/ or src/pages/)",
+  "  --watch                   regenerate on route-dir changes",
 ].join("\n");
 
 /**
  * @internal The CLI (TR7), in-process testable: returns the exit code
  * instead of exiting. Codes are grep-style so CI can tell drift from
  * breakage: 0 success, 1 `--check` drift ONLY, 2 usage/config/operational
- * errors. Unlike the wrapper's never-load-bearing stance (§7.3), the CLI
- * fails loudly — running it is explicit user intent.
+ * errors — route collisions included (PR9: Next itself fails that build, so
+ * there is no artifact to emit). Unlike the wrapper's never-load-bearing
+ * stance (§7.3), the CLI fails loudly — running it is explicit user intent.
  */
 export async function runCli(
   argv: readonly string[],
@@ -82,6 +88,7 @@ export async function runCli(
         help: { default: false, short: "h", type: "boolean" },
         "out-file": { type: "string" },
         "page-extensions": { type: "string" },
+        "pages-dir": { type: "string" },
         watch: { default: false, type: "boolean" },
       },
     }));
@@ -118,6 +125,36 @@ export async function runCli(
   return runOnce(inputs, stdout, stderr);
 }
 
+/** Resolve an explicitly-given dir and require that it exists. */
+function checkedDir(
+  dir: string,
+  router: "app" | "pages",
+  projectRoot: string,
+): string {
+  const resolved = resolve(projectRoot, dir);
+  if (!statSync(resolved, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new Error(`${router} directory not found: ${resolved}`);
+  }
+  return resolved;
+}
+
+function count(n: number, noun: string): string {
+  return `${String(n)} ${noun}${n === 1 ? "" : "s"}`;
+}
+
+/** `(2 app routes, 1 pages route)` — per-router so hybrid output reads. */
+function describeRoutes(result: GenerateResult): string {
+  const parts = [
+    ...(result.appRoutes.length > 0
+      ? [count(result.appRoutes.length, "app route")]
+      : []),
+    ...(result.pagesRoutes.length > 0
+      ? [count(result.pagesRoutes.length, "pages route")]
+      : []),
+  ];
+  return parts.length === 0 ? "0 routes" : parts.join(", ");
+}
+
 /** Error message without the stack — CLI output, not a crash report. */
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -146,29 +183,41 @@ function parsePageExtensions(flag: string | undefined): string[] | undefined {
 
 /**
  * Precedence lives in exactly this function (TR7 / §7.2): flags → config
- * file → inference. Paths resolve against the project root (= cwd, where
- * `next` itself would run).
+ * file → joint discovery (PR8). Paths resolve against the project root
+ * (= cwd, where `next` itself would run). Discovery only runs for dirs not
+ * explicitly given — passing both bypasses it (and its populated-ignored-dir
+ * config error) entirely, which is the documented escape hatch. Only when
+ * NEITHER dir exists is that an error (PR8): app-only and pages-only
+ * projects are both fine.
  */
 async function resolveInputs(
   flags: CliFlags,
   projectRoot: string,
 ): Promise<GenerateInputs> {
   const file = (await loadConfigFile(projectRoot))?.config;
+  const pageExtensions =
+    parsePageExtensions(flags["page-extensions"]) ??
+    file?.pageExtensions ??
+    DEFAULT_PAGE_EXTENSIONS;
   const explicitAppDir = flags["app-dir"] ?? file?.appDir;
-  let appDir: string;
-  if (explicitAppDir === undefined) {
-    const discovered = resolveAppDir(projectRoot);
-    if (discovered === undefined) {
-      throw new Error(
-        `no app directory (app/ or src/app/) under ${projectRoot}; pass --app-dir or set appDir in paramour.config`,
-      );
-    }
-    appDir = discovered;
-  } else {
-    appDir = resolve(projectRoot, explicitAppDir);
-    if (!statSync(appDir, { throwIfNoEntry: false })?.isDirectory()) {
-      throw new Error(`app directory not found: ${appDir}`);
-    }
+  const explicitPagesDir = flags["pages-dir"] ?? file?.pagesDir;
+  let appDir =
+    explicitAppDir === undefined
+      ? undefined
+      : checkedDir(explicitAppDir, "app", projectRoot);
+  let pagesDir =
+    explicitPagesDir === undefined
+      ? undefined
+      : checkedDir(explicitPagesDir, "pages", projectRoot);
+  if (explicitAppDir === undefined || explicitPagesDir === undefined) {
+    const discovered = resolveRouteDirs(projectRoot, pageExtensions);
+    appDir ??= discovered.appDir;
+    pagesDir ??= discovered.pagesDir;
+  }
+  if (appDir === undefined && pagesDir === undefined) {
+    throw new Error(
+      `no route directory (app/, pages/, src/app/, or src/pages/) under ${projectRoot}; pass --app-dir/--pages-dir or set appDir/pagesDir in paramour.config`,
+    );
   }
   return {
     appDir,
@@ -176,10 +225,8 @@ async function resolveInputs(
       projectRoot,
       flags["out-file"] ?? file?.outFile ?? "paramour-env.d.ts",
     ),
-    pageExtensions:
-      parsePageExtensions(flags["page-extensions"]) ??
-      file?.pageExtensions ??
-      DEFAULT_PAGE_EXTENSIONS,
+    pageExtensions,
+    pagesDir,
   };
 }
 
@@ -205,7 +252,7 @@ function runCheck(
       ? `paramour: ${inputs.artifactPath} is missing.`
       : `paramour: ${inputs.artifactPath} is out of date.`,
   );
-  const diff = formatRouteDiff(result.appeared, result.disappeared);
+  const diff = formatRouteDiff(result.app, result.pages);
   if (diff.length === 0) {
     // Byte drift with an identical route set — a hand-edited artifact.
     stderr("  content differs from generator output");
@@ -228,21 +275,22 @@ function runOnce(
     stderr(`paramour: ${message(error)}`);
     return 2;
   }
-  const count = `${String(result.routes.length)} route${result.routes.length === 1 ? "" : "s"}`;
+  const described = describeRoutes(result);
   stdout(
     result.written
-      ? `paramour: wrote ${inputs.artifactPath} (${count})`
-      : `paramour: ${inputs.artifactPath} unchanged (${count})`,
+      ? `paramour: wrote ${inputs.artifactPath} (${described})`
+      : `paramour: ${inputs.artifactPath} unchanged (${described})`,
   );
   return 0;
 }
 
 /**
- * `--watch` (TR7): TR5 watcher behind the TR6 lock. A declined lock exits 0
- * — another live watcher (usually `next dev`) is the designed dedupe case,
- * and the initial generation already ran. Without an abort signal the
- * returned promise stays pending; the process lives via the FSWatcher ref
- * and dies with the standard signal exits (lock.ts re-raises after cleanup).
+ * `--watch` (TR7): TR5 watcher behind the TR6 lock, over both route dirs
+ * (PR8). A declined lock exits 0 — another live watcher (usually `next dev`)
+ * is the designed dedupe case, and the initial generation already ran.
+ * Without an abort signal the returned promise stays pending; the process
+ * lives via the FSWatcher refs and dies with the standard signal exits
+ * (lock.ts re-raises after cleanup).
  */
 function runWatch(
   inputs: GenerateInputs,
@@ -254,8 +302,9 @@ function runWatch(
   try {
     generate(inputs);
   } catch (error) {
-    // Transient I/O failure shouldn't kill an editor-companion watcher;
-    // only option-resolution errors (earlier) are fatal.
+    // Transient I/O failure (or a collision the user is mid-fixing)
+    // shouldn't kill an editor-companion watcher; only option-resolution
+    // errors (earlier) are fatal.
     stderr(`paramour: initial generation failed: ${message(error)}`);
   }
   let lock: AcquireLockResult;
@@ -273,8 +322,11 @@ function runWatch(
     );
     return 0;
   }
+  const dirs = [inputs.appDir, inputs.pagesDir].filter(
+    (dir): dir is string => dir !== undefined,
+  );
   let warned = false;
-  const watcher = watchAppDir(inputs.appDir, {
+  const watcher = watchRouteDirs(dirs, {
     ignorePaths: [inputs.artifactPath],
     onError: (error) => {
       if (warned) return;
@@ -282,10 +334,23 @@ function runWatch(
       stderr(`paramour: watcher error; continuing: ${message(error)}`);
     },
     onRescan: () => {
-      generate(inputs);
+      try {
+        generate(inputs);
+      } catch (error) {
+        if (error instanceof RouteCollisionError) {
+          // PR9's watch exception: a collision mid-watch is usually a file
+          // mid-move — log loudly every time, keep the last good artifact
+          // on disk, keep running (TR5).
+          stderr(
+            `paramour: ${message(error)}; keeping the last good artifact and watching for the fix`,
+          );
+          return;
+        }
+        throw error; // routed to onError by the watcher (TR5 non-fatal)
+      }
     },
   });
-  stdout(`paramour: watching ${inputs.appDir}`);
+  stdout(`paramour: watching ${dirs.join(", ")}`);
   return new Promise<number>((resolveExit) => {
     const stop = (): void => {
       watcher.close();
