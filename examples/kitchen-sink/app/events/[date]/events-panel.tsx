@@ -3,7 +3,7 @@
 import {
   useRouteParamsOrThrow,
   useSearchOrThrow,
-} from "@paramour-js/next/client";
+} from "@paramour-js/next/app";
 
 import { eventsRoute } from "./route.def";
 

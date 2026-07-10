@@ -5,7 +5,7 @@
  * (design-05 TR4; `pnpm-workspace.yaml` keeps `next` peer-only on purpose).
  *
  * This is a hand-authored `.d.ts` *input*: tsc does not re-emit it to `dist`,
- * and the emitted `client.d.ts` references only `paramour`/`react` types (the
+ * and the emitted `app.d.ts` references only `paramour`/`react` types (the
  * `next/navigation` import is runtime-only), so nothing here leaks to
  * consumers — their real Next resolves the runtime import.
  *

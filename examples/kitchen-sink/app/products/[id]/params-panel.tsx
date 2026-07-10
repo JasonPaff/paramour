@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouteParams, useSearch } from "@paramour-js/next/client";
+import { useRouteParams, useSearch } from "@paramour-js/next/app";
 
 import { productsRoute } from "./route.def";
 
