@@ -30,6 +30,10 @@ const filesRoute = defineAppRoute("/files/[...slug]", {
   params: { slug: p.string() },
 });
 
+const docsRoute = defineAppRoute("/docs/[[...path]]", {
+  params: { path: p.string() },
+});
+
 const rawRoute = defineAppRoute("/raw", {
   search: rawSearch(
     z.object({ page: z.coerce.number().optional(), q: z.string() }),
@@ -205,6 +209,53 @@ describe("catch-all params through useRouteParams", () => {
     const { result } = renderHook(() => useRouteParams(filesRoute));
     expect(result.current).toEqual({
       data: { slug: ["a", "b"] },
+      status: "success",
+    });
+  });
+});
+
+describe("optional catch-all params through useRouteParams", () => {
+  it("an absent [[...path]] key normalizes to [] (D6)", () => {
+    __setParams({});
+    const { result } = renderHook(() => useRouteParams(docsRoute));
+    expect(result.current).toEqual({
+      data: { path: [] },
+      status: "success",
+    });
+  });
+
+  it("a present [[...path]] decodes element-wise like a catch-all", () => {
+    __setParams({ path: ["a", "b"] });
+    const { result } = renderHook(() => useRouteParams(docsRoute));
+    expect(result.current).toEqual({
+      data: { path: ["a", "b"] },
+      status: "success",
+    });
+  });
+});
+
+describe("params arrive percent-ENCODED from useParams (R5, core owns the decode)", () => {
+  // The pages twin pins the opposite direction (percentDecode: false, no
+  // double-decode); this pins that app.ts keeps decodeParams's DEFAULT — a
+  // symmetric `{ percentDecode: false }` here would break these, not the
+  // rest of the suite.
+  it("decodes a %20-bearing single param before the codec grammar", () => {
+    const slugRoute = defineAppRoute("/product/[slug]", {
+      params: { slug: p.string() },
+    });
+    __setParams({ slug: "a%20b" });
+    const { result } = renderHook(() => useRouteParams(slugRoute));
+    expect(result.current).toEqual({
+      data: { slug: "a b" },
+      status: "success",
+    });
+  });
+
+  it("decodes catch-all elements independently, restoring %2F to a slash (R2)", () => {
+    __setParams({ slug: ["a%2Fb", "c"] });
+    const { result } = renderHook(() => useRouteParams(filesRoute));
+    expect(result.current).toEqual({
+      data: { slug: ["a/b", "c"] },
       status: "success",
     });
   });

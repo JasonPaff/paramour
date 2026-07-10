@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import type { StandardSchemaV1 } from "@standard-schema/spec";
+
 import { renderHook } from "@testing-library/react";
 import {
   definePagesRoute,
@@ -12,7 +14,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { useRouteParams, useSearch } from "../src/pages.js";
-import { __setIsReady, __setMounted, __setQuery } from "./stubs/next-router.js";
+import {
+  __setIsReady,
+  __setMounted,
+  __setQuery,
+  __setThrow,
+} from "./stubs/next-router.js";
 
 const productRoute = definePagesRoute("/product/[id]", {
   params: { id: p.integer() },
@@ -24,6 +31,10 @@ const productRoute = definePagesRoute("/product/[id]", {
 
 const filesRoute = definePagesRoute("/files/[...slug]", {
   params: { slug: p.string() },
+});
+
+const docsRoute = definePagesRoute("/docs/[[...path]]", {
+  params: { path: p.string() },
 });
 
 const tagsRoute = definePagesRoute("/tags", {
@@ -42,6 +53,7 @@ beforeEach(() => {
   __setIsReady(true);
   __setMounted(true);
   __setQuery({});
+  __setThrow(undefined);
 });
 
 describe("three-state RouterResult (PR5): pending until isReady", () => {
@@ -99,6 +111,43 @@ describe("useSearch subtracts the route's path params from router.query (PR5)", 
     const { result } = renderHook(() => useRouteParams(productRoute));
     expect(result.current).toEqual({ data: { id: 42 }, status: "success" });
   });
+
+  it("a hostile __proto__ key survives the subtraction as an ordinary own property", () => {
+    // JSON.parse (unlike an object literal) makes "__proto__" an ordinary own
+    // key, as Node's querystring layer does for `?__proto__=`. zod silently
+    // drops the key (its own pollution guard), so a spy schema captures the
+    // exact bag the hook hands over: had omitPathParams rebuilt it with SET
+    // semantics, the array value would have swapped the bag's prototype and
+    // vanished as data; define semantics keep it an ordinary own key.
+    let seen: Record<string, string | string[]> | undefined;
+    const spy: StandardSchemaV1<unknown, unknown> = {
+      "~standard": {
+        validate: (value) => {
+          seen = value as Record<string, string | string[]>;
+          return { value };
+        },
+        vendor: "test",
+        version: 1,
+      },
+    };
+    const spyRoute = definePagesRoute("/spy/[id]", {
+      params: { id: p.integer() },
+      search: rawSearch(spy),
+    });
+    __setQuery(
+      JSON.parse('{"__proto__": ["polluted"], "id": "7"}') as Record<
+        string,
+        string | string[]
+      >,
+    );
+    const { result } = renderHook(() => useSearch(spyRoute));
+    expect(result.current.status).toBe("success");
+    // The single-element array collapses to a scalar in core's normalization;
+    // the key itself must arrive as an own enumerable property, with the
+    // bag's prototype untouched.
+    expect(Object.entries(seen ?? {})).toEqual([["__proto__", "polluted"]]);
+    expect(Reflect.getPrototypeOf(seen ?? {})).toBe(Object.prototype);
+  });
 });
 
 describe("query values arrive already percent-decoded (R5, no double-decode)", () => {
@@ -137,6 +186,24 @@ describe("query value shapes (PR11 §4)", () => {
       status: "success",
     });
   });
+
+  it("an optional catch-all absent from query normalizes to [] (D6)", () => {
+    __setQuery({});
+    const { result } = renderHook(() => useRouteParams(docsRoute));
+    expect(result.current).toEqual({
+      data: { path: [] },
+      status: "success",
+    });
+  });
+
+  it("a present optional catch-all arrives as string[]", () => {
+    __setQuery({ path: ["a", "b"] });
+    const { result } = renderHook(() => useRouteParams(docsRoute));
+    expect(result.current).toEqual({
+      data: { path: ["a", "b"] },
+      status: "success",
+    });
+  });
 });
 
 describe("decode failure is the error arm, never a throw (PR5/PR6)", () => {
@@ -151,6 +218,17 @@ describe("decode failure is the error arm, never a throw (PR5/PR6)", () => {
   it("useSearch: malformed search value", () => {
     __setQuery({ id: "1", page: "abc" });
     const { result } = renderHook(() => useSearch(productRoute));
+    expect(result.current.status).toBe("error");
+    if (result.current.status !== "error") return;
+    expect(result.current.error).toBeInstanceOf(SearchDecodeError);
+  });
+
+  it("useSearch: a foreign (zod) failure arrives branded as SearchDecodeError", () => {
+    // strictRoute's schema requires `q`; leaving it out makes zod reject, and
+    // the foreign error must reach the hook already rebranded (core's
+    // rebrandForeign), same as the /app twin pins.
+    __setQuery({ id: "7" });
+    const { result } = renderHook(() => useSearch(strictRoute));
     expect(result.current.status).toBe("error");
     if (result.current.status !== "error") return;
     expect(result.current.error).toBeInstanceOf(SearchDecodeError);
@@ -176,6 +254,32 @@ describe("unmounted next/router (App Router placement, PR5)", () => {
   });
 });
 
+describe("foreign useRouter failures propagate untranslated (PR5)", () => {
+  it("an unrelated Error is rethrown by identity, never wrapped in ParamourError", () => {
+    const boom = new Error("router exploded for an unrelated reason");
+    __setThrow(boom);
+    let caught: unknown;
+    try {
+      renderHook(() => useRouteParams(productRoute));
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBe(boom);
+    expect(caught).not.toBeInstanceOf(ParamourError);
+  });
+
+  it("a non-Error throw passes through the instanceof guard untouched", () => {
+    __setThrow("kaboom");
+    let caught: unknown;
+    try {
+      renderHook(() => useSearch(productRoute));
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBe("kaboom");
+  });
+});
+
 describe("memoization is keyed on router.query + router.isReady", () => {
   it("returns the identical result object across rerenders with the same query", () => {
     const query = { id: "42" };
@@ -191,6 +295,24 @@ describe("memoization is keyed on router.query + router.isReady", () => {
     const { rerender, result } = renderHook(() => useRouteParams(productRoute));
     const first = result.current;
     __setQuery({ id: "42" });
+    rerender();
+    expect(result.current).not.toBe(first);
+    expect(result.current).toEqual(first);
+  });
+
+  it("useSearch returns the identical result object across rerenders with the same query", () => {
+    __setQuery({ id: "42", page: "2" });
+    const { rerender, result } = renderHook(() => useSearch(productRoute));
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("useSearch recomputes when a NEW query object with identical text arrives", () => {
+    __setQuery({ id: "42", page: "2" });
+    const { rerender, result } = renderHook(() => useSearch(productRoute));
+    const first = result.current;
+    __setQuery({ id: "42", page: "2" });
     rerender();
     expect(result.current).not.toBe(first);
     expect(result.current).toEqual(first);

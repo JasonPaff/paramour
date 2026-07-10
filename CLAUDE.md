@@ -13,6 +13,7 @@ pnpm monorepo (pnpm 11, Node >= 24.18). Run from the repo root:
 - `pnpm test` — runtime tests (vitest, matches `packages/*/test/**/*.test.ts`)
 - `pnpm test packages/core/test/codecs.test.ts` — single test file; add `-t "name"` to filter by test name
 - `pnpm test:types` — type tests (tstyche, matches `packages/core/test/**/*.tst.*`); pass a path fragment to filter, e.g. `pnpm test:types codec-api`
+- `pnpm test:types:next` — type tests for `packages/next` (`packages/next/test/**/*.tst.*`, own tstyche/tsconfig pair)
 - `pnpm test:types:registry` — world-B type tests (`packages/core/test-registry/`, its own tstyche/tsconfig pair): post-generation registry behavior via a hand-authored `declare module "paramour"` augmentation. A separate compilation unit on purpose — module augmentation is program-global, so these files must never move into `test/`
 - `pnpm typecheck` — `tsc --noEmit` in every package; includes `examples/basic`, which needs the packages built first
 - `pnpm build` — topological: core tsc → next tsc (dist + the `paramour` CLI bin) → `examples/basic` `next build`. `pnpm build:packages` skips the example for fast package-only builds. `test/cli-dist.test.ts` and `test:types:registry` need a build to have run
@@ -20,12 +21,12 @@ pnpm monorepo (pnpm 11, Node >= 24.18). Run from the repo root:
 - `pnpm format` / `pnpm format:check` — Prettier
 - `pnpm changeset` — add a changeset (changesets is the release mechanism)
 
-CI runs, in order: `format:check`, `lint`, `build`, `typecheck`, `test`, `test:types`, `test:types:registry`. All seven must pass (`build` precedes `typecheck` so the example resolves the packages' dist types).
+CI runs, in order: `format:check`, `build`, `lint`, `typecheck`, `test`, `test:types`, `test:types:next`, `test:types:registry`. All eight must pass (`build` precedes `lint` and `typecheck` so the type-checked sources and the example resolve the packages' dist types).
 
 ## Two kinds of tests
 
 - `*.test.ts` (vitest) — runtime behavior. `conformance.test.ts` exercises the wire-format spec's numbered rules.
-- `*.tst.ts` (tstyche) — compile-time API contracts, including _intentional type errors_. These files are deliberately excluded from ESLint and from the package tsconfig; they are checked only by tstyche via `packages/core/tsconfig.tstyche.json` (same compiler options, exclusion removed). Don't "fix" type errors in them and don't add them to the tsc project.
+- `*.tst.ts` (tstyche) — compile-time API contracts, including _intentional type errors_. These files are deliberately excluded from ESLint and from the package tsconfig; they are checked only by tstyche via the owning package's `tsconfig.tstyche.json` (same compiler options, exclusion removed). Don't "fix" type errors in them and don't add them to the tsc project.
 
 ## Design docs and decision IDs
 

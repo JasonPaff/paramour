@@ -5,11 +5,12 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    // *.tst.ts type tests contain intentional type errors and are checked
-    // by tstyche, not by tsc or ESLint's project service.
+    // *.tst.* type tests contain intentional type errors and are checked
+    // by tstyche, not by tsc or ESLint's project service (same glob as the
+    // tstyche configs' testFileMatch).
     ignores: [
       "**/dist/**",
-      "**/*.tst.ts",
+      "**/*.tst.*",
       "coverage/**",
       "examples/**",
       "docs/**",
@@ -24,7 +25,7 @@ export default tseslint.config(
       tseslint.configs.strictTypeChecked,
       tseslint.configs.stylisticTypeChecked,
     ],
-    files: ["packages/**/*.ts"],
+    files: ["packages/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
         projectService: true,
