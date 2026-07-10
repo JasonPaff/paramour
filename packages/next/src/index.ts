@@ -13,6 +13,12 @@ export {
 } from "./scan-app.js";
 export { scanPagesRoutes } from "./scan-pages.js";
 export {
+  resolveRouteDirs,
+  type RouteDirs,
+  scanRoutes,
+  type ScanRoutesResult,
+} from "./scan.js";
+export {
   type AppDirWatcher,
   DEFAULT_DEBOUNCE_MS,
   watchAppDir,
