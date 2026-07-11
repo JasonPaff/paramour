@@ -23,6 +23,12 @@ effectively unmaintained. Paramour aims to be a documented, tested,
 community-maintained answer to typed routing in Next.js, with a migration path
 from `next-typesafe-url`.
 
+## Examples
+
+The [`examples/`](./examples/) directory has an index of the example
+projects — from a minimal tour to an exhaustive kitchen sink — all built and
+typechecked in CI.
+
 ## License
 
 MIT © Jason Paff
