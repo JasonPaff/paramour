@@ -3,7 +3,7 @@ import type { RouteProps } from "paramour";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { href } from "paramour";
+import { encodeStaticParams, href } from "paramour";
 
 import { getPhoto, photos } from "../photos";
 import { galleryRoute } from "../route.def";
@@ -12,6 +12,17 @@ import { galleryPhotoRoute } from "./route.def";
 export async function generateMetadata(props: RouteProps): Promise<Metadata> {
   const { photoId } = await galleryPhotoRoute.parseParams(props);
   return { title: `Photo #${String(photoId)} — gallery` };
+}
+
+// SSG: the photo set is finite, so every /gallery/[photoId] page prerenders.
+// encodeStaticParams returns the codec's WIRE values ({ photoId: "1" }), NOT
+// percent-encoded — Next encodes generateStaticParams values itself.
+// dynamicParams stays default-true: /gallery/999 still renders on demand and
+// getPhoto's miss becomes notFound().
+export function generateStaticParams() {
+  return photos.map((photo) =>
+    encodeStaticParams(galleryPhotoRoute, { photoId: photo.id }),
+  );
 }
 
 // The FULL-page surface: what a hard load / external link to

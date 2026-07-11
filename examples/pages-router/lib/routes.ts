@@ -1,5 +1,7 @@
 import { definePagesRoute, p, type SearchConfig } from "paramour";
 
+import { guideTopics } from "./guides";
+
 // One module for every route definition. The colocated route.def.ts pattern
 // from the App Router examples is impossible here BY DESIGN: under pages/,
 // every file with a page extension IS a page (design-06 spike 1 — only
@@ -18,6 +20,13 @@ export const findSearch = {
 } satisfies SearchConfig;
 
 export const findRoute = definePagesRoute("/find", { search: findSearch });
+
+// Statically generated (getStaticPaths + fallback: "blocking"): the param is
+// an enum, so any URL outside guideTopics fails decode in getStaticProps and
+// becomes a 404 — a runtime gate, not just a build-time enumeration.
+export const guideRoute = definePagesRoute("/guides/[topic]", {
+  params: { topic: p.enum(guideTopics) },
+});
 
 export const homeRoute = definePagesRoute("/", {});
 

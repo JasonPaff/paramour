@@ -6,6 +6,7 @@ declare module "paramour" {
     pagesRoutes:
       | "/"
       | "/find"
+      | "/guides/[topic]"
       | "/legacy/[id]"
       | "/products/[id]";
   }

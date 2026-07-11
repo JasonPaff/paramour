@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { href } from "paramour";
 
-import { findRoute, homeRoute, productRoute } from "../lib/routes";
+import { findRoute, guideRoute, homeRoute, productRoute } from "../lib/routes";
 
 // Every link is built with href(): typed params/search in, a plain string
 // out — Href is a string subtype, so it feeds next/link directly. href() is
@@ -23,6 +23,12 @@ const links = [
     label: "Find",
     path: "/find",
     to: href(findRoute, { search: { q: "cable", tag: ["audio", "usb"] } }),
+  },
+  {
+    exact: false,
+    label: "Guides",
+    path: "/guides",
+    to: href(guideRoute, { params: { topic: "routing" } }),
   },
 ];
 

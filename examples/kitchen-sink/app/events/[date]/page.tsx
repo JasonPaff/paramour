@@ -1,7 +1,22 @@
 import type { RouteProps } from "paramour";
 
+import { encodeStaticParams } from "paramour";
+
+import { eventDates } from "./dates";
 import { EventsPanel } from "./events-panel";
 import { eventsRoute } from "./route.def";
+
+// Typed serialization at the static boundary: a real Date in,
+// { date: "2026-07-10" } out — p.isoDate's wire grammar, so the enumerated
+// URLs can never disagree with what parseParams accepts. This page ALSO reads
+// searchParams, so at prerender time Next rejects that promise with its
+// dynamic-usage sentinel and bails each path back to request-time rendering —
+// which parseSearch must let through unwrapped (the digest passthrough) or
+// the bailout becomes a build failure. /gallery/[photoId] is the fully-static
+// twin that actually prerenders.
+export function generateStaticParams() {
+  return eventDates.map((date) => encodeStaticParams(eventsRoute, { date }));
+}
 
 export default async function EventsPage(props: RouteProps) {
   // parseParams throws on a malformed date (/events/2026-13-01) → error.tsx.
