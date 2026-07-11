@@ -126,6 +126,7 @@ function stringifyJson(value: unknown): string {
 export const p = {
   boolean(): Codec<boolean> {
     return createCodec<boolean>({
+      kind: "boolean",
       parseElement: (raw) => {
         if (raw === "true") return true;
         if (raw === "false") return false;
@@ -143,6 +144,8 @@ export const p = {
   },
 
   custom<Out>(codec: {
+    /** Reflection name shown by describeCodec/`paramour list` (default "custom"). */
+    label?: string;
     parse: (raw: string) => Out;
     serialize: (value: Out) => string;
   }): Codec<Out> {
@@ -153,6 +156,7 @@ export const p = {
     // aggregation. .catch() recovers foreign parse failures only, which
     // rebrandForeign normalizes to ParseError so recovery sees them.
     return createCodec<Out>({
+      ...(codec.label === undefined ? {} : { kind: codec.label }),
       parseElement: (raw) =>
         rebrandForeign(
           () => codec.parse(raw),
@@ -172,6 +176,8 @@ export const p = {
   ): Codec<M[number]> {
     const set = new Set<string>(members);
     return createCodec<M[number]>({
+      enumMembers: members,
+      kind: "enum",
       parseElement: (raw) => {
         if (!set.has(raw)) {
           throw new ParseError(`"${raw}" is not one of: ${members.join(", ")}`);
@@ -193,6 +199,7 @@ export const p = {
     schema?: S,
   ): Codec<S extends undefined ? number : StandardSchemaV1.InferOutput<S>> {
     return createCodec({
+      kind: "integer",
       parseElement: (raw) => {
         const value = parseIntegerElement(raw);
         return schema ? refine(schema, value) : value;
@@ -210,6 +217,7 @@ export const p = {
 
   isoDate(): Codec<Date> {
     return createCodec<Date>({
+      kind: "isoDate",
       parseElement: (raw) => {
         if (!ISO_DATE_RE.test(raw)) {
           throw new ParseError(`"${raw}" is not a YYYY-MM-DD date`);
@@ -235,6 +243,7 @@ export const p = {
     schema: S,
   ): Codec<StandardSchemaV1.InferOutput<S>> {
     return createCodec<StandardSchemaV1.InferOutput<S>>({
+      kind: "json",
       parseElement: (raw) => {
         let parsed: unknown;
         try {
@@ -261,6 +270,7 @@ export const p = {
     schema?: S,
   ): Codec<S extends undefined ? number : StandardSchemaV1.InferOutput<S>> {
     return createCodec({
+      kind: "number",
       parseElement: (raw) => {
         const value = parseNumberElement(raw);
         return schema ? refine(schema, value) : value;
@@ -276,6 +286,7 @@ export const p = {
     schema?: S,
   ): Codec<S extends undefined ? string : StandardSchemaV1.InferOutput<S>> {
     return createCodec({
+      kind: "string",
       parseElement: (raw) => (schema ? refine(schema, raw) : raw),
       serializeElement: (value) => {
         const refined = schema ? refineForSerialize(schema, value) : value;
@@ -290,6 +301,7 @@ export const p = {
   stringArray(): Codec<string[], "required", false, "many"> {
     return createCodec<string[], "many">({
       arity: "many",
+      kind: "string",
       parseElement: (raw) => raw,
       serializeElement: (value) => {
         if (typeof value !== "string") {
@@ -302,6 +314,7 @@ export const p = {
 
   timestamp(): Codec<Date> {
     return createCodec<Date>({
+      kind: "timestamp",
       parseElement: (raw) => {
         if (!TIMESTAMP_RE.test(raw)) {
           throw new ParseError(`"${raw}" is not an ISO 8601 UTC timestamp`);

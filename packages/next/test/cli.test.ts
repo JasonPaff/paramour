@@ -185,9 +185,17 @@ describe("paramour generate — one-shot (TR7)", () => {
 });
 
 describe("paramour generate — flags and usage (TR7)", () => {
-  it("--help prints usage to stdout and exits 0", async () => {
+  it("--help prints the global usage to stdout and exits 0", async () => {
     makeProject([]);
     const run = cli(["--help"]);
+    await expect(run.code).resolves.toBe(0);
+    expect(run.out.join("\n")).toContain("Usage: paramour <command>");
+    expect(run.err).toEqual([]);
+  });
+
+  it("generate --help prints the command usage to stdout and exits 0", async () => {
+    makeProject([]);
+    const run = cli(["generate", "--help"]);
     await expect(run.code).resolves.toBe(0);
     expect(run.out.join("\n")).toContain("Usage: paramour generate");
     expect(run.err).toEqual([]);
@@ -202,15 +210,17 @@ describe("paramour generate — flags and usage (TR7)", () => {
 
   it("rejects a bad or missing subcommand (exit 2)", async () => {
     makeProject(["app/page.tsx"]);
-    await expect(cli(["frobnicate"]).code).resolves.toBe(2);
+    const bad = cli(["frobnicate"]);
+    await expect(bad.code).resolves.toBe(2);
+    expect(bad.err.join("\n")).toContain('unknown command "frobnicate"');
     await expect(cli([]).code).resolves.toBe(2);
   });
 
-  it("-h short alias prints usage to stdout and exits 0", async () => {
+  it("-h short alias prints the global usage to stdout and exits 0", async () => {
     makeProject([]);
     const run = cli(["-h"]);
     await expect(run.code).resolves.toBe(0);
-    expect(run.out.join("\n")).toContain("Usage: paramour generate");
+    expect(run.out.join("\n")).toContain("Usage: paramour <command>");
     expect(run.err).toEqual([]);
   });
 
@@ -218,7 +228,7 @@ describe("paramour generate — flags and usage (TR7)", () => {
     makeProject(["app/page.tsx"]);
     const run = cli(["generate", "extra"]);
     await expect(run.code).resolves.toBe(2);
-    expect(run.err.join("\n")).toContain("exactly one command");
+    expect(run.err.join("\n")).toContain('unexpected argument "extra"');
   });
 
   it("rejects --watch --check together (exit 2)", async () => {
@@ -392,6 +402,49 @@ describe("paramour generate --check (TR7)", () => {
     expect(run.err.join("\n")).toContain(
       "content differs from generator output",
     );
+  });
+});
+
+describe("paramour check — first-class alias of generate --check (TR7)", () => {
+  it("exits 0 on a fresh artifact", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    writeFileSync(join(root, "paramour-env.d.ts"), emitApp(["/"]));
+    const run = cli(["check"]);
+    await expect(run.code).resolves.toBe(0);
+    expect(run.out).toEqual([expect.stringContaining("up to date")]);
+  });
+
+  it("exits 1 on drift with the same diff as generate --check", async () => {
+    const root = makeProject(["app/page.tsx", "app/new/page.tsx"]);
+    const stale = emitApp(["/", "/old"]);
+    writeFileSync(join(root, "paramour-env.d.ts"), stale);
+    const run = cli(["check"]);
+    await expect(run.code).resolves.toBe(1);
+    const err = run.err.join("\n");
+    expect(err).toContain("out of date");
+    expect(err).toContain("  + /new (app)");
+    expect(err).toContain("  - /old (app)");
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(stale);
+  });
+
+  it("missing route dirs are exit 2, not drift", async () => {
+    makeProject([]);
+    await expect(cli(["check"]).code).resolves.toBe(2);
+  });
+
+  it("rejects --watch as an unknown option (exit 2)", async () => {
+    makeProject(["app/page.tsx"]);
+    const run = cli(["check", "--watch"]);
+    await expect(run.code).resolves.toBe(2);
+    expect(run.err.join("\n")).toContain("Usage: paramour check");
+  });
+
+  it("--help prints check usage, not generate's", async () => {
+    makeProject([]);
+    const run = cli(["check", "--help"]);
+    await expect(run.code).resolves.toBe(0);
+    expect(run.out.join("\n")).toContain("Usage: paramour check");
+    expect(run.out.join("\n")).not.toContain("--watch");
   });
 });
 

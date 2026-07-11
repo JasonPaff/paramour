@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach } from "vitest";
 
 const roots: string[] = [];
@@ -17,6 +18,26 @@ afterEach(() => {
     rmSync(root, { force: true, recursive: true });
   }
 });
+
+/**
+ * Link `<root>/node_modules/paramour` to the workspace's packages/core so a
+ * fixture module's `import ... from "paramour"` resolves (temp projects live
+ * under the OS tmpdir, outside the repo's node_modules walk). Uses a
+ * junction: unlike a dir symlink it needs no Windows privilege. Requires a
+ * built core dist — pair with a `describe.skipIf` on it (cli-dist pattern).
+ * Returns false when the link cannot be created (skip the suite).
+ */
+export function linkCorePackage(root: string): boolean {
+  const target = fileURLToPath(new URL("../../core", import.meta.url));
+  const linkPath = join(root, "node_modules", "paramour");
+  mkdirSync(dirname(linkPath), { recursive: true });
+  try {
+    symlinkSync(target, linkPath, "junction");
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Fresh directory under the OS tmpdir, removed automatically after the test.

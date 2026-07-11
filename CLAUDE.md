@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Paramour — a type-safe routing companion for the Next.js App Router (validated route/search params, typed path building, explicit URL serialization) using Standard Schema for bring-your-own-validator support. It is pre-release: `packages/core` holds the real implementation; `packages/next`, `packages/codemod`, `examples/*`, and `docs/` are placeholders.
+Paramour — a type-safe routing companion for the Next.js App Router (validated route/search params, typed path building, explicit URL serialization) using Standard Schema for bring-your-own-validator support. It is pre-release: `packages/core` holds the routing library; `packages/next` holds the Next.js integration (`withTypedRoutes`, hooks, and the `paramour` CLI: `generate`/`check`/`init`/`list`/`doctor`); `packages/codemod` and `docs/` are placeholders.
 
 ## Commands
 
@@ -37,6 +37,7 @@ Design/spike/review docs live in `.claude/docs/` (gitignored — internal docs n
 - `codec.ts` — the `Codec<Out, P, C, A>` interface and `createCodec`. Codecs are bidirectional wire converters (parse + serialize), which is the whole reason the library exists: Standard Schema is validate-only, so serialization must be library-owned. The `P` (presence), `C` (caught), `A` (arity) type parameters are type-state: modifier methods (`.optional()`, `.default()`, `.catch()`) become `never` after use or on illegal combinations, so invalid chains fail to compile rather than being checked at runtime. Runtime-internal properties are prefixed `~` and are not public API; `~out` is a phantom property carrying the output type.
 - `p.ts` — the `p.*` codec builders (`string`, `integer`, `number`, `boolean`, `enum`, `isoDate`, `timestamp`, `json`, …). Parsing uses strict anchored regexes per the wire-format spec, not `Number()` coercion.
 - `search.ts` — search-param encode/decode between codec configs and `URLSearchParams`/Next's `searchParams` object, plus `buildSearchString`, which hand-rolls byte-layer encoding (deliberately not `URLSearchParams#toString`: spaces are `%20`, not `+`).
+- `describe.ts` — `describeCodec`/`describeRoute`, the public reflection surface over the `~`-prefixed runtime metadata (`~kind`, `~enumMembers`, presence/default/catch state); powers `paramour list`/`doctor` in `packages/next`.
 - `errors.ts` — `ParamourError` hierarchy with brand-based `instanceof` hardening; `rebrandForeign`/`foreignMessage` wrap errors thrown by user-supplied Standard Schema validators.
 - `index.ts` — the package barrel. Tests import from the barrel, not deep paths; new public API must be re-exported here.
 

@@ -8,6 +8,15 @@ export {
   type PresenceOf,
 } from "./codec.js";
 export {
+  type CodecDefaultDescription,
+  type CodecDescription,
+  describeCodec,
+  describeRoute,
+  type ParamDescription,
+  type RouteDescription,
+  type SearchDescription,
+} from "./describe.js";
+export {
   type Issue,
   ParamourError,
   ParamsDecodeError,

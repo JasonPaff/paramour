@@ -29,7 +29,9 @@
   },
   "dependencies": {
     "jiti": "^2.7.0",
-    "paramour": "workspace:*"
+    "magicast": "^0.3.5",
+    "paramour": "workspace:*",
+    "tinyglobby": "^0.2.15"
   },
   "peerDependencies": {
     "next": ">=15",

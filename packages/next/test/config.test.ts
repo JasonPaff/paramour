@@ -117,6 +117,29 @@ describe("loadConfigFile (TR7 / §7.2)", () => {
     expect(loaded?.config).toEqual({ pagesDir: "legacy-pages" });
   });
 
+  it("accepts routeFiles globs", async () => {
+    const root = makeProject({
+      "paramour.config.json": `{ "routeFiles": ["src/routes/**/*.ts"] }`,
+    });
+    const loaded = await loadConfigFile(root);
+    expect(loaded?.config).toEqual({ routeFiles: ["src/routes/**/*.ts"] });
+  });
+
+  it("rejects malformed routeFiles", async () => {
+    const cases = [
+      `{ "routeFiles": "src/routes/**" }`,
+      `{ "routeFiles": [] }`,
+      `{ "routeFiles": ["src/routes/**", 7] }`,
+      `{ "routeFiles": [""] }`,
+    ];
+    for (const json of cases) {
+      const root = makeProject({ "paramour.config.json": json });
+      await expect(loadConfigFile(root)).rejects.toThrow(
+        /`routeFiles` must be a non-empty array of non-empty glob strings/,
+      );
+    }
+  });
+
   it("rejects unknown keys (typo protection)", async () => {
     const root = makeProject({
       "paramour.config.json": `{ "pagesExtensions": ["tsx"] }`,

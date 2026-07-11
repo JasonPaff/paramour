@@ -67,6 +67,14 @@ export interface Codec<
   readonly "~defaultElides": boolean;
   /** Stored as a thunk regardless of the form passed to `.default()`. */
   readonly "~defaultValue": (() => Out) | undefined;
+  /** Members of a `p.enum` codec; undefined for every other kind. */
+  readonly "~enumMembers": readonly string[] | undefined;
+  /**
+   * Which builder produced the codec (`"integer"`, `"enum"`, …; `p.custom`
+   * uses its `label` or `"custom"`). Reflection metadata for describeCodec —
+   * never consulted by parse/serialize.
+   */
+  readonly "~kind": string;
   /** phantom — carries `Out` for inference; never set at runtime */
   readonly "~out": Out;
 
@@ -94,6 +102,8 @@ interface CodecState<Out> {
   readonly catchValue: (() => Out) | undefined;
   readonly defaultElides: boolean;
   readonly defaultValue: (() => Out) | undefined;
+  readonly enumMembers: readonly string[] | undefined;
+  readonly kind: string;
   readonly parseElement: (raw: string) => unknown;
   readonly presence: Presence;
   readonly serializeElement: (value: unknown) => string;
@@ -102,6 +112,8 @@ interface CodecState<Out> {
 /** Internal factory used by the `p.*` builders. */
 export function createCodec<Out, A extends Arity = "single">(impl: {
   arity?: A;
+  enumMembers?: readonly string[];
+  kind?: string;
   parseElement: (raw: string) => unknown;
   serializeElement: (value: unknown) => string;
 }): Codec<Out, "required", false, A> {
@@ -110,6 +122,8 @@ export function createCodec<Out, A extends Arity = "single">(impl: {
     catchValue: undefined,
     defaultElides: false,
     defaultValue: undefined,
+    enumMembers: impl.enumMembers,
+    kind: impl.kind ?? "custom",
     parseElement: impl.parseElement,
     presence: "required",
     serializeElement: impl.serializeElement,
@@ -171,6 +185,8 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
     "~caught": state.catchValue !== undefined,
     "~defaultElides": state.defaultElides,
     "~defaultValue": state.defaultValue,
+    "~enumMembers": state.enumMembers,
+    "~kind": state.kind,
 
     "~parseElement": state.parseElement,
     "~presence": state.presence,

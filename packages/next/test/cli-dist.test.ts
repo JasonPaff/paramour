@@ -49,6 +49,26 @@ describe.skipIf(!existsSync(distCli))("dist/cli.js (TR7 bin)", () => {
     expect(result.stderr).toContain("- /old");
   });
 
+  it("the check alias and the global help work through the built bin", () => {
+    const root = makeTempDir();
+    makeTree(root, ["app/page.tsx"]);
+    writeFileSync(join(root, "paramour-env.d.ts"), emitApp(["/"]));
+    const check = spawnSync(process.execPath, [distCli, "check"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    expect(check.status).toBe(0);
+    expect(check.stdout).toContain("up to date");
+    const help = spawnSync(process.execPath, [distCli, "--help"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    expect(help.status).toBe(0);
+    for (const command of ["check", "doctor", "generate", "init", "list"]) {
+      expect(help.stdout).toContain(command);
+    }
+  });
+
   it("loads a paramour.config.ts through jiti from the built bin", () => {
     const root = makeTempDir();
     makeTree(root, ["docs/page.mdx"]);

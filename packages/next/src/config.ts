@@ -15,6 +15,13 @@ export interface ParamourConfig {
   pageExtensions?: string[];
   /** Pages dir, relative to the project root; default: joint discovery (PR8). */
   pagesDir?: string;
+  /**
+   * Globs (relative to the project root) of modules exporting route
+   * definitions, for `paramour list`/`doctor` only — generation never reads
+   * it. Overrides their automatic defineAppRoute/definePagesRoute content
+   * scan when the heuristic misfires.
+   */
+  routeFiles?: string[];
 }
 
 /** @internal Discovery order at the project root (TR7) — first match wins. */
@@ -70,7 +77,7 @@ export async function loadConfigFile(
 }
 
 /**
- * Hand-rolled validation: a 4-key schema can afford to reject unknown keys —
+ * Hand-rolled validation: a 5-key schema can afford to reject unknown keys —
  * a silently ignored `pagesExtensions` typo is exactly the footgun this
  * prevents. Throws with the file and key named; the CLI maps it to exit 2.
  */
@@ -113,6 +120,21 @@ function validateConfig(value: unknown, sourceName: string): ParamourConfig {
           );
         }
         config.pageExtensions = entry;
+        break;
+      }
+      case "routeFiles": {
+        if (
+          !Array.isArray(entry) ||
+          entry.length === 0 ||
+          !entry.every(
+            (glob): glob is string => typeof glob === "string" && glob !== "",
+          )
+        ) {
+          throw new Error(
+            `${sourceName}: \`routeFiles\` must be a non-empty array of non-empty glob strings`,
+          );
+        }
+        config.routeFiles = entry;
         break;
       }
       default:
