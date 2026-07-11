@@ -205,6 +205,31 @@ describe("route parse methods (RL6)", () => {
     ).rejects.toThrow(/route props promise rejected: boom/);
   });
 
+  it("a framework control-flow rejection (string digest) passes through UNWRAPPED", async () => {
+    // Next rejects the searchParams promise itself with its dynamic-usage
+    // sentinel during a generateStaticParams prerender; the digest is how
+    // Next recognizes its own bailout, so branding it fails the build.
+    const sentinel = Object.assign(new Error("Dynamic server usage"), {
+      digest: "DYNAMIC_SERVER_USAGE",
+    });
+    await expect(
+      route.parse({
+        params: Promise.resolve({ id: "42" }),
+        searchParams: Promise.reject(sentinel),
+      }),
+    ).rejects.toBe(sentinel);
+    // A digest-less rejection still gets the ParamourError brand (the test
+    // above); a NON-STRING digest is not the convention and brands too.
+    await expect(
+      route.parse({
+        params: Promise.resolve({ id: "42" }),
+        searchParams: Promise.reject(
+          Object.assign(new Error("boom"), { digest: 42 }),
+        ),
+      }),
+    ).rejects.toThrow(/route props promise rejected: boom/);
+  });
+
   it("parseParams resolves to the bare params object", async () => {
     await expect(route.parseParams({ params: { id: "42" } })).resolves.toEqual({
       id: 42,

@@ -501,13 +501,26 @@ function pickOwn(
 /**
  * A props promise is user/framework code — a rejection is branded at this
  * chokepoint (paramour's own errors pass through), keeping the "every throw
- * is a ParamourError" contract.
+ * is a ParamourError" contract. ONE deliberate exception: Next's control-flow
+ * errors carry a string `digest` (`DYNAMIC_SERVER_USAGE`, `NEXT_REDIRECT`, …
+ * — the same convention `unstable_rethrow` keys on) and MUST propagate
+ * unwrapped. Next rejects the searchParams promise itself with the
+ * dynamic-usage sentinel during a `generateStaticParams` prerender; wrapping
+ * it hides the digest, and what should be a graceful bail-to-dynamic becomes
+ * a failed build.
  */
 async function rebrandRejection<T>(promise: Promise<T>): Promise<T> {
   try {
     return await promise;
   } catch (error) {
     if (error instanceof ParamourError) throw error;
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      typeof (error as { digest?: unknown }).digest === "string"
+    ) {
+      throw error;
+    }
     throw new ParamourError(
       `route props promise rejected: ${foreignMessage(error)}`,
       { cause: error },
