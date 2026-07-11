@@ -91,6 +91,53 @@ test("app route is accepted and each hook returns its exact type (PR3/PR12)", ()
   }>().type.toBeAssignableTo<typeof searchOrThrow>();
 });
 
+test("select overloads project the result type (design-07 SEL1/SEL2)", () => {
+  // Safe hooks: SafeResult<U>, with U inferred from the selector's return.
+  expect(useSearch(appRoute, { select: (search) => search.page })).type.toBe<
+    SafeResult<number>
+  >();
+  expect(useRouteParams(appRoute, { select: (params) => params.id })).type.toBe<
+    SafeResult<number>
+  >();
+
+  // OrThrow hooks: bare U.
+  expect(
+    useSearchOrThrow(appRoute, { select: (search) => search.q }),
+  ).type.toBe<string | undefined>();
+  expect(
+    useRouteParamsOrThrow(appRoute, { select: (params) => params.id }),
+  ).type.toBe<number>();
+
+  // The selector's input is the decoded output type — no annotation needed.
+  useSearch(appRoute, {
+    select: (search) => {
+      expect(search.page).type.toBe<number>();
+      expect(search.q).type.toBe<string | undefined>();
+      return search.page;
+    },
+  });
+
+  // A rawSearch route's selector receives the SCHEMA output (design-04 SS6).
+  expect(useSearch(rawRoute, { select: (search) => search.q })).type.toBe<
+    SafeResult<string>
+  >();
+});
+
+test('equality is the literal "shallow" opt-in only (design-07 SEL3)', () => {
+  expect(useSearch).type.toBeCallableWith(appRoute, {
+    equality: "shallow",
+    select: (search: { page: number; q: string | undefined }) => search.page,
+  });
+  expect(useSearch).type.not.toBeCallableWith(appRoute, {
+    equality: "deep",
+    select: (search: { page: number; q: string | undefined }) => search.page,
+  });
+  // No selector-less options bag: equality only means something with select.
+  expect(useSearch).type.not.toBeCallableWith(appRoute, {
+    equality: "shallow",
+  });
+});
+
 test("rawSearch route infers the schema output, not the marker shape (app.ts cast)", () => {
   // useSearchOrThrow's `as SearchOutputOf<R["~search"]>` cast bridges the
   // AnyAppRoute inference gap to the schema's own output type.

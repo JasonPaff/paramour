@@ -59,6 +59,31 @@ test("pages route is accepted and each hook returns its RouterResult (PR3/PR5)",
   >().type.toBeAssignableTo<typeof search>();
 });
 
+test("select overloads project the RouterResult (design-07 SEL1/SEL2)", () => {
+  // U is inferred from the selector; the pending arm stays in the union.
+  expect(useSearch(pagesRoute, { select: (search) => search.page })).type.toBe<
+    RouterResult<number>
+  >();
+  expect(
+    useRouteParams(pagesRoute, { select: (params) => params.id }),
+  ).type.toBe<RouterResult<number>>();
+
+  // The selector's input is the decoded output type — no annotation needed.
+  useSearch(pagesRoute, {
+    select: (search) => {
+      expect(search.page).type.toBe<number>();
+      expect(search.q).type.toBe<string | undefined>();
+      return search.page;
+    },
+  });
+
+  // Same equality opt-in as the /app twin (SEL3).
+  expect(useSearch).type.not.toBeCallableWith(pagesRoute, {
+    equality: "deep",
+    select: (search: { page: number; q: string | undefined }) => search.page,
+  });
+});
+
 test("the pending arm is in the union and forces narrowing (PR5/PR6)", () => {
   // RouterResult<T> is literally SafeResult<T> | { status: "pending" } (PR12),
   // so both routers' results destructure identically.

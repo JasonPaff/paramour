@@ -40,7 +40,7 @@ const rawRoute = defineAppRoute("/raw", {
   ),
 });
 
-describe("useSearch (smoke: useMemo ↔ useSearchParams wiring)", () => {
+describe("useSearch (smoke: hook ↔ useSearchParams wiring)", () => {
   it("returns the success arm for a valid search string", () => {
     __setSearchParams(new URLSearchParams("page=2&q=hi"));
     const { result } = renderHook(() => useSearch(productRoute));
@@ -59,7 +59,7 @@ describe("useSearch (smoke: useMemo ↔ useSearchParams wiring)", () => {
   });
 });
 
-describe("useRouteParams (smoke: useMemo ↔ useParams wiring)", () => {
+describe("useRouteParams (smoke: hook ↔ useParams wiring)", () => {
   it("returns the success arm for a valid params object", () => {
     __setParams({ id: "42" });
     const { result } = renderHook(() => useRouteParams(productRoute));
@@ -121,7 +121,7 @@ describe("*OrThrow variants throw to the error boundary", () => {
   });
 });
 
-describe("memoization is keyed on the Next hook's reference", () => {
+describe("raw-slice stabilization (design-07 SEL4)", () => {
   it("returns the identical result object across rerenders with the same URLSearchParams", () => {
     __setSearchParams(new URLSearchParams("page=2"));
     const { rerender, result } = renderHook(() => useSearch(productRoute));
@@ -130,67 +130,87 @@ describe("memoization is keyed on the Next hook's reference", () => {
     expect(result.current).toBe(first);
   });
 
-  it("recomputes when a NEW URLSearchParams with identical text arrives", () => {
+  it("a NEW URLSearchParams with an identical declared slice keeps the identical result", () => {
     __setSearchParams(new URLSearchParams("page=2"));
     const { rerender, result } = renderHook(() => useSearch(productRoute));
     const first = result.current;
     __setSearchParams(new URLSearchParams("page=2"));
     rerender();
-    expect(result.current).not.toBe(first);
-    expect(result.current).toEqual(first);
+    expect(result.current).toBe(first);
   });
 
-  it("useRouteParams returns the identical result object across rerenders with the same params", () => {
-    __setParams({ id: "42" });
-    const { rerender, result } = renderHook(() => useRouteParams(productRoute));
+  it("unknown-key churn (?utm_source=) keeps the identical result — no re-decode", () => {
+    __setSearchParams(new URLSearchParams("page=2&utm_source=a"));
+    const { rerender, result } = renderHook(() => useSearch(productRoute));
     const first = result.current;
+    __setSearchParams(new URLSearchParams("page=2&utm_source=b"));
     rerender();
     expect(result.current).toBe(first);
   });
 
-  it("useRouteParams recomputes when a NEW params object with identical content arrives", () => {
-    __setParams({ id: "42" });
-    const { rerender, result } = renderHook(() => useRouteParams(productRoute));
+  it("a changed declared key busts the fingerprint and re-decodes", () => {
+    __setSearchParams(new URLSearchParams("page=2"));
+    const { rerender, result } = renderHook(() => useSearch(productRoute));
     const first = result.current;
-    __setParams({ id: "42" });
+    __setSearchParams(new URLSearchParams("page=3"));
+    rerender();
+    expect(result.current).not.toBe(first);
+    expect(result.current).toEqual({ data: { page: 3 }, status: "success" });
+  });
+
+  it("the ERROR arm is stabilized too: same malformed slice, new URLSearchParams", () => {
+    __setSearchParams(new URLSearchParams("page=abc"));
+    const { rerender, result } = renderHook(() => useSearch(productRoute));
+    const first = result.current;
+    expect(first.status).toBe("error");
+    __setSearchParams(new URLSearchParams("page=abc&utm_source=x"));
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("a rawSearch route's slice is ALL keys: unknown-key churn re-decodes there", () => {
+    // The whole-object schema legitimately sees every key (P8 does not apply),
+    // so no declared subset exists to stabilize on.
+    __setSearchParams(new URLSearchParams("page=2&q=hi&utm_source=a"));
+    const { rerender, result } = renderHook(() => useSearch(rawRoute));
+    const first = result.current;
+    __setSearchParams(new URLSearchParams("page=2&q=hi&utm_source=b"));
     rerender();
     expect(result.current).not.toBe(first);
     expect(result.current).toEqual(first);
   });
 
-  it("useRouteParamsOrThrow returns the identical decoded object across rerenders with the same params", () => {
+  it("useRouteParams keeps the identical result for a NEW params object with identical content", () => {
+    __setParams({ id: "42" });
+    const { rerender, result } = renderHook(() => useRouteParams(productRoute));
+    const first = result.current;
+    __setParams({ id: "42" });
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("useRouteParams re-decodes when a segment value actually changes", () => {
+    __setParams({ id: "42" });
+    const { rerender, result } = renderHook(() => useRouteParams(productRoute));
+    const first = result.current;
+    __setParams({ id: "43" });
+    rerender();
+    expect(result.current).not.toBe(first);
+    expect(result.current).toEqual({ data: { id: 43 }, status: "success" });
+  });
+
+  it("useRouteParamsOrThrow keeps the identical decoded object for a NEW identical params object", () => {
     __setParams({ id: "42" });
     const { rerender, result } = renderHook(() =>
       useRouteParamsOrThrow(productRoute),
     );
     const first = result.current;
+    __setParams({ id: "42" });
     rerender();
     expect(result.current).toBe(first);
   });
 
-  it("useRouteParamsOrThrow recomputes when a NEW params object with identical content arrives", () => {
-    __setParams({ id: "42" });
-    const { rerender, result } = renderHook(() =>
-      useRouteParamsOrThrow(productRoute),
-    );
-    const first = result.current;
-    __setParams({ id: "42" });
-    rerender();
-    expect(result.current).not.toBe(first);
-    expect(result.current).toEqual(first);
-  });
-
-  it("useSearchOrThrow returns the identical decoded object across rerenders with the same URLSearchParams", () => {
-    __setSearchParams(new URLSearchParams("page=2&q=hi"));
-    const { rerender, result } = renderHook(() =>
-      useSearchOrThrow(productRoute),
-    );
-    const first = result.current;
-    rerender();
-    expect(result.current).toBe(first);
-  });
-
-  it("useSearchOrThrow recomputes when a NEW URLSearchParams with identical text arrives", () => {
+  it("useSearchOrThrow keeps the identical decoded object for a NEW identical URLSearchParams", () => {
     __setSearchParams(new URLSearchParams("page=2&q=hi"));
     const { rerender, result } = renderHook(() =>
       useSearchOrThrow(productRoute),
@@ -198,8 +218,141 @@ describe("memoization is keyed on the Next hook's reference", () => {
     const first = result.current;
     __setSearchParams(new URLSearchParams("page=2&q=hi"));
     rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("a route swap at the same call site busts the cache even with an equal fingerprint", () => {
+    const twinRoute = defineAppRoute("/product/[id]", {
+      params: { id: p.integer() },
+      search: {
+        page: p.integer().default(1),
+        q: p.string().optional(),
+      },
+    });
+    __setSearchParams(new URLSearchParams("page=2"));
+    const { rerender, result } = renderHook(
+      ({ route }: { route: typeof productRoute }) => useSearch(route),
+      { initialProps: { route: productRoute } },
+    );
+    const first = result.current;
+    rerender({ route: twinRoute });
     expect(result.current).not.toBe(first);
     expect(result.current).toEqual(first);
+  });
+});
+
+describe("selectors (design-07 SEL1–SEL6)", () => {
+  it("useSearch projects the success arm through select (SEL2)", () => {
+    __setSearchParams(new URLSearchParams("page=2&q=hi"));
+    const { result } = renderHook(() =>
+      useSearch(productRoute, { select: (search) => search.page }),
+    );
+    expect(result.current).toEqual({ data: 2, status: "success" });
+  });
+
+  it("an unchanged selection keeps its previous wrapper when ANOTHER param changes", () => {
+    __setSearchParams(new URLSearchParams("page=2&q=hi"));
+    const { rerender, result } = renderHook(() =>
+      useSearch(productRoute, { select: (search) => search.page }),
+    );
+    const first = result.current;
+    __setSearchParams(new URLSearchParams("page=2&q=bye"));
+    rerender();
+    // The decode re-ran (q changed), but the selected slice is Object.is-equal
+    // — the WRAPPER object comes back by identity (SEL2/SEL3). Inline-arrow
+    // selector identity churn across renders is irrelevant (SEL6).
+    expect(result.current).toBe(first);
+  });
+
+  it("a changed selection produces a new wrapper", () => {
+    __setSearchParams(new URLSearchParams("page=2&q=hi"));
+    const { rerender, result } = renderHook(() =>
+      useSearch(productRoute, { select: (search) => search.page }),
+    );
+    const first = result.current;
+    __setSearchParams(new URLSearchParams("page=3&q=hi"));
+    rerender();
+    expect(result.current).not.toBe(first);
+    expect(result.current).toEqual({ data: 3, status: "success" });
+  });
+
+  it("the error arm passes through the selector untouched (SEL2)", () => {
+    __setSearchParams(new URLSearchParams("page=abc"));
+    const { result } = renderHook(() =>
+      useSearch(productRoute, { select: (search) => search.page }),
+    );
+    expect(result.current.status).toBe("error");
+    if (result.current.status !== "error") return;
+    expect(result.current.error).toBeInstanceOf(SearchDecodeError);
+  });
+
+  it('an object selection churns under Object.is but holds with equality: "shallow" (SEL3)', () => {
+    __setSearchParams(new URLSearchParams("page=2&q=hi"));
+    const plain = renderHook(() =>
+      useSearch(productRoute, {
+        select: (search) => ({ page: search.page }),
+      }),
+    );
+    const shallow = renderHook(() =>
+      useSearch(productRoute, {
+        equality: "shallow",
+        select: (search) => ({ page: search.page }),
+      }),
+    );
+    const firstPlain = plain.result.current;
+    const firstShallow = shallow.result.current;
+    __setSearchParams(new URLSearchParams("page=2&q=bye"));
+    plain.rerender();
+    shallow.rerender();
+    // Default Object.is: a fresh { page } object per selector run → new wrapper.
+    expect(plain.result.current).not.toBe(firstPlain);
+    expect(plain.result.current).toEqual(firstPlain);
+    // "shallow": same one-level contents → previous wrapper by identity.
+    expect(shallow.result.current).toBe(firstShallow);
+  });
+
+  it("a selector throw propagates to the error boundary, never the error arm (SEL5)", () => {
+    __setSearchParams(new URLSearchParams("page=2"));
+    expect(() =>
+      renderHook(() =>
+        useSearch(productRoute, {
+          select: (): never => {
+            throw new Error("selector bug");
+          },
+        }),
+      ),
+    ).toThrow("selector bug");
+  });
+
+  it("useSearchOrThrow returns the bare selection, stable across unrelated churn", () => {
+    __setSearchParams(new URLSearchParams("page=2&q=hi"));
+    const { rerender, result } = renderHook(() =>
+      useSearchOrThrow(productRoute, { select: (search) => search.page }),
+    );
+    expect(result.current).toBe(2);
+    __setSearchParams(new URLSearchParams("page=2&q=bye"));
+    rerender();
+    expect(result.current).toBe(2);
+  });
+
+  it("useRouteParams and useRouteParamsOrThrow take the same selector surface (SEL1)", () => {
+    __setParams({ id: "42" });
+    const safe = renderHook(() =>
+      useRouteParams(productRoute, { select: (params) => params.id }),
+    );
+    expect(safe.result.current).toEqual({ data: 42, status: "success" });
+    const orThrow = renderHook(() =>
+      useRouteParamsOrThrow(productRoute, { select: (params) => params.id }),
+    );
+    expect(orThrow.result.current).toBe(42);
+  });
+
+  it("rawSearch routes select from the schema's output", () => {
+    __setSearchParams(new URLSearchParams("page=2&q=hi"));
+    const { result } = renderHook(() =>
+      useSearch(rawRoute, { select: (search) => search.q }),
+    );
+    expect(result.current).toEqual({ data: "hi", status: "success" });
   });
 });
 

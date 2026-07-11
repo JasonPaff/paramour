@@ -280,7 +280,7 @@ describe("foreign useRouter failures propagate untranslated (PR5)", () => {
   });
 });
 
-describe("memoization is keyed on router.query + router.isReady", () => {
+describe("raw-slice stabilization (design-07 SEL4)", () => {
   it("returns the identical result object across rerenders with the same query", () => {
     const query = { id: "42" };
     __setQuery(query);
@@ -290,32 +290,54 @@ describe("memoization is keyed on router.query + router.isReady", () => {
     expect(result.current).toBe(first);
   });
 
-  it("recomputes when a NEW query object with identical text arrives", () => {
+  it("a NEW query object with an identical declared slice keeps the identical result", () => {
     __setQuery({ id: "42" });
     const { rerender, result } = renderHook(() => useRouteParams(productRoute));
     const first = result.current;
     __setQuery({ id: "42" });
     rerender();
-    expect(result.current).not.toBe(first);
-    expect(result.current).toEqual(first);
+    expect(result.current).toBe(first);
   });
 
-  it("useSearch returns the identical result object across rerenders with the same query", () => {
+  it("useSearch keeps the identical result for a NEW query with an identical declared slice", () => {
     __setQuery({ id: "42", page: "2" });
     const { rerender, result } = renderHook(() => useSearch(productRoute));
     const first = result.current;
+    __setQuery({ id: "42", page: "2" });
     rerender();
     expect(result.current).toBe(first);
   });
 
-  it("useSearch recomputes when a NEW query object with identical text arrives", () => {
+  it("unknown-key churn (?utm_source=) in the query bag keeps the identical result", () => {
+    __setQuery({ id: "42", page: "2", utm_source: "a" });
+    const { rerender, result } = renderHook(() => useSearch(productRoute));
+    const first = result.current;
+    __setQuery({ id: "42", page: "2", utm_source: "b" });
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("a changed declared key busts the fingerprint and re-decodes", () => {
     __setQuery({ id: "42", page: "2" });
     const { rerender, result } = renderHook(() => useSearch(productRoute));
     const first = result.current;
-    __setQuery({ id: "42", page: "2" });
+    __setQuery({ id: "42", page: "3" });
     rerender();
     expect(result.current).not.toBe(first);
-    expect(result.current).toEqual(first);
+    expect(result.current).toEqual({ data: { page: 3 }, status: "success" });
+  });
+
+  it("a rawSearch route's slice is every non-param key: unknown-key churn re-decodes", () => {
+    // strictRoute's schema rejects unknown keys, so the second decode landing
+    // in the ERROR arm proves the changed unknown key actually re-decoded —
+    // the path param `id` alone stays outside the fingerprint (PR5
+    // subtraction).
+    __setQuery({ id: "7", q: "hi" });
+    const { rerender, result } = renderHook(() => useSearch(strictRoute));
+    expect(result.current.status).toBe("success");
+    __setQuery({ id: "7", q: "hi", utm_source: "a" });
+    rerender();
+    expect(result.current.status).toBe("error");
   });
 
   it("pending results share one referentially stable object across hooks", () => {
@@ -323,5 +345,65 @@ describe("memoization is keyed on router.query + router.isReady", () => {
     const params = renderHook(() => useRouteParams(productRoute));
     const search = renderHook(() => useSearch(productRoute));
     expect(params.result.current).toBe(search.result.current);
+  });
+});
+
+describe("selectors (design-07 SEL1–SEL6)", () => {
+  it("useSearch projects the success arm through select (SEL2)", () => {
+    __setQuery({ id: "42", page: "2" });
+    const { result } = renderHook(() =>
+      useSearch(productRoute, { select: (search) => search.page }),
+    );
+    expect(result.current).toEqual({ data: 2, status: "success" });
+  });
+
+  it("the pending arm passes through the selector untouched (SEL2)", () => {
+    __setIsReady(false);
+    const { result } = renderHook(() =>
+      useSearch(productRoute, { select: (search) => search.page }),
+    );
+    expect(result.current).toEqual({ status: "pending" });
+  });
+
+  it("an unchanged selection keeps its previous wrapper when ANOTHER param changes", () => {
+    __setQuery({ id: "42", page: "2", q: "hi" });
+    const { rerender, result } = renderHook(() =>
+      useSearch(productRoute, { select: (search) => search.page }),
+    );
+    const first = result.current;
+    __setQuery({ id: "42", page: "2", q: "bye" });
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("the error arm passes through the selector untouched (SEL2)", () => {
+    __setQuery({ id: "42", page: "abc" });
+    const { result } = renderHook(() =>
+      useSearch(productRoute, { select: (search) => search.page }),
+    );
+    expect(result.current.status).toBe("error");
+    if (result.current.status !== "error") return;
+    expect(result.current.error).toBeInstanceOf(SearchDecodeError);
+  });
+
+  it("useRouteParams takes the same selector surface (SEL1)", () => {
+    __setQuery({ id: "42" });
+    const { result } = renderHook(() =>
+      useRouteParams(productRoute, { select: (params) => params.id }),
+    );
+    expect(result.current).toEqual({ data: 42, status: "success" });
+  });
+
+  it("a selector throw propagates, never becoming an arm (SEL5)", () => {
+    __setQuery({ id: "42", page: "2" });
+    expect(() =>
+      renderHook(() =>
+        useSearch(productRoute, {
+          select: (): never => {
+            throw new Error("selector bug");
+          },
+        }),
+      ),
+    ).toThrow("selector bug");
   });
 });

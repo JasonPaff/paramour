@@ -9,12 +9,22 @@ import {
   type SafeResult,
   type SearchOutputOf,
 } from "paramour";
-import { useMemo } from "react";
+
+import {
+  paramsFingerprint,
+  PENDING_FINGERPRINT,
+  queryFingerprint,
+  type SelectOptions,
+  useSelectedResult,
+  useStableResult,
+} from "./select.js";
+
+export type { SelectOptions } from "./select.js";
 
 /**
- * Pages Router hooks (design-06 PR5/PR6). Deliberately NO `"use client"`
- * directive on this module: the directive is an App Router (RSC graph)
- * concept, meaningless in a `pages/` bundle (PR2).
+ * Pages Router hooks (design-06 PR5/PR6, design-07). Deliberately NO
+ * `"use client"` directive on this module: the directive is an App Router
+ * (RSC graph) concept, meaningless in a `pages/` bundle (PR2).
  *
  * `useRouter().query` is one merged bag (route params + search), and on a
  * statically-optimized page it is `{}` until `router.isReady` flips after
@@ -30,9 +40,11 @@ import { useMemo } from "react";
  * their page has `getServerSideProps` should be reading typed props from
  * `route.parseContext(ctx)` (PR10) rather than reaching for a client hook.
  *
- * Both hooks are gated to `AnyPagesRoute` (PR3) and stay a `useMemo` over
- * the `useRouter()` value, keyed on `query` + `isReady` — pure and
- * React-Compiler-friendly, the same discipline as the /app hooks.
+ * Both hooks are gated to `AnyPagesRoute` (PR3) and share the /app hooks'
+ * design-07 layering: raw-slice stabilization keyed on the declared slice of
+ * `query` (+ `isReady`), then an optional `{ select }` projection with
+ * result-equality checking — the `pending` arm passes through the selector
+ * untouched (SEL2), and `PENDING` itself is one referentially stable object.
  */
 
 /**
@@ -46,30 +58,62 @@ export type RouterResult<T> = SafeResult<T> | { status: "pending" };
 /** Referentially stable across every pending render. */
 const PENDING: { readonly status: "pending" } = { status: "pending" };
 
-/** Decoded route params as a {@link RouterResult} (PR5). */
+/**
+ * Decoded route params as a {@link RouterResult} (PR5), optionally projected
+ * through `options.select` (design-07 SEL1/SEL2).
+ */
 export function useRouteParams<R extends AnyPagesRoute>(
   route: R,
-): RouterResult<InferRouteParams<R>> {
+): RouterResult<InferRouteParams<R>>;
+export function useRouteParams<R extends AnyPagesRoute, U>(
+  route: R,
+  options: SelectOptions<InferRouteParams<R>, U>,
+): RouterResult<U>;
+export function useRouteParams<R extends AnyPagesRoute, U>(
+  route: R,
+  options?: SelectOptions<InferRouteParams<R>, U>,
+): RouterResult<InferRouteParams<R>> | RouterResult<U> {
   const { isReady, query } = usePagesRouter();
-  return useMemo(() => {
-    if (!isReady) return PENDING;
-    // The merged query is a legal params source as-is: decodeParams reads
-    // only the route's own segment names, never unknown keys. R5: next/router
-    // has already percent-decoded `query`, so skip core's decode to avoid a
-    // double-decode (`/product/a%2520b` → `"a%20b"` must survive as-is).
-    return safeDecodeParams(route, query, { percentDecode: false });
-  }, [isReady, query, route]);
+  const result = useStableResult(
+    route,
+    isReady ? paramsFingerprint(route, query) : PENDING_FINGERPRINT,
+    (): RouterResult<InferRouteParams<R>> => {
+      if (!isReady) return PENDING;
+      // The merged query is a legal params source as-is: decodeParams reads
+      // only the route's own segment names, never unknown keys. R5: next/router
+      // has already percent-decoded `query`, so skip core's decode to avoid a
+      // double-decode (`/product/a%2520b` → `"a%20b"` must survive as-is).
+      return safeDecodeParams(route, query, { percentDecode: false });
+    },
+  );
+  return useSelectedResult(result, options);
 }
 
-/** Decoded search params as a {@link RouterResult} (PR5). */
+/**
+ * Decoded search params as a {@link RouterResult} (PR5), optionally projected
+ * through `options.select` (design-07 SEL1/SEL2).
+ */
 export function useSearch<R extends AnyPagesRoute>(
   route: R,
-): RouterResult<SearchOutputOf<R["~search"]>> {
+): RouterResult<SearchOutputOf<R["~search"]>>;
+export function useSearch<R extends AnyPagesRoute, U>(
+  route: R,
+  options: SelectOptions<SearchOutputOf<R["~search"]>, U>,
+): RouterResult<U>;
+export function useSearch<R extends AnyPagesRoute, U>(
+  route: R,
+  options?: SelectOptions<SearchOutputOf<R["~search"]>, U>,
+): RouterResult<SearchOutputOf<R["~search"]>> | RouterResult<U> {
   const { isReady, query } = usePagesRouter();
-  return useMemo(() => {
-    if (!isReady) return PENDING;
-    return safeDecodeSearch(route, omitPathParams(query, route));
-  }, [isReady, query, route]);
+  const result = useStableResult(
+    route,
+    isReady ? queryFingerprint(route, query) : PENDING_FINGERPRINT,
+    (): RouterResult<SearchOutputOf<R["~search"]>> => {
+      if (!isReady) return PENDING;
+      return safeDecodeSearch(route, omitPathParams(query, route));
+    },
+  );
+  return useSelectedResult(result, options);
 }
 
 /**
