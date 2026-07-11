@@ -20,9 +20,10 @@ export default function FindPage() {
         <code>useSearch</code>. On a hard load the router starts{" "}
         <code>pending</code>; try{" "}
         <code>/find?q=cable&amp;tag=audio&amp;tag=usb&amp;max=5</code>, and{" "}
-        <code>/find?max=not-a-number</code> for the error arm. Or edit the form
-        below — it replaces the URL with <code>router.replace(href(...))</code>{" "}
-        and the hook re-decodes it.
+        <code>/find?max=not-a-number</code> or <code>/find?q=a</code> (a Valibot
+        min-length refinement, not the wire grammar) for the error arm. Or edit
+        the form below — it replaces the URL with{" "}
+        <code>router.replace(href(...))</code> and the hook re-decodes it.
       </p>
 
       {search.status === "pending" ? (
@@ -39,7 +40,8 @@ export default function FindPage() {
         <>
           <dl className="kv">
             <dt>
-              <code>search.q</code> — <code>p.string().optional()</code>
+              <code>search.q</code> —{" "}
+              <code>p.string(searchQuery).optional()</code>
             </dt>
             <dd>{search.data.q ?? "(absent)"}</dd>
             <dt>

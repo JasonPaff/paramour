@@ -27,7 +27,9 @@ export function FindForm({
     // emptied field disappears from the URL rather than serializing as "".
     // `tag` has no control here and carries through unchanged.
     const search: InferSearchInput<typeof findSearch> = { tag: current.tag };
-    if (typeof q === "string" && q !== "") search.q = q;
+    // Schemas run on serialize too: a 1-char q would fail the Valibot
+    // min-length inside href() as a SerializeError, so drop it instead.
+    if (typeof q === "string" && q.length >= 2) search.q = q;
     if (typeof max === "string" && max !== "") {
       // Guard the cast from the (string-typed) form field: a non-integer
       // would make p.integer throw a SerializeError inside href().
@@ -43,7 +45,7 @@ export function FindForm({
     <form className="panel" onSubmit={onSubmit}>
       <h2>Replace the URL</h2>
       <label className="field">
-        <span>q — p.string().optional()</span>
+        <span>q — p.string(searchQuery).optional()</span>
         <input defaultValue={current.q ?? ""} name="q" placeholder="cable" />
       </label>
       <label className="field">

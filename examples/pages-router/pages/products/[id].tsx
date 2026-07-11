@@ -40,7 +40,10 @@ export default function ProductPage({
       <p className="lede">
         Decoded on the server with <code>route.safeParseContext(ctx)</code> in{" "}
         <code>getServerSideProps</code>. Every value below is its real in-memory
-        type, not a raw string.
+        type, not a raw string. The <code>id</code> param carries a Valibot
+        positive-int refinement on top of <code>p.integer</code>'s wire grammar:{" "}
+        <code>/products/not-a-number</code> and <code>/products/0</code> are
+        both 404s.
       </p>
       <p className="eyebrow">Decoded on the server</p>
       <dl className="kv">
@@ -63,7 +66,9 @@ export default function ProductPage({
       <p className="eyebrow">Imperative navigation</p>
       {/* router.push takes Url | string, and Href is a string subtype, so
           the branded href() output flows in with no cast. Each push runs
-          getServerSideProps again and re-decodes the new URL. */}
+          getServerSideProps again and re-decodes the new URL. Schemas run on
+          serialize too — disabling prev at id <= 1 keeps id - 1 clear of the
+          Valibot minValue(1), which would throw inside href(). */}
       <div className="pager">
         <button
           className="btn"

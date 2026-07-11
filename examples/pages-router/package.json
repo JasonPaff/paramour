@@ -14,7 +14,8 @@
     "next": "^16.2.0",
     "paramour": "workspace:*",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "valibot": "^1.4.2"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

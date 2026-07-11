@@ -12,9 +12,16 @@ What it demonstrates:
   extension _is_ a page.
 - **Server-surface parsing** — `safeParseContext` in `getServerSideProps`
   (`/products/[id]`; a malformed URL becomes `notFound: true` — try
-  `/products/not-a-number`), and throwing `parseContext` in
+  `/products/not-a-number`, or `/products/0` for a schema refinement failing
+  rather than the wire grammar), and throwing `parseContext` in
   `getInitialProps` (`/legacy/[id]`, where the context has no `params` and
   the path param is extracted from `query` by segment name).
+- **A second Standard Schema validator** — kitchen-sink refines its codecs
+  with Zod; this app makes the same two refinements with **Valibot**
+  (`lib/schemas.ts`): a positive-int on the `/products/[id]` param and a
+  min-length-2 on `/find`'s `q`. The schema-accepting codecs take any
+  Standard Schema, so the validator is interchangeable — sync API only
+  (URL parsing is synchronous by design).
 - **Static generation** — `/guides/[topic]` is SSG. `getStaticPaths` returns
   plain path **strings** built with `buildPath(guideRoute, { topic })` (typed
   at build time — a bad params object fails `next build`, not a request), and
@@ -25,8 +32,9 @@ What it demonstrates:
   becomes `notFound: true`, a real 404.
 - **Three-state client hooks** — `useRouteParams`/`useSearch` return
   `pending | success | error`. `/find` is statically optimized, so a hard
-  load actually renders the `pending` arm before `router.isReady` flips; the
-  GSSP product page is `isReady` from its first render and never shows it.
+  load actually renders the `pending` arm before `router.isReady` flips (try
+  `/find?max=not-a-number` or `/find?q=a` for the error arm); the GSSP
+  product page is `isReady` from its first render and never shows it.
 - **Typed links** — every `<Link>` is fed by `href(route, { params, search
 })`; `href()` is router-agnostic.
 - **Imperative navigation** — `href()` output feeds `next/router`'s
