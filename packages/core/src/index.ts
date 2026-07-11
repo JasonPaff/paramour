@@ -23,6 +23,8 @@ export {
   decodeParams,
   type DecodeParamsOptions,
   encodeParams,
+  encodeStaticParams,
+  type InferStaticParams,
   type ParamsSource,
 } from "./path.js";
 export {

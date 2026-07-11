@@ -49,6 +49,20 @@ export type InferParamsInput<R extends AnyRoute> = {
 };
 
 /**
+ * Return shape of {@link encodeStaticParams}: the per-param wire-value record
+ * Next's static-generation surfaces expect — `[id]` → `string`, `[...slug]` →
+ * `string[]`, `[[...slug]]` → `string[]` with an OPTIONAL key (absent is the
+ * R3 base-path variant). Mapped types carry implicit index signatures, so the
+ * result is assignable to `generateStaticParams`' and `getStaticPaths`'
+ * params shapes without a cast.
+ */
+export type InferStaticParams<R extends AnyRoute> = Partial<
+  Record<OptionalCatchAllNames<R["path"]>, string[]>
+> &
+  Record<CatchAllNames<R["path"]>, string[]> &
+  Record<SingleParamNames<R["path"]>, string>;
+
+/**
  * Value-layer params source (wire spec §1, R5): the shape of Next's `params`
  * prop and `useParams()` return. Contrary to the byte-layer's usual "platform
  * already decoded it" stance, Next hands the App-Router surfaces percent-ENCODED
@@ -75,6 +89,12 @@ const OPTIONAL_CATCHALL_TOKEN = /^\[\[\.\.\.([^\][]+)\]\]$/;
 const CATCHALL_TOKEN = /^\[\.\.\.([^\][]+)\]$/;
 const SINGLE_TOKEN = /^\[([^\][]+)\]$/;
 const GROUP_SEGMENT = /^\(.*\)$/;
+
+/** {@link serializeDynamicSegment}'s discriminated result. */
+type SerializedSegment =
+  | { readonly kind: "many"; readonly values: string[] }
+  | { readonly kind: "none" }
+  | { readonly kind: "one"; readonly value: string };
 
 /**
  * Builds the path portion of an href (RL5): `/` plus the encoded segments
@@ -278,54 +298,78 @@ export function encodeParams<R extends AnyRoute>(
       continue;
     }
     const codec = requireCodec(config, segment.name, route.path);
-    const value = readInputValue(values, segment.name);
-
-    if (segment.kind === "single") {
-      if (value === undefined) {
-        throw new SerializeError(
-          `required route param "${segment.name}" is missing`,
-        );
+    const serialized = serializeDynamicSegment(
+      codec,
+      segment,
+      readInputValue(values, segment.name),
+    );
+    // Byte layer happens HERE, not in the shared chokepoint: encodeComponent
+    // percent-encodes each wire value and brands lone-surrogate URIErrors
+    // (S7) — the static surface (encodeStaticParams) hands Next the raw
+    // values instead. "none" (R3's elided optional catch-all) contributes
+    // no segments.
+    if (serialized.kind === "one") {
+      segments.push(encodeComponent(serialized.value));
+    } else if (serialized.kind === "many") {
+      for (const value of serialized.values) {
+        segments.push(encodeComponent(value));
       }
-      // R1: one value, one segment.
-      segments.push(encodeSegmentValue(codec, segment.name, value));
-      continue;
-    }
-
-    if (
-      segment.kind === "optional-catchall" &&
-      (value === undefined || (Array.isArray(value) && value.length === 0))
-    ) {
-      // R3: [[...x]] given [] or absent emits no segments — the segment and
-      // its preceding "/" vanish, leaving the base path.
-      continue;
-    }
-    if (value === undefined) {
-      throw new SerializeError(
-        `required route param "${segment.name}" is missing`,
-      );
-    }
-    if (!Array.isArray(value)) {
-      throw new SerializeError(
-        `route param "${segment.name}" expects an array, got ${typeof value}`,
-      );
-    }
-    if (value.length === 0) {
-      // R3: a required catch-all given [] is a serialization error — Next
-      // has no route for it.
-      throw new SerializeError(
-        `catch-all route param "${segment.name}" received an empty array`,
-      );
-    }
-    // R2: each element is encoded independently; an element containing "/"
-    // becomes %2F and round-trips as a single element — core's decodeParams
-    // restores it via percentDecodeSegment (R5), since Next hands the encoded
-    // value straight back on the params surface (wire-spec open item 1).
-    for (const element of value) {
-      segments.push(encodeSegmentValue(codec, segment.name, element));
     }
   }
 
   return segments;
+}
+
+/**
+ * Encodes a params input into the per-param wire-value record the static
+ * generation surfaces expect: App Router `generateStaticParams` entries and
+ * Pages Router `getStaticPaths` `{ params }` objects (PR10's static story).
+ * Same codec serialization and R1–R4 validation as {@link encodeParams},
+ * with two deliberate differences: static segments are skipped (Next wants
+ * only the dynamic params, keyed by name), and values are NOT percent-encoded
+ * — Next percent-encodes static-params values itself when it materializes
+ * the concrete URLs, so pre-encoding here would double-encode (the
+ * encode-side mirror of R5's decode asymmetry). That also means the S7
+ * lone-surrogate brand stays an encodeParams concern: strings are handed to
+ * Next verbatim. An elided optional catch-all (R3) OMITS its key — an absent
+ * key is the base-path variant on both routers (Pages also accepts
+ * undefined/[]; omission is the one spelling valid on both).
+ */
+export function encodeStaticParams<R extends AnyRoute>(
+  route: R,
+  params: InferParamsInput<R>,
+): InferStaticParams<R> {
+  // The TS contract forbids non-object inputs, but plain-JS callers reach
+  // here; a null input must fail loud, not read as every-param-absent.
+  const untrusted: unknown = params;
+  if (typeof untrusted !== "object" || untrusted === null) {
+    throw new SerializeError(
+      `params input must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+    );
+  }
+  const values = untrusted as Record<string, unknown>;
+  const config = route["~params"] as
+    Record<string, AnyCodec | undefined> | undefined;
+  // Built as entries so keys like "__proto__" become ordinary own properties
+  // of the result (decodeParams' hygiene stance).
+  const entries: [string, string | string[]][] = [];
+
+  for (const segment of routeSegments(route)) {
+    if (segment.kind === "static") continue;
+    const codec = requireCodec(config, segment.name, route.path);
+    const serialized = serializeDynamicSegment(
+      codec,
+      segment,
+      readInputValue(values, segment.name),
+    );
+    if (serialized.kind === "none") continue;
+    entries.push([
+      segment.name,
+      serialized.kind === "one" ? serialized.value : serialized.values,
+    ]);
+  }
+
+  return Object.fromEntries(entries) as InferStaticParams<R>;
 }
 
 /**
@@ -404,33 +448,6 @@ export function tokenizePath(path: string): PathSegment[] {
 }
 
 /**
- * Serializes one segment value into its percent-encoded wire form. Enforces
- * the serializer's string contract exactly as search.ts's serializeValue
- * does — a plain-JS custom codec returning a non-string must never reach the
- * byte layer as the literal text "undefined".
- */
-function encodeSegmentValue(
-  codec: AnyCodec,
-  name: string,
-  value: unknown,
-): string {
-  const serialized: unknown = codec["~serializeElement"](value);
-  if (typeof serialized !== "string") {
-    throw new SerializeError(
-      `serializer for route param "${name}" must return a string, got ${typeof serialized}`,
-    );
-  }
-  if (serialized === "") {
-    // R4: "" would produce "//" or a vanishing segment — same rationale as R3.
-    throw new SerializeError(
-      `route param "${name}" serialized to an empty string, which cannot form a path segment`,
-    );
-  }
-  // Byte layer: encodeComponent brands lone-surrogate URIErrors (S7).
-  return encodeComponent(serialized);
-}
-
-/**
  * Percent-decodes one segment string on the decode side (R5). Next hands the
  * `params`/`useParams()` surfaces percent-encoded values (issues #48058/#64952),
  * so `/product/a%20b` arrives as `"a%20b"` and must become `"a b"` before the
@@ -475,6 +492,97 @@ function requireCodec(
 function routeSegments(route: AnyRoute): readonly PathSegment[] {
   const segments = route["~segments"] as readonly PathSegment[] | undefined;
   return segments ?? tokenizePath(route.path);
+}
+
+/**
+ * Shape-validates and serializes ONE dynamic segment's input — the shared
+ * R1–R4 chokepoint for {@link encodeParams} (which then percent-encodes each
+ * value) and {@link encodeStaticParams} (which hands Next the raw wire
+ * values). "none" is R3's elided optional catch-all.
+ */
+function serializeDynamicSegment(
+  codec: AnyCodec,
+  segment: Extract<PathSegment, { readonly name: string }>,
+  value: unknown,
+): SerializedSegment {
+  if (segment.kind === "single") {
+    if (value === undefined) {
+      throw new SerializeError(
+        `required route param "${segment.name}" is missing`,
+      );
+    }
+    // R1: one value, one segment.
+    return {
+      kind: "one",
+      value: serializeSegmentValue(codec, segment.name, value),
+    };
+  }
+
+  if (
+    segment.kind === "optional-catchall" &&
+    (value === undefined || (Array.isArray(value) && value.length === 0))
+  ) {
+    // R3: [[...x]] given [] or absent emits no segments — the segment and
+    // its preceding "/" vanish, leaving the base path.
+    return { kind: "none" };
+  }
+  if (value === undefined) {
+    throw new SerializeError(
+      `required route param "${segment.name}" is missing`,
+    );
+  }
+  if (!Array.isArray(value)) {
+    throw new SerializeError(
+      `route param "${segment.name}" expects an array, got ${typeof value}`,
+    );
+  }
+  if (value.length === 0) {
+    // R3: a required catch-all given [] is a serialization error — Next
+    // has no route for it.
+    throw new SerializeError(
+      `catch-all route param "${segment.name}" received an empty array`,
+    );
+  }
+  // R2: each element is serialized independently; on the path surface an
+  // element containing "/" becomes %2F and round-trips as a single element —
+  // core's decodeParams restores it via percentDecodeSegment (R5), since Next
+  // hands the encoded value straight back on the params surface (wire-spec
+  // open item 1). The static surface passes the array whole, so "/" needs no
+  // escaping there.
+  return {
+    kind: "many",
+    values: (value as unknown[]).map((element) =>
+      serializeSegmentValue(codec, segment.name, element),
+    ),
+  };
+}
+
+/**
+ * Serializes one segment value into its wire-string form. Enforces the
+ * serializer's string contract exactly as search.ts's serializeValue does —
+ * a plain-JS custom codec returning a non-string must never reach the byte
+ * layer as the literal text "undefined". Percent-encoding is deliberately
+ * NOT applied here: that is encodeParams' byte-layer step (S7), and the
+ * static surfaces must skip it.
+ */
+function serializeSegmentValue(
+  codec: AnyCodec,
+  name: string,
+  value: unknown,
+): string {
+  const serialized: unknown = codec["~serializeElement"](value);
+  if (typeof serialized !== "string") {
+    throw new SerializeError(
+      `serializer for route param "${name}" must return a string, got ${typeof serialized}`,
+    );
+  }
+  if (serialized === "") {
+    // R4: "" would produce "//" or a vanishing segment — same rationale as R3.
+    throw new SerializeError(
+      `route param "${name}" serialized to an empty string, which cannot form a path segment`,
+    );
+  }
+  return serialized;
 }
 
 function tokenizeSegment(raw: string, path: string): PathSegment {

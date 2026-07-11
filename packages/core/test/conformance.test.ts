@@ -16,6 +16,7 @@ import {
   defineAppRoute,
   encodeParams,
   encodeSearch,
+  encodeStaticParams,
   p,
   ParamourError,
   ParseError,
@@ -238,6 +239,8 @@ describe("route param segments", () => {
     const route = defineAppRoute("/user/[id]", { params: { id: p.string() } });
     expect(() => buildPath(route, { id: "" })).toThrow(SerializeError);
     expect(() => encodeParams(route, { id: "" })).toThrow(SerializeError);
+    // The static surface shares the R4 chokepoint.
+    expect(() => encodeStaticParams(route, { id: "" })).toThrow(SerializeError);
   });
 
   it("C17: catch-all elements encode %2F and decode element-wise (R2/R5)", () => {

@@ -14,6 +14,7 @@ import {
   type Codec,
   decodeParams,
   defineAppRoute,
+  encodeStaticParams,
   href,
   p,
   type Route,
@@ -166,6 +167,54 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
         // canonical representative on the way back (D6).
         const source = segments.length > 1 ? { slug: segments.slice(1) } : {};
         expect(decodeParams(route, source)).toStrictEqual({ slug: values });
+      }),
+    );
+  });
+
+  // The static pipeline (PR10): getStaticPaths / generateStaticParams values
+  // reach getStaticProps' ctx.params already Node-decoded, so the way back is
+  // decodeParams with { percentDecode: false } — no byte layer in the loop.
+  it("static pipeline: p.string() through encodeStaticParams ≅ id", () => {
+    const route = defineAppRoute("/x/[v]", { params: { v: p.string() } });
+    fc.assert(
+      fc.property(segmentString, (value) => {
+        expect(
+          decodeParams(route, encodeStaticParams(route, { v: value }), {
+            percentDecode: false,
+          }),
+        ).toStrictEqual({ v: value });
+      }),
+    );
+  });
+
+  it("static pipeline: catch-all elements survive whole, including / (R2)", () => {
+    const route = defineAppRoute("/files/[...seg]", {
+      params: { seg: p.string() },
+    });
+    fc.assert(
+      fc.property(fc.array(segmentString, { minLength: 1 }), (values) => {
+        // The array is handed over pre-split, so a "/"-bearing element never
+        // meets a join — unlike the path surface's %2F round-trip above.
+        expect(
+          decodeParams(route, encodeStaticParams(route, { seg: values }), {
+            percentDecode: false,
+          }),
+        ).toStrictEqual({ seg: values });
+      }),
+    );
+  });
+
+  it("static pipeline: optional catch-all [] omits its key and comes back as [] (D6)", () => {
+    const route = defineAppRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+    });
+    fc.assert(
+      fc.property(fc.array(segmentString), (values) => {
+        const record = encodeStaticParams(route, { slug: values });
+        expect(Object.hasOwn(record, "slug")).toBe(values.length > 0);
+        expect(
+          decodeParams(route, record, { percentDecode: false }),
+        ).toStrictEqual({ slug: values });
       }),
     );
   });

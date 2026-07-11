@@ -8,13 +8,21 @@
 import { expect, test } from "tstyche";
 import { z } from "zod";
 
-import { defineAppRoute, definePagesRoute, href, p, rawSearch } from "../src";
+import {
+  defineAppRoute,
+  definePagesRoute,
+  encodeStaticParams,
+  href,
+  p,
+  rawSearch,
+} from "../src";
 import type {
   AnyAppRoute,
   AnyPagesRoute,
   AnyRoute,
   Href,
   InferRouteParams,
+  InferStaticParams,
   PagesContext,
   ParamsProps,
   RouteDecodeError,
@@ -483,4 +491,56 @@ test("href accepts both routers (PR3 — href stays router-agnostic)", () => {
     params: { id: p.integer() },
   });
   expect(href(pages, { params: { id: 1 } })).type.toBe<Href<"/product/[id]">>();
+});
+
+test("encodeStaticParams: wire-string record typed per segment kind", () => {
+  // The return is a three-way mapped intersection (like InferParamsInput),
+  // so assert assignability both ways rather than identity-sensitive toBe.
+  const single = defineAppRoute("/product/[id]", {
+    params: { id: p.integer() },
+  });
+  expect(encodeStaticParams(single, { id: 1 })).type.toBeAssignableTo<{
+    id: string;
+  }>();
+  expect<{ id: string }>().type.toBeAssignableTo<
+    InferStaticParams<typeof single>
+  >();
+
+  const catchAll = defineAppRoute("/files/[...seg]", {
+    params: { seg: p.string() },
+  });
+  expect(encodeStaticParams(catchAll, { seg: ["a"] })).type.toBeAssignableTo<{
+    seg: string[];
+  }>();
+
+  const optional = defineAppRoute("/docs/[[...slug]]", {
+    params: { slug: p.string() },
+  });
+  // The optional catch-all key is OMITTABLE (the R3 base-path variant) —
+  // unlike InferRouteParams, where D6 normalization makes it required.
+  expect<{}>().type.toBeAssignableTo<InferStaticParams<typeof optional>>();
+  expect(encodeStaticParams(optional, {})).type.toBeAssignableTo<{
+    slug?: string[];
+  }>();
+
+  // Structural Next compat: what generateStaticParams / getStaticPaths
+  // params accept (mapped types carry implicit index signatures).
+  expect(encodeStaticParams(single, { id: 1 })).type.toBeAssignableTo<
+    Record<string, string | string[] | undefined>
+  >();
+});
+
+test("encodeStaticParams: input is the typed encode side, not wire strings", () => {
+  const dates = defineAppRoute("/events/[date]", {
+    params: { date: p.isoDate() },
+  });
+  expect(encodeStaticParams).type.toBeCallableWith(dates, {
+    date: new Date("2026-07-10"),
+  });
+  // The isoDate codec's encode input is a Date — its own wire form is not
+  // accepted, exactly as href/buildPath behave.
+  expect(encodeStaticParams).type.not.toBeCallableWith(dates, {
+    date: "2026-07-10",
+  });
+  expect(encodeStaticParams).type.not.toBeCallableWith(dates, {});
 });

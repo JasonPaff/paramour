@@ -5,6 +5,7 @@ import {
   decodeParams,
   defineAppRoute,
   encodeParams,
+  encodeStaticParams,
   p,
   ParamourError,
   ParamsDecodeError,
@@ -186,6 +187,170 @@ describe("encodeParams / buildPath (RL5)", () => {
     }
     expect(() => buildPath(route, new Boom())).toThrow(SerializeError);
     expect(() => buildPath(route, new Boom())).toThrow("store not hydrated");
+  });
+});
+
+describe("encodeStaticParams (the static-generation surface)", () => {
+  it("R1: a single param is codec-serialized and keyed by name, static segments skipped", () => {
+    const route = defineAppRoute("/product/[id]", {
+      params: { id: p.integer() },
+    });
+    // toStrictEqual pins the key set: no "product", no junk.
+    expect(encodeStaticParams(route, { id: 42 })).toStrictEqual({ id: "42" });
+  });
+
+  it("values are NOT percent-encoded — Next encodes static params itself", () => {
+    const route = defineAppRoute("/tag/[name]", {
+      params: { name: p.string() },
+    });
+    // Contrast encodeParams above: the same input becomes %20/%2F on the
+    // path surface; here it must reach Next verbatim or it double-encodes.
+    expect(encodeStaticParams(route, { name: "a b/c" })).toStrictEqual({
+      name: "a b/c",
+    });
+  });
+
+  it("codec serialization earns its keep: a Date param becomes its wire day", () => {
+    const route = defineAppRoute("/events/[date]", {
+      params: { date: p.isoDate() },
+    });
+    expect(
+      encodeStaticParams(route, { date: new Date("2026-07-10") }),
+    ).toStrictEqual({ date: "2026-07-10" });
+  });
+
+  it("a fully static route yields {} and ignores junk input keys", () => {
+    const route = defineAppRoute("/about", {});
+    expect(encodeStaticParams(route, {})).toStrictEqual({});
+    expect(encodeStaticParams(route, { junk: 1 } as never)).toStrictEqual({});
+  });
+
+  it("R2: a catch-all stays an array, elements serialized independently, / unescaped", () => {
+    const route = defineAppRoute("/files/[...seg]", {
+      params: { seg: p.string() },
+    });
+    // The static surface passes the array WHOLE — a "/"-bearing element
+    // needs no %2F because no join happens here.
+    expect(
+      encodeStaticParams(route, { seg: ["a", "b c", "d/e"] }),
+    ).toStrictEqual({ seg: ["a", "b c", "d/e"] });
+  });
+
+  it("R3: an elided optional catch-all OMITS its key (the base-path variant)", () => {
+    const route = defineAppRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+    });
+    expect(encodeStaticParams(route, {})).toStrictEqual({});
+    expect(encodeStaticParams(route, { slug: [] })).toStrictEqual({});
+    expect(encodeStaticParams(route, { slug: ["a", "b"] })).toStrictEqual({
+      slug: ["a", "b"],
+    });
+  });
+
+  it("R3: a required catch-all given [] is a SerializeError", () => {
+    const route = defineAppRoute("/files/[...seg]", {
+      params: { seg: p.string() },
+    });
+    expect(() => encodeStaticParams(route, { seg: [] })).toThrow(
+      SerializeError,
+    );
+    expect(() => encodeStaticParams(route, { seg: [] })).toThrow(/empty array/);
+  });
+
+  it("a missing required param is a SerializeError (single and catch-all)", () => {
+    const single = defineAppRoute("/product/[id]", {
+      params: { id: p.integer() },
+    });
+    expect(() => encodeStaticParams(single, {} as never)).toThrow(
+      SerializeError,
+    );
+    expect(() => encodeStaticParams(single, {} as never)).toThrow(/is missing/);
+    const catchAll = defineAppRoute("/files/[...seg]", {
+      params: { seg: p.string() },
+    });
+    expect(() => encodeStaticParams(catchAll, {} as never)).toThrow(
+      /is missing/,
+    );
+  });
+
+  it("a non-array for a catch-all is a SerializeError", () => {
+    const route = defineAppRoute("/files/[...seg]", {
+      params: { seg: p.string() },
+    });
+    expect(() => encodeStaticParams(route, { seg: "a" } as never)).toThrow(
+      /expects an array/,
+    );
+  });
+
+  it('R4: "" as a segment value or catch-all element is a SerializeError', () => {
+    const single = defineAppRoute("/user/[id]", { params: { id: p.string() } });
+    expect(() => encodeStaticParams(single, { id: "" })).toThrow(
+      SerializeError,
+    );
+    const catchAll = defineAppRoute("/files/[...seg]", {
+      params: { seg: p.string() },
+    });
+    expect(() => encodeStaticParams(catchAll, { seg: ["a", ""] })).toThrow(
+      SerializeError,
+    );
+  });
+
+  it("a non-object params input fails loud", () => {
+    const route = defineAppRoute("/product/[id]", {
+      params: { id: p.integer() },
+    });
+    expect(() => encodeStaticParams(route, null as never)).toThrow(
+      SerializeError,
+    );
+    expect(() => encodeStaticParams(route, null as never)).toThrow(
+      /must be an object/,
+    );
+  });
+
+  it("a serializer returning a non-string is a SerializeError, not literal text", () => {
+    const sneaky = p.custom<string>({
+      parse: (raw) => raw,
+      serialize: () => undefined as unknown as string,
+    });
+    const route = defineAppRoute("/x/[id]", { params: { id: sneaky } });
+    expect(() => encodeStaticParams(route, { id: "v" })).toThrow(
+      /must return a string/,
+    );
+  });
+
+  it("a missing codec for a dynamic segment is a loud ParamourError", () => {
+    const route = defineAppRoute("/x/[id]", {} as never);
+    expect(() => encodeStaticParams(route, { id: "1" })).toThrow(
+      /declares no codec/,
+    );
+  });
+
+  it("class instances exposing params via prototype getters encode (readInputValue parity)", () => {
+    const route = defineAppRoute("/product/[id]", {
+      params: { id: p.integer() },
+    });
+    /* eslint-disable @typescript-eslint/class-literal-property-style */
+    class Params {
+      get id() {
+        return 42;
+      }
+    }
+    /* eslint-enable @typescript-eslint/class-literal-property-style */
+    expect(encodeStaticParams(route, new Params())).toStrictEqual({
+      id: "42",
+    });
+  });
+
+  it("percent-encoding its values reproduces encodeParams' dynamic segments exactly", () => {
+    const route = defineAppRoute("/tag/[name]", {
+      params: { name: p.string() },
+    });
+    const wire = encodeStaticParams(route, { name: "a b" });
+    // The two surfaces differ ONLY by the byte layer: static values are
+    // encodeParams' segments minus encodeComponent.
+    expect(encodeURIComponent(wire.name)).toBe(
+      encodeParams(route, { name: "a b" })[1],
+    );
   });
 });
 
