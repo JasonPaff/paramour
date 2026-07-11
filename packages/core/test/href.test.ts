@@ -89,6 +89,58 @@ describe("href assembly (RL4)", () => {
   });
 });
 
+describe("string-form href (SH1)", () => {
+  it("builds the bare path — same output as a route object would", () => {
+    expect(href("/about")).toBe("/about");
+    expect(href("/")).toBe("/");
+  });
+
+  it("assembles the hash with S10 semantics", () => {
+    expect(href("/about", { hash: "team" })).toBe("/about#team");
+    expect(href("/about", { hash: "" })).toBe("/about");
+    expect(href("/", { hash: "top" })).toBe("/#top");
+    // Verbatim, caller owns escaping — same as the route-object form.
+    expect(href("/about", { hash: "#top" })).toBe("/about##top");
+  });
+
+  it("returns a primitive string — the brand is type-only", () => {
+    expect(typeof href("/about")).toBe("string");
+  });
+
+  it("SH6: rejects a dynamic path — brackets need a route object", () => {
+    for (const path of [
+      "/product/[id]",
+      "/files/[...path]",
+      "/docs/[[...slug]]",
+    ]) {
+      expect(() => href(path)).toThrow(ParamourError);
+      expect(() => href(path)).toThrow(/requires a static route path/);
+    }
+  });
+
+  it("SH6: rejects a path that is not /-prefixed", () => {
+    expect(() => href("about")).toThrow(ParamourError);
+    expect(() => href("")).toThrow(ParamourError);
+  });
+
+  it("SH6: rejects query/hash smuggled into the path string", () => {
+    expect(() => href("/about?q=1")).toThrow(ParamourError);
+    expect(() => href("/about#top")).toThrow(ParamourError);
+  });
+
+  it("SH6: a JS caller passing params/search fails loud, not silently dropped", () => {
+    const stringHref = href as (path: string, options?: unknown) => string;
+    expect(() => stringHref("/about", { search: { q: "x" } })).toThrow(
+      ParamourError,
+    );
+    expect(() => stringHref("/about", { params: { id: 1 } })).toThrow(
+      /takes no params\/search/,
+    );
+    // Explicit undefined means absent (the plain-JS caller shape).
+    expect(stringHref("/about", { search: undefined })).toBe("/about");
+  });
+});
+
 describe("hash emission (S10)", () => {
   const about = defineAppRoute("/about", {});
 

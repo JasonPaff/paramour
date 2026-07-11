@@ -25,6 +25,7 @@ import type {
   InferStaticParams,
   PagesContext,
   ParamsProps,
+  RegisteredStaticRoutePaths,
   RouteDecodeError,
   RouteProps,
   SafeResult,
@@ -383,6 +384,32 @@ test("href: an empty-input half bans its property outright (2026-07-04 ruling)",
     params: { id: 1 },
     search: { q: "x" },
   });
+});
+
+test("href: string form accepts any string pre-generation, branded like the route form (SH1/SH5)", () => {
+  // World A: no registry members, so the static union falls back to `string`
+  // — the same documented unverified stance as the constructors (RL8). The
+  // SH6 runtime guard is the world-A backstop.
+  expect<RegisteredStaticRoutePaths>().type.toBe<string>();
+  expect(href).type.toBeCallableWith("/totally/unverified");
+  // The literal is retained into the brand — identical to what
+  // href(defineAppRoute("/about", {})) produces.
+  expect(href("/about")).type.toBe<Href<"/about">>();
+  expect(href("/about", { hash: "team" })).type.toBe<Href<"/about">>();
+});
+
+test("href: string form is hash-only — no params/search side door (SH4)", () => {
+  expect(href).type.toBeCallableWith("/about");
+  expect(href).type.toBeCallableWith("/about", {});
+  expect(href).type.toBeCallableWith("/about", { hash: "team" });
+  // ?: never bans both halves outright — present-but-empty and non-fresh
+  // objects included (same stance as the 2026-07-04 empty-input ruling).
+  expect(href).type.not.toBeCallableWith("/about", { search: { q: "x" } });
+  expect(href).type.not.toBeCallableWith("/about", { params: { id: 1 } });
+  expect(href).type.not.toBeCallableWith("/about", { params: {} });
+  expect(href).type.not.toBeCallableWith("/about", { search: {} });
+  const junk = { search: { q: "x" } };
+  expect(href).type.not.toBeCallableWith("/about", junk);
 });
 
 test("router brand: the constructors declare distinct brands (PR3/PR7)", () => {

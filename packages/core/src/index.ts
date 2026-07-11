@@ -26,7 +26,13 @@ export {
   SearchSourceError,
   SerializeError,
 } from "./errors.js";
-export { href, type Href, type HrefArgs, type InferHrefInput } from "./href.js";
+export {
+  href,
+  type Href,
+  type HrefArgs,
+  type InferHrefInput,
+  type StaticHrefOptions,
+} from "./href.js";
 export { p } from "./p.js";
 export {
   buildPath,
@@ -52,6 +58,9 @@ export {
   type ParamsProps,
   type RegisteredAppRoutePaths,
   type RegisteredPagesRoutePaths,
+  type RegisteredStaticAppRoutePaths,
+  type RegisteredStaticPagesRoutePaths,
+  type RegisteredStaticRoutePaths,
   type Route,
   type RouteProps,
   type RouterKind,

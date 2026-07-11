@@ -109,6 +109,30 @@ test("param extraction still runs on the literal, not the registry (spike-01)", 
   });
 });
 
+test("href string form: registered static paths only, both routers (SH1/SH2)", () => {
+  // The static union is derived from the same registry the constructors
+  // read: "/" | "/about" (app) and "/legacy" (pages) — router-agnostic,
+  // like href itself.
+  expect(href("/about")).type.toBe<Href<"/about">>();
+  expect(href("/")).type.toBe<Href<"/">>();
+  expect(href("/legacy")).type.toBe<Href<"/legacy">>();
+  expect(href).type.toBeCallableWith("/about", { hash: "team" });
+  // The world-A fallback is gone: unregistered strings are rejected.
+  expect(href).type.not.toBeCallableWith("/totally/made/up");
+  expect(href).type.not.toBeCallableWith("/abou");
+});
+
+test("href string form: dynamic paths need a route object (SH2/SH7)", () => {
+  // A dynamic literal is registered but NOT static — string form rejects it.
+  expect(href).type.not.toBeCallableWith("/product/[id]");
+  expect(href).type.not.toBeCallableWith("/legacy/[id]");
+  // SH7: /docs is REACHABLE (optional catch-all), but reachability ≠
+  // staticness — the route carries a codec, so linking it stays
+  // route-object work (href(docsRoute) already builds "/docs" bare).
+  expect(href).type.not.toBeCallableWith("/docs");
+  expect(href).type.not.toBeCallableWith("/docs/[[...slug]]");
+});
+
 test("href narrows its brand to the registered literal for both routers (RL4/PR3)", () => {
   const product = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },

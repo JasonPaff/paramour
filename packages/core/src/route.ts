@@ -245,6 +245,34 @@ export type RegisteredPagesRoutePaths = ParamourRegister extends {
   : string;
 
 /**
+ * Static-only subset of {@link RegisteredAppRoutePaths} (SH2): derived by
+ * syntactic filter, not emitted — dynamic-ness is a property of the path
+ * literal, so the registry format doesn't change. Same world-A `string`
+ * fallback as the full union (the filter passes `string` through).
+ */
+export type RegisteredStaticAppRoutePaths =
+  StaticPathsOf<RegisteredAppRoutePaths>;
+
+/** Pages twin of {@link RegisteredStaticAppRoutePaths} (SH2). */
+export type RegisteredStaticPagesRoutePaths =
+  StaticPathsOf<RegisteredPagesRoutePaths>;
+
+/**
+ * Every registered STATIC path across both routers — the string form of
+ * href's path argument (SH1/SH2). Deliberately NOT the union of the two
+ * per-router types (SH3): each falls back to `string` when its registry
+ * member is absent, and in a single-router project the absent side's
+ * `string` would swallow the union and erase verification for the router
+ * that HAS routes. The permissive fallback applies only when NEITHER member
+ * is present (world A / TR3's empty merge).
+ */
+export type RegisteredStaticRoutePaths = [PresentRegisteredPaths] extends [
+  never,
+]
+  ? string
+  : StaticPathsOf<PresentRegisteredPaths>;
+
+/**
  * The router-agnostic core of a defined route (PR3): path, configs, and the
  * define-time token cache. The parse surface is router-specific and lives on
  * {@link AppRoute} / {@link PagesRoute} — gating it via the interface split
@@ -332,6 +360,34 @@ export type SingleParamNames<Path extends string> =
           ? NonEmptyName<Name>
           : never
     : never;
+
+/**
+ * Union of the registry members that are actually PRESENT — `never` when
+ * neither router has generated routes. The input to SH3's combined-union
+ * fallback rule; see {@link RegisteredStaticRoutePaths}.
+ */
+/* eslint-disable @typescript-eslint/no-duplicate-type-constituents, @typescript-eslint/no-redundant-type-constituents --
+   pre-generation BOTH arms resolve to `never`, so the rules see a
+   duplicate/redundant union — and no-duplicate's AUTO-FIX deletes an arm.
+   Post-generation each arm carries its router's registered paths; both are
+   load-bearing. */
+type PresentRegisteredPaths =
+  | (ParamourRegister extends { appRoutes: infer A extends string } ? A : never)
+  | (ParamourRegister extends { pagesRoutes: infer P extends string }
+      ? P
+      : never);
+/* eslint-enable @typescript-eslint/no-duplicate-type-constituents, @typescript-eslint/no-redundant-type-constituents */
+
+/**
+ * Filters a path union to its static members (SH2): any `[` marks a dynamic
+ * segment. `string` passes through (it doesn't extend the bracket template),
+ * which is exactly what keeps the world-A fallback intact. Note reachability
+ * ≠ staticness (SH7): `/docs/[[...slug]]` serves `/docs`, but it carries a
+ * codec and decode expectations, so it is excluded here.
+ */
+type StaticPathsOf<P extends string> = P extends `${string}[${string}`
+  ? never
+  : P;
 
 /**
  * Defines an App Router route: the URL-shaped path literal (RL2) plus its
