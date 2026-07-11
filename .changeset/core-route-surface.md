@@ -1,6 +1,0 @@
----
-"paramour": minor
-"@paramour-js/next": minor
----
-
-**Breaking:** the core route surface is now two-router (design-06 Group 2). `defineRoute` is retired in favor of `defineAppRoute` / `definePagesRoute` — neither router is the implicit default, and the constructor declares the route's `~router` brand (`"app" | "pages"`), which gates the parse surface at compile time: the async props methods (`parse` / `parseParams` / `parseSearch` and their safe twins) exist on app routes only, and the new synchronous `parseContext` / `safeParseContext` (reading `getServerSideProps` / `getInitialProps`-shaped `{ params?, query }` contexts) exist on pages routes only. `href()` and the standalone decoders stay router-agnostic. The registry splits per router: `ParamourRegister` is now augmented with `appRoutes` / `pagesRoutes` (each independently absent when unscanned), replacing `routes`, and the artifact emitter writes `appRoutes` accordingly — regenerate with `paramour generate`. Pages routes additionally reject search keys that shadow a path param (`router.query` merges the two with the route param winning, so such a codec could never receive a value); app routes are unaffected. New exports: `AnyAppRoute`, `AnyPagesRoute`, `AppRoute`, `PagesRoute`, `PagesContext`, `RouterKind`, `RegisteredAppRoutePaths`, `RegisteredPagesRoutePaths`.
