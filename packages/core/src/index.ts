@@ -23,6 +23,7 @@ export {
   ParseError,
   type RouteDecodeError,
   SearchDecodeError,
+  SearchSourceError,
   SerializeError,
 } from "./errors.js";
 export { href, type Href, type HrefArgs, type InferHrefInput } from "./href.js";
@@ -71,3 +72,7 @@ export {
   type SearchSource,
   searchToString,
 } from "./search.js";
+export {
+  standardSearchSchema,
+  type StandardSearchSchema,
+} from "./standard-schema.js";

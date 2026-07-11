@@ -1,6 +1,7 @@
 import type { AnyCodec, OutputOf, ParamCodec } from "./codec.js";
 
 import {
+  describeType,
   foreignMessage,
   ParamourError,
   ParamsDecodeError,
@@ -591,14 +592,14 @@ function splitPagesContext(
   const untrusted: unknown = context;
   if (typeof untrusted !== "object" || untrusted === null) {
     throw new ParamourError(
-      `pages context must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+      `pages context must be an object, got ${describeType(untrusted)}`,
     );
   }
   const { params, query } = untrusted as PagesContext;
   const untrustedQuery: unknown = query;
   if (typeof untrustedQuery !== "object" || untrustedQuery === null) {
     throw new ParamourError(
-      `pages context has no query object (got ${untrustedQuery === null ? "null" : typeof untrustedQuery}): getStaticProps contexts carry no query string — decode ctx.params with safeDecodeParams instead (PR10)`,
+      `pages context has no query object (got ${describeType(untrustedQuery)}): getStaticProps contexts carry no query string — decode ctx.params with safeDecodeParams instead (PR10)`,
     );
   }
   return [params ?? pickOwn(query, paramNames), omitOwn(query, paramNames)];

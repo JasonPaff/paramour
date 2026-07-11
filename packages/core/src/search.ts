@@ -3,12 +3,14 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { AnyCodec, OutputOf, PresenceOf } from "./codec.js";
 
 import {
+  describeType,
   foreignMessage,
   type Issue,
   ParamourError,
   ParseError,
   rebrandForeign,
   SearchDecodeError,
+  SearchSourceError,
   SerializeError,
 } from "./errors.js";
 import { runStandardSchemaSync } from "./schema.js";
@@ -279,7 +281,7 @@ export function encodeSearch<S extends SearchSlot>(
   const untrusted: unknown = input;
   if (typeof untrusted !== "object" || untrusted === null) {
     throw new SerializeError(
-      `search input must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+      `search input must be an object, got ${describeType(untrusted)}`,
     );
   }
   const pairs: [string, string][] = [];
@@ -333,6 +335,18 @@ export function encodeSearch<S extends SearchSlot>(
 }
 
 /**
+ * Runtime discriminant for the `search:` slot (design-04 SS2): the reserved
+ * `~kind` marker is unambiguous against a codec map, which never carries a
+ * top-level `~`-prefixed key. Module-exported for standard-schema.ts, not
+ * barrel-exported.
+ */
+export function isRawSearch(
+  config: SearchSlot,
+): config is RawSearch<StandardSchemaV1> {
+  return "~kind" in config && config["~kind"] === "raw-search";
+}
+
+/**
  * The whole-object search escape hatch (design-04 SS1, maintainer ruling):
  * an explicit, greppable wrapper around a bare Standard Schema so a route's
  * `search:` slot never falls into the degraded raw mode by accident — a
@@ -375,6 +389,23 @@ export function readInputValue(
     current = Object.getPrototypeOf(current) as null | object;
   }
   return undefined;
+}
+
+/**
+ * The TS contract makes a non-object config unrepresentable, but a
+ * hand-built route missing `~search` reaches both codecs' entry points via
+ * href/parseSearch in plain JS; fail branded — a missing config is a
+ * config-contract violation (requireCodec's precedent), never a raw
+ * TypeError out of Object.entries/Object.keys. Module-exported for
+ * standard-schema.ts, not barrel-exported.
+ */
+export function requireSearchConfig(config: SearchSlot): void {
+  const untrusted: unknown = config;
+  if (typeof untrusted !== "object" || untrusted === null) {
+    throw new ParamourError(
+      `search config must be an object, got ${describeType(untrusted)}`,
+    );
+  }
 }
 
 /** Convenience: encode + build in one step. */
@@ -443,7 +474,7 @@ function encodeRawSearch(input: unknown): [string, string][] {
   const untrusted: unknown = input;
   if (typeof untrusted !== "object" || untrusted === null) {
     throw new SerializeError(
-      `search input must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+      `search input must be an object, got ${describeType(untrusted)}`,
     );
   }
   const values = untrusted as Record<string, unknown>;
@@ -463,17 +494,6 @@ function encodeRawSearch(input: unknown): [string, string][] {
 }
 
 /**
- * Runtime discriminant for the `search:` slot (design-04 SS2): the reserved
- * `~kind` marker is unambiguous against a codec map, which never carries a
- * top-level `~`-prefixed key.
- */
-function isRawSearch(
-  config: SearchSlot,
-): config is RawSearch<StandardSchemaV1> {
-  return "~kind" in config && config["~kind"] === "raw-search";
-}
-
-/**
  * Snapshots EVERY source key's wire values, before any user code (the
  * whole-object schema's `validate`) runs — sibling of
  * {@link readDeclaredValues} that reads all keys instead of declared-only
@@ -490,8 +510,9 @@ function readAllValues(
   // here; fail branded, not with a raw TypeError out of Object.keys.
   const untrusted: unknown = source;
   if (typeof untrusted !== "object" || untrusted === null) {
-    throw new ParamourError(
-      `search source must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+    throw new SearchSourceError(
+      `search source must be an object, got ${describeType(untrusted)}`,
+      null,
     );
   }
   const grouped = new Map<string, string[]>();
@@ -501,8 +522,9 @@ function readAllValues(
     // Record branch below.
     for (const [key, value] of source as Iterable<readonly [string, unknown]>) {
       if (typeof value !== "string") {
-        throw new ParamourError(
+        throw new SearchSourceError(
           `search source values for "${key}" must be strings, got ${typeof value}`,
+          key,
         );
       }
       const list = grouped.get(key);
@@ -537,8 +559,8 @@ function readAllValues(
  * user code runs. Declared keys only, on purpose: unknown keys are never
  * validated, so malformed junk under keys paramour doesn't own (qs bracket
  * params, numbers) can't fail a decode (P8). Malformed values under a
- * DECLARED key are a loud {@link ParamourError} — the source doesn't match
- * its stated contract — never a silent key drop.
+ * DECLARED key are a loud {@link SearchSourceError} — the source doesn't
+ * match its stated contract — never a silent key drop.
  */
 function readDeclaredValues(
   config: SearchConfig,
@@ -548,8 +570,9 @@ function readDeclaredValues(
   // here; fail branded, not with a raw TypeError out of Object.hasOwn.
   const untrusted: unknown = source;
   if (typeof untrusted !== "object" || untrusted === null) {
-    throw new ParamourError(
-      `search source must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+    throw new SearchSourceError(
+      `search source must be an object, got ${describeType(untrusted)}`,
+      null,
     );
   }
   const values = new Map<string, string[]>();
@@ -561,8 +584,9 @@ function readDeclaredValues(
     for (const [key, value] of source as Iterable<readonly [string, unknown]>) {
       if (!Object.hasOwn(config, key)) continue;
       if (typeof value !== "string") {
-        throw new ParamourError(
+        throw new SearchSourceError(
           `search source values for "${key}" must be strings, got ${typeof value}`,
+          key,
         );
       }
       const list = values.get(key);
@@ -596,15 +620,17 @@ function readRecordValues(
     const copy: unknown[] = [...(value as unknown[])];
     for (const element of copy) {
       if (typeof element !== "string") {
-        throw new ParamourError(
+        throw new SearchSourceError(
           `search source values for "${key}" must be strings, got ${typeof element}`,
+          key,
         );
       }
     }
     return copy as string[];
   }
-  throw new ParamourError(
+  throw new SearchSourceError(
     `search source value for "${key}" must be a string or string[], got ${typeof value}`,
+    key,
   );
 }
 
@@ -640,22 +666,6 @@ function requireRawSearchString(key: string, value: unknown): string {
     );
   }
   return value;
-}
-
-/**
- * The TS contract makes a non-object config unrepresentable, but a
- * hand-built route missing `~search` reaches both codecs' entry points via
- * href/parseSearch in plain JS; fail branded — a missing config is a
- * config-contract violation (requireCodec's precedent), never a raw
- * TypeError out of Object.entries/Object.keys.
- */
-function requireSearchConfig(config: SearchSlot): void {
-  const untrusted: unknown = config;
-  if (typeof untrusted !== "object" || untrusted === null) {
-    throw new ParamourError(
-      `search config must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
-    );
-  }
 }
 
 /**

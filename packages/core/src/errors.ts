@@ -20,6 +20,7 @@ const paramourErrorBrand = Symbol.for("paramour.errors.ParamourError");
 const paramsDecodeErrorBrand = Symbol.for("paramour.errors.ParamsDecodeError");
 const parseErrorBrand = Symbol.for("paramour.errors.ParseError");
 const searchDecodeErrorBrand = Symbol.for("paramour.errors.SearchDecodeError");
+const searchSourceErrorBrand = Symbol.for("paramour.errors.SearchSourceError");
 const serializeErrorBrand = Symbol.for("paramour.errors.SerializeError");
 
 /** Base class for every error paramour throws. */
@@ -95,6 +96,33 @@ export class SearchDecodeError extends ParamourError {
   }
 }
 
+/**
+ * A search source violated its wire-shape contract (design-08 STD7): a
+ * non-object source, or a non-string / non-string[] value under a read key.
+ * Thrown by search.ts's source readers; distinct from {@link ParamourError}
+ * so the Standard Schema adapter can soften exactly these throws to issues
+ * while config-contract violations and rebranded validator throws stay loud.
+ */
+export class SearchSourceError extends ParamourError {
+  static {
+    brandPrototype(this, searchSourceErrorBrand);
+  }
+
+  /** The offending source key, or null when the source itself is malformed. */
+  readonly key: null | string;
+
+  constructor(message: string, key: null | string) {
+    super(message);
+    this.key = key;
+  }
+
+  static override [Symbol.hasInstance](
+    value: unknown,
+  ): value is SearchSourceError {
+    return hasBrand(value, searchSourceErrorBrand);
+  }
+}
+
 /** A value could not be serialized to the wire (bad type, non-finite, etc.). */
 export class SerializeError extends ParamourError {
   static {
@@ -106,6 +134,14 @@ export class SerializeError extends ParamourError {
   ): value is SerializeError {
     return hasBrand(value, serializeErrorBrand);
   }
+}
+
+/**
+ * Renders a value's type for "…, got X" error messages, distinguishing null
+ * from typeof's "object". Not exported from the package.
+ */
+export function describeType(value: unknown): string {
+  return value === null ? "null" : typeof value;
 }
 
 /**

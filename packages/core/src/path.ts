@@ -9,6 +9,7 @@ import type {
 } from "./route.js";
 
 import {
+  describeType,
   type Issue,
   ParamourError,
   ParamsDecodeError,
@@ -130,7 +131,7 @@ export function decodeParams<R extends AnyRoute>(
   const untrusted: unknown = source;
   if (typeof untrusted !== "object" || untrusted === null) {
     throw new ParamourError(
-      `params source must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+      `params source must be an object, got ${describeType(untrusted)}`,
     );
   }
   // R5: App-Router surfaces arrive percent-encoded (decode by default); pages
@@ -282,7 +283,7 @@ export function encodeParams<R extends AnyRoute>(
   const untrusted: unknown = params;
   if (typeof untrusted !== "object" || untrusted === null) {
     throw new SerializeError(
-      `params input must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+      `params input must be an object, got ${describeType(untrusted)}`,
     );
   }
   const values = untrusted as Record<string, unknown>;
@@ -344,7 +345,7 @@ export function encodeStaticParams<R extends AnyRoute>(
   const untrusted: unknown = params;
   if (typeof untrusted !== "object" || untrusted === null) {
     throw new SerializeError(
-      `params input must be an object, got ${untrusted === null ? "null" : typeof untrusted}`,
+      `params input must be an object, got ${describeType(untrusted)}`,
     );
   }
   const values = untrusted as Record<string, unknown>;
