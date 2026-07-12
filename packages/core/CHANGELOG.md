@@ -1,5 +1,28 @@
 # paramour
 
+## 0.2.0
+
+### Minor Changes
+
+- 91ce034: Add `standardSearchSchema(route)` (and the `StandardSearchSchema` type): exports a route's `search:` config as a spec-compliant Standard Schema, so the same route definition can validate tRPC inputs, server-action payloads, or TanStack Router `validateSearch`.
+
+  The schema is the URL wire contract, verbatim. Two things to know up front:
+
+  - **No coercion, ever.** It accepts wire strings (`{ page: "2" }`), not decoded values (`{ page: 2 }`) — the inferred input type (`Record<string, string | string[] | undefined>`) enforces this at compile time, and decoded values are rejected with issues at runtime. TanStack Router users need a string-preserving `parseSearch`.
+  - **`.catch()` semantics are exported too.** On a `.catch()` codec, invalid API input silently coerces to the fallback instead of erroring — byte-identical to URL decode, which is the point: one semantics for every consumer.
+
+  Defaults apply, unknown keys strip silently, and duplicate values on a scalar codec reject — exactly as `decodeSearch` behaves. `rawSearch` routes are supported (input is the raw wire record; output is the inner schema's output). Contract-violating input (non-objects, non-string values) becomes issues rather than thrown errors at this one boundary; async raw schemas and malformed configs still throw.
+
+  Also adds `SearchSourceError` (a `ParamourError` subclass, exported): `decodeSearch`/`safeDecodeSearch` now throw it for source-shape violations — a non-object source or a non-string value under a read key — instead of a bare `ParamourError`. Messages are unchanged, and `instanceof ParamourError` still matches.
+
+- 0a5fb3b: `href` now accepts a registered static path string as an alternative to a route object: `href("/about")`, `href("/about", { hash: "team" })`. Defining a route for a static path purely to link to it safely is no longer necessary — the generated registry already verifies the path against the filesystem, and the string form returns the same branded `Href<"/about">` a route object would.
+
+  - The static-path union is **derived** from the existing per-router registry unions (a path containing `[` is dynamic) — no change to the generated `paramour-env.d.ts` format; already-generated artifacts gain the feature for free. New exported types: `RegisteredStaticAppRoutePaths`, `RegisteredStaticPagesRoutePaths`, and the router-agnostic `RegisteredStaticRoutePaths` the string overload consumes (its permissive `string` fallback applies only when NEITHER router has generated routes, so single-router projects keep full verification).
+  - The string form's options are **hash-only** (`StaticHrefOptions`, also exported): `params`/`search` are banned at the type level. A static path that needs query params still warrants `defineAppRoute` with search codecs — typed serialization remains the only road to a query string.
+  - Pre-generation, any string is accepted (the same documented unverified fallback the route constructors carry). A runtime guard backstops it: a path that doesn't start with `/` or contains `[`, `]`, `?`, or `#` throws `ParamourError`, as does a JS caller passing a `params`/`search` half.
+  - Optional catch-all routes (`/docs/[[...slug]]`) are not in the static union even though `/docs` is a reachable URL — they carry a codec, so linking them stays route-object work (`href(docsRoute)` already builds `/docs` bare).
+  - Known diagnostics change: a failing route-object `href` call now reports TS2769 ("No overload matches this call") with the specific diagnosis in the last-overload detail, instead of a direct single-overload error.
+
 ## 0.1.0
 
 ### Minor Changes
