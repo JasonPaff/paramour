@@ -5,21 +5,19 @@ import { usePathname } from "next/navigation";
 import { href } from "paramour";
 
 import { legacyRoute } from "../lib/legacy.def";
-import { aboutRoute } from "./(marketing)/about/route.def";
-import { dashboardRoute } from "./dashboard/route.def";
 import { docsRoute } from "./docs/[[...slug]]/route.def";
 import { eventsRoute } from "./events/[date]/route.def";
-import { feedRoute } from "./feed/route.def";
 import { filesRoute } from "./files/[...path]/route.def";
 import { findRoute } from "./find/route.def";
-import { galleryRoute } from "./gallery/route.def";
 import { productsListRoute } from "./products/route.def";
 import { homeRoute } from "./route.def";
 import { serializeRoute } from "./serialize/route.def";
 
 // Every link is built with href(): typed params/search in, a plain string out.
 // Href is a string subtype, so it feeds next/link directly. A route whose only
-// dynamic segment is an optional catch-all (docs) can be linked with no params.
+// dynamic segment is an optional catch-all (docs) can be linked with no params,
+// and a registered static path can skip the route object entirely — see the
+// exotic wing below.
 //
 // `prefix` is only for the active-tab highlight — href() output is the real
 // destination, and the built string never has to be re-parsed to know where it
@@ -55,10 +53,18 @@ const links = [
   // The exotic-conventions wing: a route group page, a parallel-routes page,
   // and the two interception hosts. Gallery's prefix also matches
   // /gallery/[photoId], so the tab stays lit under the modal.
-  { label: "About", prefix: "/about", to: href(aboutRoute) },
-  { label: "Dashboard", prefix: "/dashboard", to: href(dashboardRoute) },
-  { label: "Gallery", prefix: "/gallery", to: href(galleryRoute) },
-  { label: "Feed", prefix: "/feed", to: href(feedRoute) },
+  //
+  // These four use href's string form (SH1): a registered STATIC path stands
+  // in for the route object, so linking needs no route.def import at all. The
+  // path is still verified — the union comes from the generated registry, and
+  // a typo or a dynamic path (`href("/gallery/[photoId]")`) fails to compile.
+  // The form is hash-only: no params, and no search even where the route
+  // defines one (about's `ref`) — a query string only comes from a route
+  // object's search codecs.
+  { label: "About", prefix: "/about", to: href("/about") },
+  { label: "Dashboard", prefix: "/dashboard", to: href("/dashboard") },
+  { label: "Gallery", prefix: "/gallery", to: href("/gallery") },
+  { label: "Feed", prefix: "/feed", to: href("/feed") },
   {
     label: "Legacy",
     prefix: "/legacy",
