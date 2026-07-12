@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# One release run at a time, and never cancel a run that may be mid-publish.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the version branch, create tags and GitHub Releases
+  pull-requests: write # open/update the "Version Packages" PR
+  id-token: write # npm trusted publishing (OIDC)
+
+jobs:
+  release:
+    name: Version PR / publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        # version is read from the packageManager field in package.json
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # OIDC trusted publishing requires npm >= 11.5.1; don't trust whatever
+      # the runner's Node image happens to bundle.
+      - run: npm install -g npm@^11
+
+      - run: pnpm install --frozen-lockfile
+
+      # The full ci.yml gate set. It must be repeated here because CI never
+      # runs on the Version Packages PR: PRs created with GITHUB_TOKEN don't
+      # trigger other workflows, so this is the only pre-publish check.
+      - run: pnpm format:check
+      - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm --filter example-type-errors run check
+      - run: pnpm test
+      - run: pnpm test:types
+      - run: pnpm test:types:next
+      - run: pnpm test:types:registry
+
+      # No NPM_TOKEN on purpose: auth is OIDC via the trusted publisher
+      # registered on npmjs.com for both packages (repo JasonPaff/paramour,
+      # workflow release.yml). If a scoped publish fails with a masked
+      # "E404 ... PUT", see npm/cli#8976 before reaching for tokens.
+      - uses: changesets/action@v1
+        with:
+          commit: "chore: release packages"
+          publish: pnpm changeset publish
+          title: "chore: release packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
