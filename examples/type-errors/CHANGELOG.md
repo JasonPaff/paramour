@@ -1,5 +1,13 @@
 # example-type-errors
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [[`5c4a25c`](https://github.com/JasonPaff/paramour/commit/5c4a25c37b543ca96df2a2e15291a946ee8a0d56)]:
+  - paramour@0.2.1
+  - @paramour-js/next@0.1.2
+
 ## 0.0.2
 
 ### Patch Changes

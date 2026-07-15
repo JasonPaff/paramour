@@ -1,5 +1,14 @@
 # @paramour-js/next
 
+## 0.1.2
+
+### Patch Changes
+
+- [#10](https://github.com/JasonPaff/paramour/pull/10) [`5c4a25c`](https://github.com/JasonPaff/paramour/commit/5c4a25c37b543ca96df2a2e15291a946ee8a0d56) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Publish with npm provenance and explicit public access (`publishConfig`), and switch release changelogs to the GitHub-linked format.
+
+- Updated dependencies [[`5c4a25c`](https://github.com/JasonPaff/paramour/commit/5c4a25c37b543ca96df2a2e15291a946ee8a0d56)]:
+  - paramour@0.2.1
+
 ## 0.1.1
 
 ### Patch Changes
