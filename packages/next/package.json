@@ -63,5 +63,9 @@
   "files": [
     "bin",
     "dist"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }

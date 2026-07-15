@@ -5,38 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   checks:
     name: Format, lint, typecheck, test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-        # version is read from the packageManager field in package.json
+      - uses: ./.github/actions/setup
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - run: pnpm format:check
-      # build before lint and typecheck: packages/next's type-checked source
-      # and the examples resolve the packages' dist types, and pnpm's
-      # topological order builds core → next → example-basic.
-      - run: pnpm build
-      - run: pnpm lint
-      - run: pnpm typecheck
-      # Negative suite: examples/type-errors must fail tsc with EXACTLY its
-      # expected diagnostics (and stay codegen-drift-free). It defines no
-      # build/typecheck scripts, so the recursive gates above never sweep it.
-      - run: pnpm --filter example-type-errors run check
-      - run: pnpm test
-      - run: pnpm test:types
-      - run: pnpm test:types:next
-      - run: pnpm test:types:registry
+      - uses: ./.github/actions/checks
 
   # DESIGN §12: "Next: latest two majors. Verified in CI matrix."
   #
@@ -52,6 +34,7 @@ jobs:
   next-compat:
     name: Next ${{ matrix.next }} compat
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: checks
     strategy:
       fail-fast: false
@@ -62,14 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       # The compat package resolves @paramour-js/next through its built dist.
       - run: pnpm build:packages
@@ -80,3 +56,22 @@ jobs:
       - run: pnpm --filter example-next-compat add -D next@${{ matrix.next }}
 
       - run: pnpm --filter example-next-compat run typecheck
+
+  # Single stable context for branch protection: the ruleset requires "CI OK"
+  # and nothing else, so renaming jobs or bumping the compat matrix's Next
+  # versions never silently detaches a required check.
+  ci-ok:
+    name: CI OK
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [checks, next-compat]
+    if: always()
+    steps:
+      - name: All jobs succeeded
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then
+            echo "One or more required jobs did not succeed:"
+            echo "  checks: ${{ needs.checks.result }}"
+            echo "  next-compat: ${{ needs.next-compat.result }}"
+            exit 1
+          fi

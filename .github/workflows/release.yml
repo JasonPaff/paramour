@@ -18,35 +18,20 @@ jobs:
   release:
     name: Version PR / publish
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-        # version is read from the packageManager field in package.json
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - uses: ./.github/actions/setup
 
       # OIDC trusted publishing requires npm >= 11.5.1; don't trust whatever
       # the runner's Node image happens to bundle.
       - run: npm install -g npm@^11
 
-      - run: pnpm install --frozen-lockfile
-
-      # The full ci.yml gate set. It must be repeated here because CI never
-      # runs on the Version Packages PR: PRs created with GITHUB_TOKEN don't
-      # trigger other workflows, so this is the only pre-publish check.
-      - run: pnpm format:check
-      - run: pnpm build
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm --filter example-type-errors run check
-      - run: pnpm test
-      - run: pnpm test:types
-      - run: pnpm test:types:next
-      - run: pnpm test:types:registry
+      # The full ci.yml gate. It must run again here because CI never runs on
+      # the Version Packages PR: PRs created with GITHUB_TOKEN don't trigger
+      # other workflows, so this is the only pre-publish check.
+      - uses: ./.github/actions/checks
 
       # No NPM_TOKEN on purpose: auth is OIDC via the trusted publisher
       # registered on npmjs.com for both packages (repo JasonPaff/paramour,
