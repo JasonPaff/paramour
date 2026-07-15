@@ -1,0 +1,38 @@
+name: Checks
+description: The full check gate — format, build, lint, typecheck, tests. Shared by ci.yml and release.yml so the two can never drift.
+
+runs:
+  using: composite
+  steps:
+    - run: pnpm format:check
+      shell: bash
+
+    # build before lint and typecheck: packages/next's type-checked source
+    # and the examples resolve the packages' dist types, and pnpm's
+    # topological order builds core → next → example-basic.
+    - run: pnpm build
+      shell: bash
+
+    - run: pnpm lint
+      shell: bash
+
+    - run: pnpm typecheck
+      shell: bash
+
+    # Negative suite: examples/type-errors must fail tsc with EXACTLY its
+    # expected diagnostics (and stay codegen-drift-free). It defines no
+    # build/typecheck scripts, so the recursive gates above never sweep it.
+    - run: pnpm --filter example-type-errors run check
+      shell: bash
+
+    - run: pnpm test
+      shell: bash
+
+    - run: pnpm test:types
+      shell: bash
+
+    - run: pnpm test:types:next
+      shell: bash
+
+    - run: pnpm test:types:registry
+      shell: bash
