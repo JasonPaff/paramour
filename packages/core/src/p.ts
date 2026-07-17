@@ -1,8 +1,9 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import { type Codec, createCodec } from "./codec.js";
+import { type AnyCodec, type Codec, createCodec } from "./codec.js";
 import {
   foreignMessage,
+  ParamourError,
   ParseError,
   rebrandForeign,
   SerializeError,
@@ -120,6 +121,13 @@ function stringifyJson(value: unknown): string {
 }
 
 /**
+ * Shared element for no-arg `p.csv()` — codecs are immutable, so one
+ * schemaless string codec serves every list. Lazily built: `p` does not
+ * exist yet while the module initializes.
+ */
+let defaultCsvElement: AnyCodec | undefined;
+
+/**
  * The `p.*` wire-codec builders (DESIGN §5 layer 1, design-02 D9).
  * Each codec defines how one value crosses the URL boundary, both directions.
  */
@@ -139,6 +147,99 @@ export const p = {
           );
         }
         return value ? "true" : "false";
+      },
+    });
+  },
+
+  /**
+   * A comma-separated scalar list in ONE wire value (design-11 CV1): arity
+   * "single", so the full modifier set applies — unlike `p.stringArray`'s
+   * repeated-key format (CV7: both are first-class; csv is the one-key
+   * packing). Elements are strings unless an element codec is given.
+   */
+  csv<E = string>(element?: Codec<E>): Codec<E[]> {
+    // CV2: presence, catch, and arity-many inners are excluded by the
+    // parameter type (the D3 philosophy); these guards mirror that
+    // type-state for JS consumers (the RL1 ethos) — only the element
+    // functions are captured below, so an accepted modifier would be
+    // silently dropped, not applied. Nesting is detected structurally via
+    // ~element (never via ~kind, which is reflection-only and free-form for
+    // p.custom labels). Comma-emitting p.custom inners are undetectable
+    // here and are caught by the CV4 serialize guard instead.
+    const inner: AnyCodec = element ?? (defaultCsvElement ??= p.string());
+    if (inner["~element"] !== undefined) {
+      throw new ParamourError(
+        "p.csv() elements cannot themselves be csv lists",
+      );
+    }
+    if (
+      inner["~arity"] === "many" ||
+      inner["~caught"] ||
+      inner["~presence"] !== "required"
+    ) {
+      throw new ParamourError(
+        "p.csv() elements cannot carry modifiers (.optional()/.default()/.catch()) or be array codecs",
+      );
+    }
+    const parseInner = inner["~parseElement"];
+    const serializeInner = inner["~serializeElement"];
+    return createCodec<E[]>({
+      element: inner,
+      kind: "csv",
+      parseElement: (raw) => {
+        // CV3: the empty wire string is [] — checked before split, because
+        // "".split(",") is [""], which the strict grammar would reject.
+        if (raw === "") return [];
+        const result: unknown[] = [];
+        for (const segment of raw.split(",")) {
+          // CV3: strict grammar — "a,,b", trailing "a,", and a lone "," are
+          // ParseErrors, recoverable via the LIST's .catch() (D2).
+          if (segment === "") {
+            throw new ParseError(`"${raw}" contains an empty list element`);
+          }
+          // CV3: the first element failure aborts the list parse — the
+          // element codec's own ParseError propagates unwrapped.
+          result.push(parseInner(segment));
+        }
+        return result;
+      },
+      serializeElement: (value) => {
+        if (!Array.isArray(value)) {
+          throw new SerializeError(
+            `Expected an array, got ${showValue(value)}`,
+          );
+        }
+        const parts: string[] = [];
+        for (const item of value) {
+          const serialized: unknown = serializeInner(item);
+          // A plain-JS custom element serializer can return a non-string;
+          // enforce the string contract here — as search.ts/path.ts do at
+          // their ~serializeElement call sites — so the CV4 guards below
+          // cannot throw raw TypeErrors.
+          if (typeof serialized !== "string") {
+            throw new SerializeError(
+              `List element serializer must return a string, got ${typeof serialized}`,
+            );
+          }
+          // CV4: an empty segment on re-parse; [""] is deliberately
+          // unrepresentable — the empty wire string already means [].
+          if (serialized === "") {
+            throw new SerializeError(
+              `List element ${showValue(item)} serializes to the empty string`,
+            );
+          }
+          // CV4: would mis-split on re-parse.
+          if (serialized.includes(",")) {
+            throw new SerializeError(
+              `List element serialization "${serialized}" contains a comma`,
+            );
+          }
+          parts.push(serialized);
+        }
+        // [] joins to "" (CV5) — which is also why .default([])'s
+        // define-time pre-serialization succeeds and D8 elision compares
+        // [] against the empty wire form.
+        return parts.join(",");
       },
     });
   },

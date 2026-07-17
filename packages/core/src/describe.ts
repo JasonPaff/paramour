@@ -22,6 +22,11 @@ export interface CodecDescription {
   readonly arity: Arity;
   readonly caught: boolean;
   readonly defaultValue?: CodecDefaultDescription;
+  /**
+   * Nested description of a composite list codec's element scalar (CV6;
+   * currently `p.csv`).
+   */
+  readonly element?: CodecDescription;
   readonly enumMembers?: readonly string[];
   readonly kind: string;
   readonly presence: Presence;
@@ -59,11 +64,15 @@ export type SearchDescription =
  */
 export function describeCodec(codec: AnyCodec): CodecDescription {
   const defaultValue = describeDefault(codec);
+  const element = codec["~element"];
   const enumMembers = codec["~enumMembers"];
   return {
     arity: codec["~arity"],
     caught: codec["~caught"],
     ...(defaultValue === undefined ? {} : { defaultValue }),
+    // Recursion terminates: nested csv is rejected at construction (CV2),
+    // and element codecs are unmodified scalars with no element of their own.
+    ...(element === undefined ? {} : { element: describeCodec(element) }),
     ...(enumMembers === undefined ? {} : { enumMembers }),
     kind: codec["~kind"],
     presence: codec["~presence"],

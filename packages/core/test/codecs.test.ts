@@ -3,7 +3,13 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { p, ParamourError, ParseError, SerializeError } from "../src";
+import {
+  type Codec,
+  p,
+  ParamourError,
+  ParseError,
+  SerializeError,
+} from "../src";
 
 const parse = (
   codec: { "~parseElement": (raw: string) => unknown },
@@ -415,6 +421,151 @@ describe("p.custom", () => {
     });
     expect(() => parse(codec, "x")).toThrow(ParseError);
     expect(() => parse(codec, "x")).toThrow("oops");
+  });
+});
+
+describe("p.csv", () => {
+  it("parses comma-separated segments through the element codec", () => {
+    expect(parse(p.csv(), "a,b")).toEqual(["a", "b"]);
+    expect(parse(p.csv(p.integer()), "1,-2")).toEqual([1, -2]);
+    expect(parse(p.csv(p.enum(["a", "b"])), "b,a")).toEqual(["b", "a"]);
+    expect(parse(p.csv(), "solo")).toEqual(["solo"]);
+  });
+
+  it("CV3: the empty wire string decodes to []", () => {
+    expect(parse(p.csv(), "")).toEqual([]);
+    expect(parse(p.csv(p.integer()), "")).toEqual([]);
+  });
+
+  it("CV3: empty segments are parse errors, not filtered", () => {
+    for (const raw of [",", "a,", ",a", "a,,b"]) {
+      expect(() => parse(p.csv(), raw)).toThrow(ParseError);
+      expect(() => parse(p.csv(), raw)).toThrow(/empty list element/);
+    }
+  });
+
+  it("CV3: the first element failure aborts the list parse", () => {
+    expect(() => parse(p.csv(p.integer()), "1,x,2")).toThrow(ParseError);
+    expect(() => parse(p.csv(p.integer()), "1,x,2")).toThrow(
+      /"x" is not an integer/,
+    );
+  });
+
+  it("CV3: element order is preserved, duplicates kept (no dedupe)", () => {
+    expect(parse(p.csv(), "b,a,b")).toEqual(["b", "a", "b"]);
+  });
+
+  it("serializes per element and joins with commas; [] is the empty string (CV5)", () => {
+    expect(serialize(p.csv(p.integer()), [2, -3])).toBe("2,-3");
+    expect(serialize(p.csv(), ["a", "b"])).toBe("a,b");
+    expect(serialize(p.csv(), [])).toBe("");
+  });
+
+  it("CV4: a comma-containing element is a SerializeError", () => {
+    expect(() => serialize(p.csv(), ["a,b"])).toThrow(SerializeError);
+    expect(() => serialize(p.csv(), ["a,b"])).toThrow(/contains a comma/);
+  });
+
+  it('CV4: an empty-serializing element is a SerializeError ([""] is unrepresentable)', () => {
+    expect(() => serialize(p.csv(), [""])).toThrow(SerializeError);
+    expect(() => serialize(p.csv(), [""])).toThrow(/empty string/);
+  });
+
+  it("element serialize failures surface (no coercion)", () => {
+    expect(() => serialize(p.csv(p.integer()), [1.5])).toThrow(SerializeError);
+    expect(() => serialize(p.csv(), [1])).toThrow(SerializeError);
+    expect(() => serialize(p.csv(), [1])).toThrow(/Expected a string/);
+  });
+
+  it("rejects non-array serialize input", () => {
+    expect(() => serialize(p.csv(), "a,b")).toThrow(SerializeError);
+    expect(() => serialize(p.csv(), "a,b")).toThrow(/Expected an array/);
+  });
+
+  it("CV2: a nested csv element is a construction-time ParamourError", () => {
+    // A nested csv passes the type-level constraint (it is structurally an
+    // unmodified single scalar) — the runtime guard is the backstop.
+    expect(() => p.csv(p.csv())).toThrow(ParamourError);
+    expect(() => p.csv(p.csv())).toThrow(/cannot themselves be csv lists/);
+    expect(() => p.csv(p.csv(p.integer()))).toThrow(ParamourError);
+  });
+
+  it("CV2: nesting is detected structurally, not via the reflection label", () => {
+    // ~kind is reflection metadata a p.custom label can set to anything —
+    // a scalar labeled "csv" is a legal comma-free element, not a nested list.
+    const labeled = p.custom<string>({
+      label: "csv",
+      parse: (raw) => raw,
+      serialize: (value) => value,
+    });
+    expect(() => p.csv(labeled)).not.toThrow();
+    expect(parse(p.csv(labeled), "a,b")).toEqual(["a", "b"]);
+  });
+
+  it("CV2: a modified element is a construction-time ParamourError (runtime mirror of the type-state)", () => {
+    // Plain-JS consumers bypass the parameter type; only ~parseElement/
+    // ~serializeElement are captured, so an accepted modifier would be
+    // silently dropped (e.g. "1,x" throwing instead of recovering to [1, 0]).
+    const modified: Codec<unknown>[] = [
+      p.integer().catch(0) as unknown as Codec<unknown>,
+      p.integer().default(1) as unknown as Codec<unknown>,
+      p.integer().optional() as unknown as Codec<unknown>,
+      p.stringArray() as unknown as Codec<unknown>,
+    ];
+    for (const inner of modified) {
+      expect(() => p.csv(inner)).toThrow(ParamourError);
+      expect(() => p.csv(inner)).toThrow(/cannot carry modifiers/);
+    }
+  });
+
+  it("a non-string-returning custom element serializer is a SerializeError, not a TypeError", () => {
+    // rebrandForeign wraps throws, not bad return values — the string
+    // contract must be enforced before the CV4 guards consume the result.
+    const broken = p.custom<unknown>({
+      parse: (raw) => raw,
+      serialize: () => undefined as unknown as string,
+    });
+    expect(() => serialize(p.csv(broken), ["a"])).toThrow(SerializeError);
+    expect(() => serialize(p.csv(broken), ["a"])).toThrow(
+      /must return a string/,
+    );
+  });
+
+  it("round-trips per element kind", () => {
+    const string = p.csv();
+    expect(parse(string, serialize(string, ["x", "y z"]))).toEqual([
+      "x",
+      "y z",
+    ]);
+
+    const integer = p.csv(p.integer());
+    expect(parse(integer, serialize(integer, [7, -12]))).toEqual([7, -12]);
+
+    const dates = p.csv(p.isoDate());
+    const wire = serialize(dates, [new Date(Date.UTC(2026, 6, 4))]);
+    expect(wire).toBe("2026-07-04");
+    expect((parse(dates, wire) as Date[]).map((d) => d.getTime())).toEqual([
+      Date.UTC(2026, 6, 4),
+    ]);
+
+    const bigint = p.csv(
+      p.custom<bigint>({
+        parse: (raw) => {
+          if (!/^-?\d+$/.test(raw))
+            throw new ParseError(`"${raw}" is not a bigint`);
+          return BigInt(raw);
+        },
+        serialize: (value) => value.toString(),
+      }),
+    );
+    expect(parse(bigint, serialize(bigint, [9007199254740993n]))).toEqual([
+      9007199254740993n,
+    ]);
+  });
+
+  it(".default([]) pre-serializes cleanly; a comma-carrying default fails at define time", () => {
+    expect(() => p.csv().default([])).not.toThrow();
+    expect(() => p.csv().default(["a,b"])).toThrow(SerializeError);
   });
 });
 

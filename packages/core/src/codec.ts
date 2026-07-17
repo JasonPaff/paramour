@@ -28,7 +28,8 @@ export type Arity = "many" | "single";
  *
  * `.default()` and `.catch()` accept either a value or a zero-arg factory;
  * factories are invoked per decode/encode, so reference-typed defaults can be
- * isolated per call (plain object values are returned by reference).
+ * isolated per call. Array values are shallow-copied per call for the same
+ * isolation; other plain object values are returned by reference.
  *
  * Properties prefixed `~` are internal machinery, not public API. For
  * arity-"many" codecs the element functions operate on single elements of
@@ -67,6 +68,11 @@ export interface Codec<
   readonly "~defaultElides": boolean;
   /** Stored as a thunk regardless of the form passed to `.default()`. */
   readonly "~defaultValue": (() => Out) | undefined;
+  /**
+   * Element codec of a composite list codec (currently `p.csv`) — the
+   * per-segment scalar; undefined for every non-composite kind (CV6).
+   */
+  readonly "~element": AnyCodec | undefined;
   /** Members of a `p.enum` codec; undefined for every other kind. */
   readonly "~enumMembers": readonly string[] | undefined;
   /**
@@ -102,6 +108,7 @@ interface CodecState<Out> {
   readonly catchValue: (() => Out) | undefined;
   readonly defaultElides: boolean;
   readonly defaultValue: (() => Out) | undefined;
+  readonly element: AnyCodec | undefined;
   readonly enumMembers: readonly string[] | undefined;
   readonly kind: string;
   readonly parseElement: (raw: string) => unknown;
@@ -112,6 +119,7 @@ interface CodecState<Out> {
 /** Internal factory used by the `p.*` builders. */
 export function createCodec<Out, A extends Arity = "single">(impl: {
   arity?: A;
+  element?: AnyCodec;
   enumMembers?: readonly string[];
   kind?: string;
   parseElement: (raw: string) => unknown;
@@ -122,6 +130,7 @@ export function createCodec<Out, A extends Arity = "single">(impl: {
     catchValue: undefined,
     defaultElides: false,
     defaultValue: undefined,
+    element: impl.element,
     enumMembers: impl.enumMembers,
     kind: impl.kind ?? "custom",
     parseElement: impl.parseElement,
@@ -185,6 +194,7 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
     "~caught": state.catchValue !== undefined,
     "~defaultElides": state.defaultElides,
     "~defaultValue": state.defaultValue,
+    "~element": state.element,
     "~enumMembers": state.enumMembers,
     "~kind": state.kind,
 
@@ -229,7 +239,14 @@ function toThunk<Out>(
   stored: (() => Out) | Out,
   what: "catch" | "default",
 ): () => Out {
-  if (!isFactory(stored)) return () => stored;
+  if (!isFactory(stored)) {
+    // Array values are handed out as fresh shallow copies: a consumer
+    // mutating a decoded fallback must not pollute later decodes or shift
+    // D8 elision (p.csv makes array defaults idiomatic — CV5). Non-array
+    // reference values stay by-reference; use a factory to isolate those.
+    if (Array.isArray(stored)) return () => stored.slice() as Out;
+    return () => stored;
+  }
   return () => {
     try {
       return stored();

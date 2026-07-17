@@ -1,9 +1,8 @@
 import { defineAppRoute, p } from "paramour";
 
-import { csvList } from "../../../lib/codecs";
 import { coords } from "../../../lib/schemas";
 
-// Date/time, JSON, and custom codecs, plus the FACTORY forms of the modifiers.
+// Date/time, JSON, and list codecs, plus the FACTORY forms of the modifiers.
 export const eventsRoute = defineAppRoute("/events/[date]", {
   params: {
     // p.isoDate — strict YYYY-MM-DD, round-trip validated (rejects Feb 30),
@@ -18,8 +17,12 @@ export const eventsRoute = defineAppRoute("/events/[date]", {
     attempts: p.integer().default(() => 0),
     // p.json refined by a Zod schema: JSON.parse then validate, both ways.
     coords: p.json(coords).optional(),
-    // p.custom (the CSV codec) with a FACTORY .catch() then .optional(): a
-    // malformed value recovers to a fresh []; an absent key stays undefined.
-    ref: csvList.catch((): string[] => []).optional(),
+    // p.csv (the comma-separated list codec) with a FACTORY .catch() then
+    // .optional(): a malformed list (e.g. an empty segment) recovers to a
+    // fresh []; an absent key stays undefined.
+    ref: p
+      .csv()
+      .catch((): string[] => [])
+      .optional(),
   },
 });

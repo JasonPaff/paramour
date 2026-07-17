@@ -69,7 +69,7 @@ export function Playground() {
   const [page, setPage] = useState("2");
   const [query, setQuery] = useState("labels=a,b&q=hi&tags=x&tags=y&page=3");
 
-  // encode side of the search config — labels is required (a custom codec with
+  // encode side of the search config — labels is required (a p.csv codec with
   // no presence modifier); q/page/tags are omittable.
   const searchInput: InferSearchInput<typeof demoSearch> = {
     labels: splitCsv(labels),
@@ -134,7 +134,7 @@ export function Playground() {
           <div>
             <Field label="q (optional)" onChange={setQ} value={q} />
             <Field
-              label="labels (required, csv custom codec)"
+              label="labels (required, p.csv codec)"
               onChange={setLabels}
               value={labels}
             />
@@ -167,8 +167,9 @@ export function Playground() {
             <p className="hint">
               Drop <code>labels=</code> for a <code>SearchDecodeError</code>{" "}
               whose <code>.issues</code> name the missing required key; set{" "}
-              <code>page=abc</code> for a per-key <code>ParseError</code>{" "}
-              aggregated into the same error.
+              <code>labels=a,,b</code> for p.csv&apos;s strict empty-segment{" "}
+              <code>ParseError</code>; set <code>page=abc</code> for a per-key{" "}
+              <code>ParseError</code> aggregated into the same error.
             </p>
           </div>
           <div>

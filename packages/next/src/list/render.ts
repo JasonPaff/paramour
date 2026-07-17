@@ -48,14 +48,14 @@ export function buildListJson(report: ListReport): unknown {
 }
 
 /**
- * `integer`, `enum(a, b)`, `string[]`, with annotations in fixed order:
- * presence, default, catch.
+ * `integer`, `enum(a, b)`, `string[]`, `csv<integer>`, with annotations in
+ * fixed order: presence, default, catch.
  */
 export function formatCodec(description: CodecDescription): string {
-  let base =
-    description.enumMembers === undefined
-      ? description.kind
-      : `enum(${description.enumMembers.join(", ")})`;
+  let base = formatKind(description);
+  if (description.element !== undefined) {
+    base = `${base}<${formatKind(description.element)}>`;
+  }
   if (description.arity === "many") base += "[]";
   const notes: string[] = [];
   if (description.presence === "optional") notes.push("(optional)");
@@ -114,6 +114,15 @@ function definitionJson(definition: DescribedDefinition): unknown {
     router: definition.description.router,
     search: definition.description.search,
   };
+}
+
+/** `integer`, or `enum(a, b)` when members are carried. */
+function formatKind(
+  description: Pick<CodecDescription, "enumMembers" | "kind">,
+): string {
+  return description.enumMembers === undefined
+    ? description.kind
+    : `enum(${description.enumMembers.join(", ")})`;
 }
 
 /**

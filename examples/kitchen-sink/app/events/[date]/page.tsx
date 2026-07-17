@@ -61,7 +61,7 @@ export default async function EventsPage(props: RouteProps) {
           </dd>
           <dt>
             <code>search.ref</code> —{" "}
-            <code>p.custom(csv).catch(() =&gt; []).optional()</code>
+            <code>p.csv().catch(() =&gt; []).optional()</code>
           </dt>
           <dd>
             {search.data.ref

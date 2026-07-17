@@ -13,6 +13,7 @@ import {
 describe("describeCodec", () => {
   it("reports each builder's kind", () => {
     expect(describeCodec(p.boolean()).kind).toBe("boolean");
+    expect(describeCodec(p.csv()).kind).toBe("csv");
     expect(describeCodec(p.enum(["a", "b"])).kind).toBe("enum");
     expect(describeCodec(p.integer()).kind).toBe("integer");
     expect(describeCodec(p.isoDate()).kind).toBe("isoDate");
@@ -36,7 +37,33 @@ describe("describeCodec", () => {
   it("omits inapplicable optional members entirely", () => {
     const description = describeCodec(p.string());
     expect("defaultValue" in description).toBe(false);
+    expect("element" in description).toBe(false);
     expect("enumMembers" in description).toBe(false);
+  });
+
+  it("CV6: csv carries a nested element description", () => {
+    expect(describeCodec(p.csv(p.integer())).element).toEqual({
+      arity: "single",
+      caught: false,
+      kind: "integer",
+      presence: "required",
+    });
+    // The no-arg form carries string element semantics (CV2).
+    expect(describeCodec(p.csv()).element?.kind).toBe("string");
+    expect(
+      describeCodec(p.csv(p.enum(["a", "b"]))).element?.enumMembers,
+    ).toEqual(["a", "b"]);
+  });
+
+  it("CV6: element survives modifiers; value defaults reflect the list wire form", () => {
+    const modified = p.csv(p.integer()).default([1, 2]).catch([]);
+    const description = describeCodec(modified);
+    expect(description.element?.kind).toBe("integer");
+    expect(description.defaultValue).toEqual({ kind: "value", wire: "1,2" });
+    expect(describeCodec(p.csv().default([])).defaultValue).toEqual({
+      kind: "value",
+      wire: "",
+    });
   });
 
   it("carries enum members", () => {

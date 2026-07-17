@@ -139,6 +139,83 @@ describe("arrays (repeated keys)", () => {
   });
 });
 
+describe("csv lists (design-11)", () => {
+  it("CV3: tags=a,b decodes to a two-element list", () => {
+    expect(decodeSearch({ tags: p.csv() }, { tags: "a,b" })).toEqual({
+      tags: ["a", "b"],
+    });
+    expect(decodeSearch({ tags: p.csv(p.integer()) }, { tags: "1,2" })).toEqual(
+      { tags: [1, 2] },
+    );
+  });
+
+  it("CV3: present-but-empty ?tags= decodes to []", () => {
+    expect(decodeSearch({ tags: p.csv() }, { tags: "" })).toEqual({
+      tags: [],
+    });
+  });
+
+  it("CV3: an empty segment is a per-key issue, recoverable via .catch()", () => {
+    expect(() => decodeSearch({ tags: p.csv() }, { tags: "a,,b" })).toThrow(
+      SearchDecodeError,
+    );
+    expect(
+      decodeSearch(
+        { tags: p.csv().catch((): string[] => []) },
+        { tags: "a,,b" },
+      ),
+    ).toEqual({ tags: [] });
+    // D2: catch recovers failures, never absence — absent required still errors.
+    expect(() =>
+      decodeSearch({ tags: p.csv().catch((): string[] => []) }, {}),
+    ).toThrow(SearchDecodeError);
+  });
+
+  it("CV5: absent under .default([]) and present-but-empty both reach []", () => {
+    const config = { tags: p.csv().default([]) };
+    expect(decodeSearch(config, {})).toEqual({ tags: [] });
+    expect(decodeSearch(config, { tags: "" })).toEqual({ tags: [] });
+  });
+
+  it("CV5: .optional() reads absent as undefined, ?tags= as []", () => {
+    const config = { tags: p.csv().optional() };
+    expect(decodeSearch(config, {})).toEqual({ tags: undefined });
+    expect(decodeSearch(config, { tags: "" })).toEqual({ tags: [] });
+  });
+
+  it("CV5/D8: mutating a decoded value-form default does not pollute later decodes or elision", () => {
+    const config = { tags: p.csv().default([]) };
+    const first = decodeSearch(config, {});
+    first.tags.push("x");
+    expect(decodeSearch(config, {})).toEqual({ tags: [] });
+    // Elision still compares against the config's [] — the explicitly-set
+    // value equal to the mutation must stay on the wire.
+    expect(searchToString(config, { tags: ["x"] })).toBe("?tags=x");
+  });
+
+  it("CV5/D8: a list equal to its [] default is elided", () => {
+    const config = { tags: p.csv().default([]) };
+    expect(searchToString(config, { tags: [] })).toBe("");
+    expect(searchToString(config, {})).toBe("");
+    expect(searchToString(config, { tags: ["a"] })).toBe("?tags=a");
+  });
+
+  it("CV3/S3: [] on a required csv key emits tags= and round-trips", () => {
+    const config = { tags: p.csv() };
+    const wire = searchToString(config, { tags: [] });
+    expect(wire).toBe("?tags=");
+    expect(decodeSearch(config, new URLSearchParams(wire.slice(1)))).toEqual({
+      tags: [],
+    });
+  });
+
+  it("CV4: a comma-containing element is a SerializeError at link-build time", () => {
+    expect(() => encodeSearch({ tags: p.csv() }, { tags: ["a,b"] })).toThrow(
+      SerializeError,
+    );
+  });
+});
+
 describe("byte-layer serialization", () => {
   it("C13: unicode round-trips byte-exact through the platform decoder", () => {
     const wire = searchToString({ q: p.string() }, { q: "héllo wörld" });

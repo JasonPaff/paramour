@@ -77,6 +77,7 @@ const KITCHEN_DEFS = `import { defineAppRoute, definePagesRoute, p } from "param
 export const product = defineAppRoute("/product/[id]", {
   params: { id: p.integer() },
   search: {
+    labels: p.csv(p.integer()),
     q: p.string().optional(),
     sort: p.enum(["name", "price"]).default("name"),
     tags: p.stringArray(),
@@ -104,6 +105,7 @@ describe.skipIf(!runnable)("paramour list", () => {
     expect(text).toContain("string (optional)");
     expect(text).toContain("enum(name, price) (default: name)");
     expect(text).toContain("string[]");
+    expect(text).toContain("labels: csv<integer>");
     // The definition-less route is flagged, not an error.
     expect(text).toMatch(/\/\s+⚠ filesystem only/);
     expect(run.err).toEqual([]);

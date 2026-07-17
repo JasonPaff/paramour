@@ -240,6 +240,8 @@ describe("dual property (§6): serialize ∘ parse ≅ id on canonical wire", ()
         ["0", "1.5", "-2.25", "1e+21", "0.30000000000000004", "1e-7"],
       ],
       [p.boolean() as Codec<unknown>, ["true", "false"]],
+      [p.csv() as Codec<unknown>, ["", "a", "a,b", "a b,é ü"]],
+      [p.csv(p.integer()) as Codec<unknown>, ["1,2,3", "-17", ""]],
       [p.enum(["price", "rating"]) as Codec<unknown>, ["price", "rating"]],
       [
         p.isoDate() as Codec<unknown>,
@@ -278,6 +280,7 @@ describe("dual property (§6): serialize ∘ parse ≅ id on canonical wire", ()
 
   it("non-canonical accepted inputs re-serialize to canonical form (normalizer, never error amplifier)", () => {
     const cases: [Codec<unknown>, string, string][] = [
+      [p.csv(p.integer()) as Codec<unknown>, "007,1", "7,1"],
       [p.integer() as Codec<unknown>, "007", "7"],
       [p.integer() as Codec<unknown>, "-0", "0"],
       [p.number() as Codec<unknown>, "2E3", "2000"],
@@ -314,11 +317,16 @@ describe("full loop: parse ∘ href ≅ id", () => {
       params: { cat: p.string() },
       search: {
         flag: p.boolean().optional(),
+        labels: p.csv(),
         n: p.integer().default(5),
         q: p.string(),
         tags: p.stringArray(),
       },
     });
+    // CV4: csv elements must be non-empty and comma-free to serialize.
+    const csvElement = wireString.filter(
+      (value) => value !== "" && !value.includes(","),
+    );
     await fc.assert(
       fc.asyncProperty(
         segmentString,
@@ -326,12 +334,19 @@ describe("full loop: parse ∘ href ≅ id", () => {
         fc.integer(),
         fc.option(fc.boolean(), { nil: undefined }),
         fc.array(wireString),
-        async (cat, q, n, flag, tags) => {
+        fc.array(csvElement),
+        async (cat, q, n, flag, tags, labels) => {
           const link = href(route, {
             params: { cat },
             // exactOptionalPropertyTypes: an absent optional key, never an
             // explicit undefined.
-            search: { n, q, tags, ...(flag === undefined ? {} : { flag }) },
+            search: {
+              labels,
+              n,
+              q,
+              tags,
+              ...(flag === undefined ? {} : { flag }),
+            },
           });
           const [, catSegment] = simulateNextDecode(pathOf(link));
           const result = await route.parse({
@@ -340,8 +355,9 @@ describe("full loop: parse ∘ href ≅ id", () => {
           });
           expect(result.params).toStrictEqual({ cat });
           // n equal to its default is elided on the wire (D8) and restored
-          // by the default on decode — same value either way.
-          expect(result.search).toStrictEqual({ flag, n, q, tags });
+          // by the default on decode — same value either way. labels: [] on
+          // a required csv key rides labels= and comes back as [] (CV3).
+          expect(result.search).toStrictEqual({ flag, labels, n, q, tags });
         },
       ),
     );
