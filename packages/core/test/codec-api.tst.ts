@@ -74,6 +74,41 @@ test("exported utility types resolve against built codecs", () => {
   expect<PresenceOf<typeof codec>>().type.toBe<"defaulted">();
 });
 
+test("p.csv infers E[] output, string[] when no element is given", () => {
+  expect(p.csv()["~out"]).type.toBe<string[]>();
+  expect(p.csv(p.integer())["~out"]).type.toBe<number[]>();
+  expect(p.csv(p.enum(["a", "b"]))["~out"]).type.toBe<("a" | "b")[]>();
+  expect(p.csv(p.isoDate())["~out"]).type.toBe<Date[]>();
+});
+
+test("p.csv rejects modified and arity-many elements (CV2)", () => {
+  expect(p.csv).type.toBeCallableWith(p.integer());
+  expect(p.csv).type.not.toBeCallableWith(p.integer().optional());
+  expect(p.csv).type.not.toBeCallableWith(p.integer().default(1));
+  expect(p.csv).type.not.toBeCallableWith(p.integer().catch(0));
+  expect(p.csv).type.not.toBeCallableWith(p.stringArray());
+  // The one type-level hole: a nested csv is structurally an unmodified
+  // single scalar, so it compiles — the runtime ParamourError guard in
+  // codecs.test.ts is the backstop (CV2).
+  expect(p.csv).type.toBeCallableWith(p.csv());
+});
+
+test("p.csv takes ordinary modifier chains (scalar arity, CV5)", () => {
+  expect(p.csv().default).type.toBeCallableWith([]);
+  expect(p.csv(p.integer()).default).type.toBeCallableWith([1, 2]);
+  expect(p.csv(p.integer()).default).type.not.toBeCallableWith(["x"]);
+  expect(p.csv()["~arity"]).type.toBe<"single">();
+  expect(p.csv().default([])["~presence"]).type.toBe<"defaulted">();
+  expect(
+    p
+      .csv()
+      .catch((): string[] => [])
+      .optional()["~presence"],
+  ).type.toBe<"optional">();
+  expect(p.csv().optional().optional).type.toBe<never>();
+  expect(p.csv().default([]).default).type.toBe<never>();
+});
+
 test("array codecs reject presence modifiers; catch stays legal", () => {
   expect(p.stringArray().default).type.toBe<never>();
   expect(p.stringArray().optional).type.toBe<never>();
