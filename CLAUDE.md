@@ -30,7 +30,7 @@ CI runs, in order: `format:check`, `build`, `lint`, `typecheck`, `test`, `test:t
 
 ## Design docs and decision IDs
 
-Design/spike/review docs live in `.claude/docs/` (gitignored — internal docs never go in the public repo): `DESIGN.md` (overall architecture), `design-02-codec-api.md` (codec API decisions), `wire-format-spec.md` (URL wire format). Code comments cite decision IDs from these docs — `D3`, `S6`, `P6`, `§4`, etc. When touching behavior near such a comment, read the cited section first; when adding behavior that implements a spec rule, cite the ID the same way.
+Design/spike/review docs live in `.claude/docs/` (gitignored — internal docs never go in the public repo), currently `design-07` through `design-11` plus analysis docs (`competitor-feature-comparison.md`, `examples-gaps.md`, `proposal-dx-improvements.md`). Each design doc has a decision-ID prefix (design-10 → `NQ*`, design-11 → `CV*`). The early numbered rules (`D*` codec API, `S*`/`P*`/`SS*` wire format, `RL*` route layer) come from retired docs (`DESIGN.md`, `design-02-codec-api.md`, `design-04`, `wire-format-spec.md`, …) and now live only in the code comments that cite them — the comment at the citation site is the authoritative statement of the rule. When touching behavior near such a comment, read it (and its neighbors citing the same ID) first; when adding behavior that implements a documented decision, cite its ID the same way.
 
 ## Core architecture (`packages/core/src`)
 
