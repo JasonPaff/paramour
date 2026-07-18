@@ -13,7 +13,10 @@ export default tseslint.config(
       "**/*.tst.*",
       "coverage/**",
       "examples/**",
-      "docs/**",
+      "docs/.next/**",
+      "docs/.source/**",
+      "**/next-env.d.ts",
+      "**/paramour-env.d.ts",
     ],
   },
   eslint.configs.recommended,
@@ -26,6 +29,22 @@ export default tseslint.config(
       tseslint.configs.stylisticTypeChecked,
     ],
     files: ["packages/**/*.{ts,tsx}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
+  // The docs site is a first-class workspace (design-14 DS2): same
+  // type-checked bar as the packages.
+  {
+    extends: [
+      tseslint.configs.strictTypeChecked,
+      tseslint.configs.stylisticTypeChecked,
+    ],
+    files: ["docs/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
         projectService: true,

@@ -6,3 +6,7 @@ CHANGELOG.md
 # artifact's TR3 multi-line union into permanent drift against strict builds.
 **/next-env.d.ts
 **/paramour-env.d.ts
+
+# MDX is hand-formatted: prettier's mdx parser predates MDX v3 and can shift
+# Twoslash's positional `// ^?` markers.
+*.mdx
