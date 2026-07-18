@@ -295,7 +295,42 @@ describe("enum select (DT8)", () => {
 
 describe("array textarea (DT8)", () => {
   const tagsRoute = defineAppRoute("/tags", {
-    search: { tags: p.stringArray() },
+    search: { tags: p.array() },
+  });
+
+  it("renders a textarea seeded one wire value per line and commits every line", () => {
+    setUrl("/tags?tags=a&tags=b");
+    const navigate = observeOn(tagsRoute, [
+      ["tags", "a"],
+      ["tags", "b"],
+    ]);
+    render(<ParamourDevtoolsPanel />);
+    const textarea = screen.getByLabelText<HTMLTextAreaElement>("edit tags");
+    // The element must actually BE the textarea: the single-line fallback
+    // also matches getByLabelText, but it seeds from the first pair only —
+    // committing from it silently drops every other repeated value.
+    expect(textarea.tagName).toBe("TEXTAREA");
+    expect(textarea.value).toBe("a\nb");
+    expect(textarea.placeholder).toBe("one value per line");
+    fireEvent.change(textarea, { target: { value: "a\nb\nc" } });
+    fireEvent.blur(textarea);
+    expect(navigate).toHaveBeenCalledExactlyOnceWith("?tags=a&tags=b&tags=c");
+  });
+
+  it("csv keeps its single-line input with the element comma hint", () => {
+    // The csv-vs-array contrast the widget dispatch must preserve: csv's
+    // one comma-joined wire value edits in a plain input, and only csv may
+    // show the `element,…` comma hint — on a repeated-key array it would
+    // invite a comma-joined value the element parse rejects.
+    const csvRoute = defineAppRoute("/csv", {
+      search: { ids: p.csv(p.integer()) },
+    });
+    setUrl("/csv?ids=1,2");
+    observeOn(csvRoute, [["ids", "1,2"]]);
+    render(<ParamourDevtoolsPanel />);
+    const input = screen.getByLabelText<HTMLInputElement>("edit ids");
+    expect(input.tagName).toBe("INPUT");
+    expect(input.placeholder).toBe("integer,…");
   });
 
   it("clearing the textarea removes the key instead of committing one empty element", () => {
@@ -309,6 +344,24 @@ describe("array textarea (DT8)", () => {
     fireEvent.change(textarea, { target: { value: "" } });
     fireEvent.blur(textarea);
     expect(navigate).toHaveBeenCalledExactlyOnceWith("");
+  });
+});
+
+describe("index number input (DT8)", () => {
+  it("p.index gets the integer number widget, not a free-text input", () => {
+    // p.index shares p.integer's wire grammar (a strict digit string, floor
+    // 1), so it must get the same number widget — type "number", step "1" —
+    // plus the wire floor as min.
+    const pagedRoute = defineAppRoute("/paged", {
+      search: { page: p.index() },
+    });
+    setUrl("/paged?page=3");
+    observeOn(pagedRoute, [["page", "3"]]);
+    render(<ParamourDevtoolsPanel />);
+    const input = screen.getByLabelText<HTMLInputElement>("edit page");
+    expect(input.type).toBe("number");
+    expect(input.step).toBe("1");
+    expect(input.min).toBe("1");
   });
 });
 

@@ -134,7 +134,7 @@ describe("parseContext (PR10)", () => {
 
   it("a repeated query key (array value) decodes through an array codec", () => {
     const tags = definePagesRoute("/tags", {
-      search: { tags: p.stringArray() },
+      search: { tags: p.array() },
     });
     expect(tags.parseContext({ query: { tags: ["a", "b"] } }).search).toEqual({
       tags: ["a", "b"],

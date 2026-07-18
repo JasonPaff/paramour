@@ -17,7 +17,7 @@ export const productsRoute = defineAppRoute("/products", {
     labels: p.csv().default([]),
     page: p.integer().default(1),
     q: p.string().optional(),
-    tags: p.stringArray(),
+    tags: p.array(),
   },
 });
 
@@ -48,7 +48,7 @@ The adapter imports from `nuqs/server`, so the derived parsers are usable in ser
 | `.default(value)`           | `withDefault(value)` — non-nullable read, clearOnDefault stays on  |
 | `.default(() => value)`     | plain (nullable) parser — see below                                |
 | `.catch(value \| fn)`       | parse failures recover to the catch value before nuqs's `null`     |
-| `p.stringArray()`           | multi parser (repeated keys, `?tags=a&tags=b`) — absent reads `[]` |
+| `p.array()`                 | multi parser (repeated keys, `?tags=a&tags=b`) — absent reads `[]` |
 
 **Equality is wire-form.** The derived `eq` compares values by serializing both through the codec — the same judgment paramour's encode uses to elide default values. So nuqs's clearOnDefault and paramour's URL elision agree by construction, for every codec kind including `p.custom`, with no hand-written comparators: both writers produce the identical canonical URL.
 

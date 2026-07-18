@@ -99,6 +99,31 @@ function refineForSerialize(schema: StandardSchemaV1, value: unknown): unknown {
   return result.value;
 }
 
+/**
+ * Shared element admission for `p.array`/`p.csv` (PP1/CV2): resolves the
+ * no-arg default and mirrors the type-state exclusions — presence, catch,
+ * and arity-many inners — for JS consumers (the RL1 ethos). Only the
+ * element's parse/serialize functions are captured by the list builders, so
+ * an accepted modifier would be silently dropped, not applied; one guard
+ * keeps that runtime mirror of the type-state in a single place.
+ */
+function resolveListElement(
+  element: AnyCodec | undefined,
+  builder: "p.array" | "p.csv",
+): AnyCodec {
+  const inner = element ?? (defaultListElement ??= p.string());
+  if (
+    inner["~arity"] === "many" ||
+    inner["~caught"] ||
+    inner["~presence"] !== "required"
+  ) {
+    throw new ParamourError(
+      `${builder}() elements cannot carry modifiers (.optional()/.default()/.catch()) or be array codecs`,
+    );
+  }
+  return inner;
+}
+
 function serializeFiniteNumber(value: unknown): string {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new SerializeError(
@@ -106,6 +131,29 @@ function serializeFiniteNumber(value: unknown): string {
     );
   }
   return String(value);
+}
+
+/**
+ * Serialize-side twin of {@link parseIntegerElement}, shared by `p.integer`
+ * and `p.index`: schema refinement plus the finite and safe-integer guards.
+ * Returns the refined NUMBER — `p.integer` stringifies it as-is, `p.index`
+ * shifts it into the 1-based wire form first — so the happy path pays no
+ * throwaway stringification.
+ */
+function serializeIntegerElement(
+  schema: StandardSchemaV1 | undefined,
+  value: unknown,
+): number {
+  const refined = schema ? refineForSerialize(schema, value) : value;
+  if (typeof refined !== "number" || !Number.isFinite(refined)) {
+    throw new SerializeError(
+      `Expected a finite number, got ${showValue(refined)}`,
+    );
+  }
+  if (!Number.isSafeInteger(refined)) {
+    throw new SerializeError(`${String(refined)} is not a safe integer`);
+  }
+  return refined;
 }
 
 /**
@@ -121,17 +169,45 @@ function stringifyJson(value: unknown): string {
 }
 
 /**
- * Shared element for no-arg `p.csv()` — codecs are immutable, so one
- * schemaless string codec serves every list. Lazily built: `p` does not
+ * Shared element for no-arg `p.csv()`/`p.array()` — codecs are immutable, so
+ * one schemaless string codec serves every list. Lazily built: `p` does not
  * exist yet while the module initializes.
  */
-let defaultCsvElement: AnyCodec | undefined;
+let defaultListElement: AnyCodec | undefined;
 
 /**
  * The `p.*` wire-codec builders (DESIGN §5 layer 1, design-02 D9).
  * Each codec defines how one value crosses the URL boundary, both directions.
  */
 export const p = {
+  /**
+   * A repeated-key list (`?tags=a&tags=b`, design-13 PP1): arity "many", so
+   * presence modifiers are unavailable — absent and `[]` are the same wire
+   * state (S6/P6) — unlike `p.csv`'s one-key packing (CV7). Elements are
+   * strings unless an element codec is given.
+   */
+  array<E = string>(element?: Codec<E>): Codec<E[], "required", false, "many"> {
+    // PP1: same element-by-composition shape as p.csv (CV2) — presence,
+    // catch, and arity-many inners are excluded by the parameter type;
+    // resolveListElement mirrors that type-state for JS consumers. Unlike
+    // csv there is no nested-composite special case: a csv element is a
+    // legal whole-value scalar per repeated key (?m=a,b&m=c,d), and
+    // repeated-key values have no separator for element serializations to
+    // collide with, so no CV4 twin is needed either.
+    const inner = resolveListElement(element, "p.array");
+    // The element functions already have the arity-"many" per-element
+    // contract (one wire value per array item), so they pass through as-is;
+    // the string-return contract on custom serializers is enforced at the
+    // search.ts/path.ts call sites, same as using the element directly.
+    return createCodec<E[], "many">({
+      arity: "many",
+      element: inner,
+      kind: "array",
+      parseElement: inner["~parseElement"],
+      serializeElement: inner["~serializeElement"],
+    });
+  },
+
   boolean(): Codec<boolean> {
     return createCodec<boolean>({
       kind: "boolean",
@@ -153,32 +229,26 @@ export const p = {
 
   /**
    * A comma-separated scalar list in ONE wire value (design-11 CV1): arity
-   * "single", so the full modifier set applies — unlike `p.stringArray`'s
+   * "single", so the full modifier set applies — unlike `p.array`'s
    * repeated-key format (CV7: both are first-class; csv is the one-key
    * packing). Elements are strings unless an element codec is given.
    */
   csv<E = string>(element?: Codec<E>): Codec<E[]> {
     // CV2: presence, catch, and arity-many inners are excluded by the
-    // parameter type (the D3 philosophy); these guards mirror that
-    // type-state for JS consumers (the RL1 ethos) — only the element
-    // functions are captured below, so an accepted modifier would be
-    // silently dropped, not applied. Nesting is detected structurally via
-    // ~element (never via ~kind, which is reflection-only and free-form for
-    // p.custom labels). Comma-emitting p.custom inners are undetectable
-    // here and are caught by the CV4 serialize guard instead.
-    const inner: AnyCodec = element ?? (defaultCsvElement ??= p.string());
+    // parameter type (the D3 philosophy); resolveListElement mirrors that
+    // type-state for JS consumers (the RL1 ethos). Nesting is detected
+    // structurally via ~element (never via ~kind, which is reflection-only
+    // and free-form for p.custom labels). Comma-emitting p.custom inners
+    // are undetectable here and are caught by the CV4 serialize guard
+    // instead.
+    const inner = resolveListElement(element, "p.csv");
+    // The shared guard ran first: p.array also carries ~element (PP1), and
+    // the arity guard owns the "array codecs" wording — the ~element guard
+    // here is then specifically the nested-csv (arity-"single" composite)
+    // case.
     if (inner["~element"] !== undefined) {
       throw new ParamourError(
         "p.csv() elements cannot themselves be csv lists",
-      );
-    }
-    if (
-      inner["~arity"] === "many" ||
-      inner["~caught"] ||
-      inner["~presence"] !== "required"
-    ) {
-      throw new ParamourError(
-        "p.csv() elements cannot carry modifiers (.optional()/.default()/.catch()) or be array codecs",
       );
     }
     const parseInner = inner["~parseElement"];
@@ -296,6 +366,47 @@ export const p = {
     });
   },
 
+  /**
+   * A 1-based-on-wire / 0-based-in-memory integer for pagination-style
+   * params (`?page=1` ↔ index 0, design-13 PP5). Deliberately stricter than
+   * nuqs's `parseAsIndex`, whose below-floor behavior is unspecified: wire
+   * values below 1 are a ParseError (recoverable via `.catch()`, like any
+   * other malformed input), and a negative in-memory index — which cannot
+   * round-trip through the 1-based wire floor — is a SerializeError at
+   * link-build time (the RL1 ethos). The optional schema validates the
+   * in-memory (0-based) value on both sides.
+   */
+  index<S extends StandardSchemaV1<number, number>>(
+    schema?: S,
+  ): Codec<S extends undefined ? number : StandardSchemaV1.InferOutput<S>> {
+    return createCodec({
+      kind: "index",
+      parseElement: (raw) => {
+        const wire = parseIntegerElement(raw);
+        if (wire < 1) {
+          throw new ParseError(`"${raw}" is below the 1-based wire floor of 1`);
+        }
+        const value = wire - 1;
+        return schema ? refine(schema, value) : value;
+      },
+      serializeElement: (value) => {
+        const index = serializeIntegerElement(schema, value);
+        if (index < 0) {
+          throw new SerializeError(
+            `${String(index)} is negative and cannot round-trip through the 1-based wire form`,
+          );
+        }
+        const wire = index + 1;
+        if (!Number.isSafeInteger(wire)) {
+          throw new SerializeError(
+            `${String(index)} is outside the 1-based wire form's safe integer range`,
+          );
+        }
+        return String(wire);
+      },
+    });
+  },
+
   integer<S extends StandardSchemaV1<number, number>>(
     schema?: S,
   ): Codec<S extends undefined ? number : StandardSchemaV1.InferOutput<S>> {
@@ -305,14 +416,8 @@ export const p = {
         const value = parseIntegerElement(raw);
         return schema ? refine(schema, value) : value;
       },
-      serializeElement: (value) => {
-        const refined = schema ? refineForSerialize(schema, value) : value;
-        const serialized = serializeFiniteNumber(refined);
-        if (!Number.isSafeInteger(refined)) {
-          throw new SerializeError(`${serialized} is not a safe integer`);
-        }
-        return serialized;
-      },
+      serializeElement: (value) =>
+        String(serializeIntegerElement(schema, value)),
     });
   },
 
@@ -395,20 +500,6 @@ export const p = {
           throw new SerializeError("Expected a string");
         }
         return refined;
-      },
-    });
-  },
-
-  stringArray(): Codec<string[], "required", false, "many"> {
-    return createCodec<string[], "many">({
-      arity: "many",
-      kind: "string",
-      parseElement: (raw) => raw,
-      serializeElement: (value) => {
-        if (typeof value !== "string") {
-          throw new SerializeError("Expected an array of strings");
-        }
-        return value;
       },
     });
   },

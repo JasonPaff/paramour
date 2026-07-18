@@ -13,6 +13,6 @@ export const searchRoute = defineAppRoute("/search", {
     // An old deep link straight to a product — moved for good (308).
     product: p.integer(positiveInt).optional(),
     // The old singular spelling of tags.
-    tag: p.stringArray(),
+    tag: p.array(),
   },
 });

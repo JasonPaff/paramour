@@ -56,7 +56,7 @@ export default function HomePage() {
             <span className="pill">number</span>
             <span className="pill">boolean</span>
             <span className="pill">enum</span>
-            <span className="pill">stringArray</span>
+            <span className="pill">array</span>
             <span className="pill">.default()</span>
             <span className="pill">.optional()</span>
             <span className="pill">.catch()</span>

@@ -26,8 +26,8 @@ export const productsRoute = defineAppRoute("/products/[id]", {
       .enum(["relevance", "price", "newest"])
       .default("relevance")
       .catch("relevance"),
-    // p.stringArray — the arity-"many" codec: ?tags=a&tags=b decodes to
+    // p.array — the arity-"many" codec: ?tags=a&tags=b decodes to
     // ["a","b"]; absent decodes to []. Presence modifiers are banned here.
-    tags: p.stringArray(),
+    tags: p.array(),
   },
 });

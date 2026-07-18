@@ -13,15 +13,16 @@ import {
 
 describe("describeCodec", () => {
   it("reports each builder's kind", () => {
+    expect(describeCodec(p.array()).kind).toBe("array");
     expect(describeCodec(p.boolean()).kind).toBe("boolean");
     expect(describeCodec(p.csv()).kind).toBe("csv");
     expect(describeCodec(p.enum(["a", "b"])).kind).toBe("enum");
+    expect(describeCodec(p.index()).kind).toBe("index");
     expect(describeCodec(p.integer()).kind).toBe("integer");
     expect(describeCodec(p.isoDate()).kind).toBe("isoDate");
     expect(describeCodec(p.json(z.object({}))).kind).toBe("json");
     expect(describeCodec(p.number()).kind).toBe("number");
     expect(describeCodec(p.string()).kind).toBe("string");
-    expect(describeCodec(p.stringArray()).kind).toBe("string");
     expect(describeCodec(p.timestamp()).kind).toBe("timestamp");
   });
 
@@ -32,7 +33,7 @@ describe("describeCodec", () => {
       kind: "string",
       presence: "required",
     });
-    expect(describeCodec(p.stringArray()).arity).toBe("many");
+    expect(describeCodec(p.array()).arity).toBe("many");
   });
 
   it("omits inapplicable optional members entirely", () => {
@@ -40,6 +41,21 @@ describe("describeCodec", () => {
     expect("defaultValue" in description).toBe(false);
     expect("element" in description).toBe(false);
     expect("enumMembers" in description).toBe(false);
+  });
+
+  it("PP1: array carries a nested element description", () => {
+    expect(describeCodec(p.array(p.integer())).element).toEqual({
+      arity: "single",
+      caught: false,
+      kind: "integer",
+      presence: "required",
+    });
+    // The no-arg form carries string element semantics, same as p.csv().
+    expect(describeCodec(p.array()).element?.kind).toBe("string");
+    // A csv element nests one level deeper (the deepest legal chain).
+    expect(
+      describeCodec(p.array(p.csv(p.integer()))).element?.element?.kind,
+    ).toBe("integer");
   });
 
   it("CV6: csv carries a nested element description", () => {
@@ -136,7 +152,7 @@ describe("describeRoute", () => {
   it("describes an app route's params and search", () => {
     const route = defineAppRoute("/product/[id]/[...rest]", {
       params: { id: p.integer(), rest: p.string() },
-      search: { q: p.string().optional(), tags: p.stringArray() },
+      search: { q: p.string().optional(), tags: p.array() },
     });
     expect(describeRoute(route)).toEqual({
       params: {
@@ -168,7 +184,13 @@ describe("describeRoute", () => {
           tags: {
             arity: "many",
             caught: false,
-            kind: "string",
+            element: {
+              arity: "single",
+              caught: false,
+              kind: "string",
+              presence: "required",
+            },
+            kind: "array",
             presence: "required",
           },
         },
@@ -231,9 +253,24 @@ describe("formatCodecDescription", () => {
         "compact",
       ),
     ).toBe("integer =ƒ()");
+    expect(formatCodecDescription(describeCodec(p.array()), "compact")).toBe(
+      "string[]",
+    );
     expect(
-      formatCodecDescription(describeCodec(p.stringArray()), "compact"),
-    ).toBe("string[]");
+      formatCodecDescription(describeCodec(p.array(p.integer())), "compact"),
+    ).toBe("integer[]");
+    expect(
+      formatCodecDescription(
+        describeCodec(p.array(p.enum(["a", "b"]))),
+        "compact",
+      ),
+    ).toBe("enum(a|b)[]");
+    expect(
+      formatCodecDescription(
+        describeCodec(p.array(p.csv(p.integer()))),
+        "compact",
+      ),
+    ).toBe("csv<integer>[]");
     expect(
       formatCodecDescription(
         describeCodec(p.csv(p.enum(["a", "b"]))),
@@ -264,8 +301,21 @@ describe("formatCodecDescription", () => {
         "verbose",
       ),
     ).toBe("csv<enum(a, b)>");
+    expect(formatCodecDescription(describeCodec(p.array()), "verbose")).toBe(
+      "string[]",
+    );
+  });
+
+  it("a forced arity-many description keeps a non-array kind's wrapper", () => {
+    // `paramour list` renders catch-all params by spreading arity "many"
+    // onto the per-segment description (render.ts formatParam); a csv
+    // segment must keep its wrapper — `csv<integer>[]`, never `integer[]`,
+    // which is what a plain per-segment p.integer() catch-all renders.
     expect(
-      formatCodecDescription(describeCodec(p.stringArray()), "verbose"),
-    ).toBe("string[]");
+      formatCodecDescription(
+        { ...describeCodec(p.csv(p.integer())), arity: "many" },
+        "compact",
+      ),
+    ).toBe("csv<integer>[]");
   });
 });

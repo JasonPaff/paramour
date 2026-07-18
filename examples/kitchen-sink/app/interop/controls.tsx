@@ -106,9 +106,7 @@ export function Controls() {
             </div>
           </div>
           <div className="field">
-            <span>
-              tags — p.stringArray(): repeated keys (?tags=a&amp;tags=b)
-            </span>
+            <span>tags — p.array(): repeated keys (?tags=a&amp;tags=b)</span>
             <div className="checks">
               {ALL_TAGS.map((tag) => (
                 <label key={tag}>

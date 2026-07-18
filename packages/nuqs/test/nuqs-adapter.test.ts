@@ -1,4 +1,4 @@
-import type { MultiParserBuilder, SingleParserBuilder } from "nuqs/server";
+import type { SingleParserBuilder } from "nuqs/server";
 import type { AnyCodec } from "paramour";
 
 import { createLoader, createSerializer } from "nuqs/server";
@@ -9,7 +9,6 @@ import {
   encodeSearch,
   p,
   ParamourError,
-  ParseError,
   rawSearch,
   SearchDecodeError,
 } from "paramour";
@@ -24,11 +23,6 @@ import { nuqsParser, nuqsParsers } from "../src/index.js";
  */
 const derive = (codec: AnyCodec) =>
   nuqsParser(codec as never) as unknown as SingleParserBuilder<unknown>;
-
-const deriveMulti = (codec: AnyCodec) =>
-  nuqsParser(codec as never) as unknown as ReturnType<
-    MultiParserBuilder<unknown[]>["withDefault"]
-  >;
 
 const decodeOne = (codec: AnyCodec, wire: string | string[]): unknown =>
   (decodeSearch({ k: codec }, { k: wire }) as Record<string, unknown>).k;
@@ -59,6 +53,7 @@ describe("per-kind round-trips match decodeSearch/encodeSearch", () => {
       value: "HELLO",
     },
     { codec: p.enum(["price", "rating"]), name: "enum", value: "rating" },
+    { codec: p.index(), name: "index", value: 4 },
     { codec: p.integer(), name: "integer", value: 42 },
     {
       codec: p.isoDate(),
@@ -257,21 +252,29 @@ describe(".catch() parity, then null (NQ7)", () => {
 
 describe("arity-many codecs derive multi parsers (NQ8a)", () => {
   it("round-trips repeated keys, absent reads []", () => {
-    const parser = nuqsParser(p.stringArray());
+    const parser = nuqsParser(p.array());
     expect(parser.parse(["a", "b"])).toEqual(["a", "b"]);
     expect(parser.serialize(["a", "b"])).toEqual(["a", "b"]);
     expect(parser.defaultValue).toEqual([]);
   });
 
+  it("PP1: a typed element crosses the same derivation path unchanged", () => {
+    const parser = nuqsParser(p.array(p.integer()));
+    expect(parser.parse(["1", "2"])).toEqual([1, 2]);
+    expect(parser.serialize([1, 2])).toEqual(["1", "2"]);
+    expect(parser.eq([1, 2], [1, 2])).toBe(true);
+    expect(parser.defaultValue).toEqual([]);
+  });
+
   it("eq is element-wise wire-string equality", () => {
-    const parser = nuqsParser(p.stringArray());
+    const parser = nuqsParser(p.array());
     expect(parser.eq(["a", "b"], ["a", "b"])).toBe(true);
     expect(parser.eq(["a", "b"], ["a"])).toBe(false);
     expect(parser.eq(["a", "b"], ["b", "a"])).toBe(false);
   });
 
   it("createLoader sees every repeated key, agreeing with the server decode", () => {
-    const config = { tags: p.stringArray() };
+    const config = { tags: p.array() };
     const load = createLoader(nuqsParsers(config));
     const url = buildSearchString(encodeSearch(config, { tags: ["a", "b"] }));
     expect(load(url)).toEqual({ tags: ["a", "b"] });
@@ -280,23 +283,13 @@ describe("arity-many codecs derive multi parsers (NQ8a)", () => {
   });
 
   it("a failing element resolves the whole key to catch, then null (whole-key recovery)", () => {
-    // No public arity-many builder has a failing element parse today;
-    // structurally-built codecs (the conformance.test.ts precedent) exercise
-    // the recovery path the adapter mirrors from decodeSearch.
-    const failing = (catchValue?: () => unknown): AnyCodec =>
-      ({
-        "~arity": "many",
-        "~catchValue": catchValue,
-        "~parseElement": (raw: string) => {
-          if (raw === "bad") throw new ParseError("bad element");
-          return raw;
-        },
-        "~serializeElement": (value: unknown) => String(value),
-      }) as unknown as AnyCodec;
+    // p.array(p.integer()) is the public arity-many builder with a failing
+    // element parse (PP1); the adapter mirrors decodeSearch's whole-key
+    // recovery, never a per-element one.
     expect(
-      deriveMulti(failing(() => ["recovered"])).parse(["ok", "bad"]),
-    ).toEqual(["recovered"]);
-    expect(deriveMulti(failing()).parse(["ok", "bad"])).toBeNull();
+      nuqsParser(p.array(p.integer()).catch([0])).parse(["1", "x"]),
+    ).toEqual([0]);
+    expect(nuqsParser(p.array(p.integer())).parse(["1", "x"])).toBeNull();
   });
 });
 
@@ -353,7 +346,7 @@ describe("route objects and bare configs are interchangeable (NQ2)", () => {
     search: {
       page: p.integer().default(1),
       q: p.string().optional(),
-      tags: p.stringArray(),
+      tags: p.array(),
     },
   });
 

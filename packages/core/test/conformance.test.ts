@@ -115,27 +115,83 @@ describe("booleans and enums", () => {
 describe("arrays (repeated keys)", () => {
   it("C10: order and duplicate values are preserved", () => {
     const source = new URLSearchParams("tag=a&tag=b&tag=a");
-    expect(decodeSearch({ tag: p.stringArray() }, source)).toEqual({
+    expect(decodeSearch({ tag: p.array() }, source)).toEqual({
       tag: ["a", "b", "a"],
     });
   });
 
   it("C11: absent decodes to []", () => {
-    expect(decodeSearch({ tag: p.stringArray() }, {})).toEqual({ tag: [] });
+    expect(decodeSearch({ tag: p.array() }, {})).toEqual({ tag: [] });
   });
 
   it("C12: a single occurrence decodes to a one-element array", () => {
-    expect(decodeSearch({ tag: p.stringArray() }, { tag: "a" })).toEqual({
+    expect(decodeSearch({ tag: p.array() }, { tag: "a" })).toEqual({
       tag: ["a"],
     });
   });
 
   it("C15: serializing [] emits nothing", () => {
-    expect(searchToString({ tag: p.stringArray() }, { tag: [] })).toBe("");
+    expect(searchToString({ tag: p.array() }, { tag: [] })).toBe("");
   });
 
   it("S6: an omitted array key encodes to nothing (absent ≡ [])", () => {
-    expect(searchToString({ tag: p.stringArray() }, {})).toBe("");
+    expect(searchToString({ tag: p.array() }, {})).toBe("");
+  });
+});
+
+describe("typed repeated-key arrays (design-13 PP1)", () => {
+  it("typed elements round-trip through repeated keys", () => {
+    const config = { ids: p.array(p.integer()) };
+    expect(searchToString(config, { ids: [1, 2] })).toBe("?ids=1&ids=2");
+    expect(decodeSearch(config, new URLSearchParams("ids=1&ids=2"))).toEqual({
+      ids: [1, 2],
+    });
+  });
+
+  it("an element parse failure fails the key; the LIST's .catch() recovers", () => {
+    expect(() =>
+      decodeSearch(
+        { ids: p.array(p.integer()) },
+        new URLSearchParams("ids=1&ids=x"),
+      ),
+    ).toThrow(SearchDecodeError);
+    expect(
+      decodeSearch(
+        { ids: p.array(p.integer()).catch([]) },
+        new URLSearchParams("ids=1&ids=x"),
+      ),
+    ).toEqual({ ids: [] });
+  });
+
+  it("empty-array semantics are element-type-independent (S6/P6)", () => {
+    const config = { ids: p.array(p.integer()) };
+    expect(decodeSearch(config, {})).toEqual({ ids: [] });
+    expect(searchToString(config, { ids: [] })).toBe("");
+  });
+});
+
+describe("p.index (design-13 PP5)", () => {
+  it("?page=1 decodes to index 0; index 0 encodes to ?page=1", () => {
+    expect(decodeSearch({ page: p.index() }, { page: "1" })).toEqual({
+      page: 0,
+    });
+    expect(searchToString({ page: p.index() }, { page: 0 })).toBe("?page=1");
+  });
+
+  it("PP5: the wire floor is recoverable via .catch(), like any malformed input", () => {
+    expect(() => decodeSearch({ page: p.index() }, { page: "0" })).toThrow(
+      SearchDecodeError,
+    );
+    expect(decodeSearch({ page: p.index().catch(0) }, { page: "0" })).toEqual({
+      page: 0,
+    });
+  });
+
+  it("D8: .default(0) elides the wire form page=1", () => {
+    const config = { page: p.index().default(0) };
+    expect(searchToString(config, { page: 0 })).toBe("");
+    expect(searchToString(config, { page: 3 })).toBe("?page=4");
+    expect(decodeSearch(config, {})).toEqual({ page: 0 });
   });
 });
 
@@ -420,7 +476,7 @@ describe("decode-side hygiene", () => {
       >),
     ).toThrow(ParamourError);
     expect(() =>
-      decodeSearch({ tag: p.stringArray() }, {
+      decodeSearch({ tag: p.array() }, {
         tag: [5, true],
       } as unknown as Record<string, string[]>),
     ).toThrow(ParamourError);
@@ -440,7 +496,7 @@ describe("decode-side hygiene", () => {
     Object.defineProperty(tampered, "0", {
       get: (): number | string => (reads++ === 0 ? "x" : 42),
     });
-    expect(decodeSearch({ tag: p.stringArray() }, { tag: tampered })).toEqual({
+    expect(decodeSearch({ tag: p.array() }, { tag: tampered })).toEqual({
       tag: ["x"],
     });
   });
@@ -513,7 +569,7 @@ describe("decode-side hygiene", () => {
     expect(
       decodeSearch({ q: p.string().default("d") }, { q: undefined }),
     ).toEqual({ q: "d" });
-    expect(decodeSearch({ tag: p.stringArray() }, { tag: undefined })).toEqual({
+    expect(decodeSearch({ tag: p.array() }, { tag: undefined })).toEqual({
       tag: [],
     });
   });
@@ -527,25 +583,22 @@ describe("decode-side hygiene", () => {
 
   it("a failing array ELEMENT at encode time is a SerializeError", () => {
     expect(() =>
-      encodeSearch({ tag: p.stringArray() }, {
+      encodeSearch({ tag: p.array() }, {
         tag: ["a", 5],
       } as unknown as { tag: string[] }),
     ).toThrow(SerializeError);
     expect(() =>
-      encodeSearch({ tag: p.stringArray() }, {
+      encodeSearch({ tag: p.array() }, {
         tag: ["a", 5],
       } as unknown as { tag: string[] }),
-    ).toThrow(/Expected an array of strings/);
+    ).toThrow(/Expected a string/);
   });
 });
 
 describe("error contract — every throw is a ParamourError", () => {
   it("non-array input for an array codec is a SerializeError", () => {
     expect(() =>
-      encodeSearch(
-        { tag: p.stringArray() },
-        { tag: null as unknown as string[] },
-      ),
+      encodeSearch({ tag: p.array() }, { tag: null as unknown as string[] }),
     ).toThrow(SerializeError);
   });
 

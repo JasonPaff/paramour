@@ -23,7 +23,7 @@ describe("formatShape (DT7)", () => {
       formatShape(describeCodec(p.enum(["asc", "desc"]).catch("asc"))),
     ).toBe("enum(asc|desc) catch");
     expect(formatShape(describeCodec(p.csv(p.integer())))).toBe("csv<integer>");
-    expect(formatShape(describeCodec(p.stringArray()))).toBe("string[]");
+    expect(formatShape(describeCodec(p.array()))).toBe("string[]");
   });
 
   it("inlines a csv element's enum members (no drift from the CLI's walk)", () => {

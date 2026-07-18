@@ -18,7 +18,7 @@ test("base builders carry their output types", () => {
   expect(p.integer()["~out"]).type.toBe<number>();
   expect(p.boolean()["~out"]).type.toBe<boolean>();
   expect(p.isoDate()["~out"]).type.toBe<Date>();
-  expect(p.stringArray()["~out"]).type.toBe<string[]>();
+  expect(p.array()["~out"]).type.toBe<string[]>();
 });
 
 test("enum keeps its literal union through const inference", () => {
@@ -127,7 +127,7 @@ test("p.csv rejects modified and arity-many elements (CV2)", () => {
   expect(p.csv).type.not.toBeCallableWith(p.integer().optional());
   expect(p.csv).type.not.toBeCallableWith(p.integer().default(1));
   expect(p.csv).type.not.toBeCallableWith(p.integer().catch(0));
-  expect(p.csv).type.not.toBeCallableWith(p.stringArray());
+  expect(p.csv).type.not.toBeCallableWith(p.array());
   // The one type-level hole: a nested csv is structurally an unmodified
   // single scalar, so it compiles — the runtime ParamourError guard in
   // codecs.test.ts is the backstop (CV2).
@@ -150,14 +150,42 @@ test("p.csv takes ordinary modifier chains (scalar arity, CV5)", () => {
   expect(p.csv().default([]).default).type.toBe<never>();
 });
 
+test("p.array infers E[] output, string[] when no element is given (PP1)", () => {
+  expect(p.array()["~out"]).type.toBe<string[]>();
+  expect(p.array(p.integer())["~out"]).type.toBe<number[]>();
+  expect(p.array(p.enum(["a", "b"]))["~out"]).type.toBe<("a" | "b")[]>();
+  expect(p.array(p.isoDate())["~out"]).type.toBe<Date[]>();
+});
+
+test("p.array rejects modified and arity-many elements (PP1)", () => {
+  expect(p.array).type.toBeCallableWith(p.integer());
+  expect(p.array).type.not.toBeCallableWith(p.integer().optional());
+  expect(p.array).type.not.toBeCallableWith(p.integer().default(1));
+  expect(p.array).type.not.toBeCallableWith(p.integer().catch(0));
+  expect(p.array).type.not.toBeCallableWith(p.array());
+  // Unlike csv's nested-csv hole (CV2), a csv element is deliberately legal
+  // here: one whole comma-packed value per repeated key (PP1).
+  expect(p.array).type.toBeCallableWith(p.csv(p.integer()));
+});
+
+test("p.index is an ordinary single-arity integer shape (PP5)", () => {
+  expect(p.index()["~out"]).type.toBe<number>();
+  expect(p.index()["~arity"]).type.toBe<"single">();
+  expect(p.index().default(0)["~presence"]).type.toBe<"defaulted">();
+  expect(p.index().optional()["~presence"]).type.toBe<"optional">();
+  expect(p.index().catch(0)["~caught"]).type.toBe<true>();
+  expect(p.index().optional().optional).type.toBe<never>();
+  expect(p.index().default(0).default).type.toBe<never>();
+});
+
 test("array codecs reject presence modifiers; catch stays legal", () => {
-  expect(p.stringArray().default).type.toBe<never>();
-  expect(p.stringArray().optional).type.toBe<never>();
-  expect(p.stringArray().catch).type.toBeCallableWith(["a"]);
+  expect(p.array().default).type.toBe<never>();
+  expect(p.array().optional).type.toBe<never>();
+  expect(p.array().catch).type.toBeCallableWith(["a"]);
 });
 
 test("catch preserves 'many' arity", () => {
-  expect(p.stringArray().catch(["a"])["~arity"]).type.toBe<"many">();
+  expect(p.array().catch(["a"])["~arity"]).type.toBe<"many">();
 });
 
 test("default and catch accept a factory form", () => {
@@ -209,7 +237,7 @@ test("search input side: omittable keys admit explicit undefined", () => {
     page: p.integer().default(1),
     q: p.string(),
     sort: p.enum(["price", "rating"]).optional(),
-    tags: p.stringArray(),
+    tags: p.array(),
   };
   // Explicit undefined on a defaulted/optional/many key is a second spelling
   // of absence — encodeSearch already omits the key for that value (S3), so
@@ -236,7 +264,7 @@ test("search input side: decoded output round-trips into the input type", () => 
   const config = {
     page: p.integer().default(1),
     sort: p.enum(["price", "rating"]).optional(),
-    tags: p.stringArray(),
+    tags: p.array(),
   };
   // The decode→href round-trip: every-key-present output (optional presence
   // contributing `| undefined`) assigns to the input side wholesale.
@@ -246,12 +274,12 @@ test("search input side: decoded output round-trips into the input type", () => 
 });
 
 test("array codecs: output key always present as an array", () => {
-  const config = { tags: p.stringArray() };
+  const config = { tags: p.array() };
   expect<InferSearchOutput<typeof config>>().type.toBe<{ tags: string[] }>();
 });
 
 test("array codecs: input key may be omitted (absent ≡ [])", () => {
-  const config = { q: p.string(), tags: p.stringArray() };
+  const config = { q: p.string(), tags: p.array() };
   expect<{ q: string }>().type.toBeAssignableTo<
     InferSearchInput<typeof config>
   >();

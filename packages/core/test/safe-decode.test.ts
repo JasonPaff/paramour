@@ -27,7 +27,7 @@ const catchRoute = defineAppRoute("/items", {
 });
 
 const tagsRoute = defineAppRoute("/tags", {
-  search: { tags: p.stringArray() },
+  search: { tags: p.array() },
 });
 
 const filesRoute = defineAppRoute("/files/[...seg]", {

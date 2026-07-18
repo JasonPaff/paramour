@@ -117,7 +117,7 @@ test("params reject presence-modified codecs; catch stays legal (D5)", () => {
   // The params codec describes ONE segment element (D6); arrays come from
   // the segment kind, so arity-"many" codecs are rejected too.
   expect(defineAppRoute).type.not.toBeCallableWith("/product/[id]", {
-    params: { id: p.stringArray() },
+    params: { id: p.array() },
   });
   expect(defineAppRoute).type.toBeCallableWith("/files/[...seg]", {
     params: { seg: p.integer().catch(0) },
