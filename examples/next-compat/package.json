@@ -1,6 +1,6 @@
 {
   "name": "example-next-compat",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "type": "module",
   "description": "Type-level compatibility checks: pins paramour's hand-written assumptions about Next against a real Next install, on every supported major.",
