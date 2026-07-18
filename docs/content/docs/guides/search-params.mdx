@@ -3,6 +3,191 @@ title: Search Params in the App Router
 description: Validated, serializable search params with codec modifiers.
 ---
 
-<Callout title="Under construction">
-  This page is a stub — content lands in a later milestone.
-</Callout>
+Search params are where URL state actually lives — filters, pagination,
+search text, view modes. This guide covers declaring them, reading them in
+server components and route handlers, and building links that serialize them
+correctly.
+
+## Declaring a search config
+
+Each key gets a codec; modifiers express the presence policy:
+
+```ts twoslash title="app/products/route.def.ts"
+import { defineAppRoute, p } from "paramour";
+
+export const productsRoute = defineAppRoute("/products", {
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+    sort: p.enum(["price", "rating", "newest"]).catch("newest"),
+    tags: p.csv(),
+  },
+});
+```
+
+Choosing a modifier is choosing what "absent" and "malformed" mean per key:
+
+- **`.optional()`** when absence is meaningful — "no search text" is a real
+  state your code checks for (`q?: string`).
+- **`.default(v)`** when absence means a canonical value — nobody handles
+  "no page"; page one *is* the absence. Bonus: values equal to the default
+  [elide from URLs](/docs/concepts/serialization#round-tripping).
+- **`.catch(v)`** when a malformed value shouldn't take the page down — a
+  hand-edited `?sort=banana` degrades to `"newest"` instead of erroring.
+- **Bare** when the param is required and malformed input should fail the
+  decode loudly.
+
+## Reading in a server component
+
+`safeParse` (or `parseSearch` if you don't need params) — render the error
+arm rather than crashing on a hand-edited URL:
+
+```tsx twoslash title="app/products/page.tsx"
+// @filename: app/products/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productsRoute = defineAppRoute("/products", {
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+    sort: p.enum(["price", "rating", "newest"]).catch("newest"),
+    tags: p.csv(),
+  },
+});
+
+// @filename: app/products/page.tsx
+import type { RouteProps } from "paramour";
+
+import { productsRoute } from "./route.def";
+
+export default async function ProductsPage(props: RouteProps) {
+  const result = await productsRoute.safeParseSearch(props);
+  if (result.status === "error") {
+    return <p>Bad filter URL: {result.error.issues[0]?.message}</p>;
+  }
+
+  const { page, q, sort, tags } = result.data;
+  //                                ^?
+  return (
+    <p>
+      Page {page}, sorted by {sort}
+      {q && <> — matching “{q}”</>} ({tags.length} tag filters)
+    </p>
+  );
+}
+```
+
+Note what *didn't* need handling: `page` and `sort` are always present
+(default and catch), `tags` is always an array, and unknown keys
+(`?utm_source=…`) are ignored by the decode — none of them can produce the
+error arm.
+
+## Building links
+
+`href` takes the same search shape, serializes each value through its codec,
+and omits what should be omitted (absent optionals, values equal to their
+default):
+
+```ts twoslash
+import { defineAppRoute, href, p } from "paramour";
+
+const productsRoute = defineAppRoute("/products", {
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+    sort: p.enum(["price", "rating", "newest"]).catch("newest"),
+    tags: p.csv(),
+  },
+});
+// ---cut---
+const link = href(productsRoute, {
+  search: { page: 1, sort: "price", tags: ["sale"] },
+  hash: "results",
+});
+// => "/products?sort=price&tags=sale#results"
+```
+
+A filter UI that renders `<Link href={...}>` per option gets canonical URLs
+for free — no `?page=1` cache-splitting, no manually-assembled query
+strings.
+
+## List params: `p.array` vs `p.csv`
+
+Same in-memory type (`string[]`, or `T[]` with an element codec), two wire
+shapes:
+
+| Builder | Wire shape | Modifiers |
+| --- | --- | --- |
+| `p.array()` | `?tags=sale&tags=new` (repeated key) | none — absent *is* `[]` |
+| `p.csv()` | `?tags=sale%2Cnew` (one key) | full set available |
+
+`p.csv` keeps one key per param and supports `.catch()`/`.default()`;
+`p.array` matches the repeated-key convention other stacks emit. Pick per
+param — both round-trip exactly.
+
+## Outside pages: route handlers and middleware
+
+Route handlers and middleware hold a `URLSearchParams`, not page props. The
+standalone decoders take the same route object:
+
+```ts twoslash title="app/api/products/route.ts"
+// @filename: app/products/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productsRoute = defineAppRoute("/products", {
+  search: { page: p.integer().default(1), q: p.string().optional() },
+});
+
+// @filename: app/api/products/route.ts
+import type { NextRequest } from "next/server";
+
+import { NextResponse } from "next/server";
+import { safeDecodeSearch } from "paramour";
+
+import { productsRoute } from "../../products/route.def";
+
+export function GET(request: NextRequest) {
+  const result = safeDecodeSearch(productsRoute, request.nextUrl.searchParams);
+  if (result.status === "error") {
+    return NextResponse.json({ issues: result.error.issues }, { status: 400 });
+  }
+  return NextResponse.json({ page: result.data.page });
+}
+```
+
+An API endpoint and the page it backs now enforce the *same* URL contract
+from the same definition. (`encodeSearch`/`buildSearchString` are the
+serialize-side equivalents, and `standardSearchSchema` exports the contract
+to [Standard Schema consumers](/docs/concepts/standard-schema#the-seam-runs-the-other-way-too)
+like tRPC.)
+
+## The whole-object escape hatch
+
+If per-key codecs genuinely don't fit — a legacy query shape, one schema
+validating cross-key invariants — `rawSearch` hands the entire search object
+to a single Standard Schema:
+
+```ts twoslash
+import { defineAppRoute, rawSearch } from "paramour";
+import { z } from "zod";
+
+export const legacyRoute = defineAppRoute("/legacy", {
+  search: rawSearch(
+    z.object({ from: z.string(), to: z.string() }).refine(
+      (r) => r.from !== r.to,
+      { message: "from and to must differ" },
+    ),
+  ),
+});
+```
+
+The trade is explicit: no per-key defaults or `.catch()`, and no round-trip
+encoding — `href` can't serialize what only a validator understands. It's a
+deliberate, greppable act, not a fallback paramour ever picks for you.
+
+## On the client
+
+Reading search params in client components is the
+[hooks guide](/docs/guides/hooks); *setting* them as client state — the
+filter-panel use case — is what the [nuqs adapter](/docs/guides/nuqs) is
+for.

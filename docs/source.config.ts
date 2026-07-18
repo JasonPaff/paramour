@@ -19,9 +19,10 @@ export default defineConfig({
       transformers: [
         ...(rehypeCodeDefaultOptions.transformers ?? []),
         transformerTwoslash({
-          // tsx twoslash snippets (hooks, devtools, nuqs guides) contain JSX.
+          // tsx twoslash snippets (hooks, devtools, nuqs guides) contain JSX,
+          // and dev-gating snippets read process.env — match a real Next app.
           twoslashOptions: {
-            compilerOptions: { jsx: JsxEmit.ReactJSX },
+            compilerOptions: { jsx: JsxEmit.ReactJSX, types: ["node"] },
           },
           typesCache: createFileSystemTypesCache(),
         }),

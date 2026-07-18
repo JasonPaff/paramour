@@ -3,6 +3,141 @@ title: nuqs Adapter
 description: Derive nuqs parsers from a route's search codecs.
 ---
 
-<Callout title="Under construction">
-  This page is a stub — content lands in a later milestone.
-</Callout>
+[nuqs](https://nuqs.dev) is the standard tool for *writing* search-param
+state from client components — `useQueryState(s)` with batched updates,
+history control, and shallow routing. What it asks of you is a parser per
+key. `@paramour-js/nuqs` derives those parsers from the codecs your route
+already declares, so URL state is never defined twice.
+
+```package-install
+@paramour-js/nuqs nuqs
+```
+
+## A filter panel from a route
+
+`nuqsParsers(route)` turns a route's whole search config into an ordinary
+nuqs parser map:
+
+```tsx twoslash title="app/products/filter-panel.tsx"
+// @filename: app/products/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productsRoute = defineAppRoute("/products", {
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+    tags: p.array(),
+  },
+});
+
+// @filename: app/products/filter-panel.tsx
+"use client";
+
+import { nuqsParsers } from "@paramour-js/nuqs";
+import { useQueryStates } from "nuqs";
+
+import { productsRoute } from "./route.def";
+
+export function FilterPanel() {
+  const [{ page, q, tags }, setFilters] = useQueryStates(
+    nuqsParsers(productsRoute),
+  );
+
+  return (
+    <div>
+      <input
+        onChange={(e) => void setFilters({ page: 1, q: e.target.value })}
+        value={q ?? ""}
+      />
+      <button onClick={() => void setFilters({ page: page + 1 })}>
+        next page ({tags.length} tags active)
+      </button>
+    </div>
+  );
+}
+```
+
+Everything the codecs declared carries over: `page` reads non-nullable
+(its `.default(1)` became `withDefault`), `q` reads `string | null` (nuqs's
+spelling of absent), `tags` is a repeated-key multi-parser that reads `[]`
+when absent, and every value round-trips through the same
+[wire format](/docs/concepts/serialization) your server parse expects. When
+the route's config changes, this component's types change with it.
+
+The output is ordinary nuqs currency — `withOptions`, `createSerializer`,
+`createLoader`, and the server cache all compose untouched. The adapter
+imports from `nuqs/server` internally, so deriving parsers is safe in server
+code too.
+
+## Single-codec derivation
+
+`nuqsParser(codec)` is the one-key form, useful when a component owns a
+single param:
+
+```tsx twoslash
+// @filename: app/products/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productsRoute = defineAppRoute("/products", {
+  search: { page: p.integer().default(1), q: p.string().optional() },
+});
+
+// @filename: app/products/search-box.tsx
+"use client";
+
+import { nuqsParser } from "@paramour-js/nuqs";
+import { useQueryState } from "nuqs";
+import { p } from "paramour";
+
+export function SearchBox() {
+  const [q, setQ] = useQueryState("q", nuqsParser(p.string().optional()));
+
+  return <input onChange={(e) => void setQ(e.target.value)} value={q ?? ""} />;
+}
+```
+
+## The derivation rules
+
+The adapter reads presence and defaults off the codec so the nuqs reading
+matches core's decode:
+
+| Codec shape | nuqs parser |
+| --- | --- |
+| required or `.optional()` | nullable read (`null` = absent) |
+| `.default(value)` | `withDefault(value)` — non-nullable read |
+| `.default(() => value)` (factory) | nullable — a frozen default would lie |
+| `.catch(fallback)` | malformed reads recover to the fallback |
+| `p.array(…)` | multi (repeated-key) parser, `[]` when absent |
+
+## What refuses to compile
+
+nuqs reserves `null` to mean "absent or unparseable" — so a codec whose
+*legitimate output* includes `null` has no faithful nuqs twin, and the
+adapter rejects it at the call site with the reason in the error, rather
+than silently conflating your `null` with nuqs's:
+
+```ts twoslash
+// @errors: 2345
+import { nuqsParser } from "@paramour-js/nuqs";
+import { p } from "paramour";
+
+const maybe = p.custom<null | string>({
+  parse: (raw) => (raw === "null" ? null : raw),
+  serialize: (value) => value ?? "null",
+});
+
+nuqsParser(maybe);
+```
+
+`rawSearch` routes are rejected the same way (there are no per-key codecs
+to derive from), as are search-less routes. Plain-JavaScript callers get the
+same judgments as loud runtime errors.
+
+## Server and client, one contract
+
+The point of deriving rather than declaring: your server components
+[parse](/docs/guides/search-params) with the route, your client components
+*set* state through parsers derived from the route, and
+[`standardSearchSchema`](/docs/concepts/standard-schema#the-seam-runs-the-other-way-too)
+exports the same contract to tRPC and friends. One search config, every
+consumer.

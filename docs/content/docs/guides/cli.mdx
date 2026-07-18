@@ -3,6 +3,157 @@ title: CLI Workflows
 description: generate, check, init, list, and doctor.
 ---
 
-<Callout title="Under construction">
-  This page is a stub — content lands in a later milestone.
-</Callout>
+`@paramour-js/next` ships a `paramour` binary with five commands. One
+contract holds across all of them — exit `0` means success, `1` means "the
+thing you asked me to verify is not true" (drift, failed checks), `2` means
+usage or configuration errors — so CI scripting never has to guess. Every
+command takes `--help`.
+
+Configuration comes from `paramour.config.ts` (or `.mjs`/`.json`) at the
+project root; every field is optional, flags take precedence, and with no
+config at all the CLI infers `app/` / `src/app/` and `pages/` / `src/pages/`.
+
+## generate
+
+Scans the route directories and writes `paramour-env.d.ts` — the
+[registry artifact](/docs/concepts/registry) that narrows route constructors
+to real paths:
+
+```bash
+npx paramour generate
+```
+
+```txt
+paramour: wrote paramour-env.d.ts (3 app routes)
+```
+
+The write is deterministic and idempotent (byte-identical output is a
+skipped write, so timestamps don't churn). Flags: `--app-dir`,
+`--pages-dir`, `--out-file`, `--page-extensions`, and two modes:
+
+- `--watch` — regenerate on route-directory changes, for workflows outside
+  `next dev`. (Inside `next dev`, the `withTypedRoutes` wrapper already
+  keeps the artifact current — and a watcher lock prevents the two from
+  fighting.)
+- `--check` — see below.
+
+## check
+
+`check` is exactly `generate --check`: re-scan, byte-compare against the
+committed artifact, exit `1` on drift, **never write**:
+
+```bash
+npx paramour check
+```
+
+On drift it names what appeared and disappeared, so the fix is obvious:
+rerun `generate` and commit. A missing artifact also counts as drift — CI
+can't silently degrade to unchecked paths.
+
+This is the CI gate. The two standard wirings:
+
+```json title="package.json"
+{
+  "scripts": {
+    "build": "paramour check && next build"
+  }
+}
+```
+
+or `withTypedRoutes(config, { strict: true })`, which upgrades build-phase
+drift into a `next build` failure — this docs site does both.
+
+## init
+
+Sets up a project non-interactively: scaffold `paramour.config.ts`, wrap
+`next.config` with `withTypedRoutes`, add the `"paramour"` package script,
+run the first generate. Every step is idempotent and individually
+skippable:
+
+```bash
+npx paramour init
+```
+
+Flags: `--dry-run` (report every step, write nothing), `--force` (overwrite
+an existing config with the scaffold), and `--no-config` / `--no-wrap` /
+`--no-script` / `--no-generate` to skip steps. If the `next.config` can't be
+transformed safely, init prints the wrap snippet for you to apply by hand
+and still exits `0` — a printed instruction is a successful outcome.
+
+The [Getting Started tutorial](/docs/getting-started#initialize) shows a
+full init run and explains each change.
+
+## list
+
+Prints every filesystem route with its params/search shape:
+
+```bash
+npx paramour list
+```
+
+```txt
+app routes (2):
+  /              app/route.def.ts
+  /product/[id]  app/product/[id]/route.def.ts
+    params:
+      id: integer
+    search:
+      page: integer (default: 1)
+      q:    string (optional)
+```
+
+The filesystem scan decides *which* routes exist (same engine as
+`generate`); shapes come from your `defineAppRoute`/`definePagesRoute` call
+sites — list scans source for those calls and **evaluates the matching
+modules** to read the route objects, which is why definitions should stay
+[import-safe](/docs/concepts/route-objects#convention-routedefts-beside-the-page).
+Set `routeFiles` globs in `paramour.config.ts` to pin which modules are
+scanned.
+
+A filesystem route with no definition (or a definition whose path matches no
+file) is reported as a warning, not an error — the output doubles as a
+coverage report. `--json` emits the same data machine-readably.
+
+## doctor
+
+Diagnoses the whole setup — config validity, route-directory discovery,
+artifact freshness, `next.config` wrapping, version alignment between the
+two packages, tsconfig coverage of the artifact, and route-definition
+discovery:
+
+```bash
+npx paramour doctor
+```
+
+```txt
+  ✔ config: no paramour.config file — defaults in effect
+  ✔ route directories: app/
+  ✔ artifact: paramour-env.d.ts is up to date
+  ✔ next.config: next.config.ts wraps withTypedRoutes
+  ⚠ versions: paramour 0.4.0 != @paramour-js/next 0.2.1
+      align the two versions — they release in lockstep
+  ✔ tsconfig: tsconfig.json includes paramour-env.d.ts
+  ✔ route definitions: 3 found in 3 modules
+      3 of 3 filesystem routes have definitions
+
+doctor: 7 checks — 0 failed, 1 warning
+```
+
+Warnings exit `0`; any failed check exits `1` (so doctor can run in CI too,
+if you want a broader gate than `check`). `--json` for tooling. When
+something about a setup feels off, run doctor before debugging by hand —
+it checks the boring causes first.
+
+## A CI recipe
+
+The minimal honest pipeline: install, verify the registry, build.
+
+```bash
+npx paramour check
+npx tsc --noEmit
+npx next build
+```
+
+`check` catches route drift explicitly and first, with a clear message —
+don't rely solely on strict-mode `withTypedRoutes` inside `next build` to
+find it later in the log.
