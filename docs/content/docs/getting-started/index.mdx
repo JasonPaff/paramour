@@ -255,6 +255,10 @@ export function ParamsPanel() {
 }
 ```
 
+Render it from the page (`<ParamsPanel />` below the `<h1>`), then visit
+`/product/42?q=wool%20socks` — the server and client read the same URL through
+the same route object.
+
 A malformed URL surfaces as the `status: "error"` arm rather than a throw, so
 the component renders a fallback instead of crashing. If you'd rather let an
 error boundary handle it, `useRouteParamsOrThrow` exists — the [hooks
