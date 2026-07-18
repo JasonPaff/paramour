@@ -15,6 +15,7 @@ declare module "paramour" {
       | "/find"
       | "/gallery"
       | "/gallery/[photoId]"
+      | "/interop"
       | "/products"
       | "/products/[id]"
       | "/search"

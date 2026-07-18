@@ -74,12 +74,14 @@ export {
   encodeSearch,
   type InferSearchInput,
   type InferSearchOutput,
+  isRawSearch,
   rawSearch,
   type RawSearch,
   type SearchConfig,
   type SearchOutputOf,
   type SearchSource,
   searchToString,
+  serializeValue,
 } from "./search.js";
 export {
   standardSearchSchema,

@@ -1,0 +1,5 @@
+{
+  "$schema": "https://tstyche.org/schemas/config.json",
+  "testFileMatch": ["packages/nuqs/test/**/*.tst.*"],
+  "tsconfig": "./packages/nuqs/tsconfig.tstyche.json"
+}

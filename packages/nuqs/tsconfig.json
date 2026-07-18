@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src", "test"],
+  // Type tests are checked by tstyche (see tsconfig.tstyche.json), not tsc.
+  "exclude": ["test/**/*.tst.ts"]
+}

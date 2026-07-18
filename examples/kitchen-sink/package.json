@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@paramour-js/next": "workspace:*",
+    "@paramour-js/nuqs": "workspace:*",
     "next": "^16.2.0",
+    "nuqs": "^2.9.0",
     "paramour": "workspace:*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
