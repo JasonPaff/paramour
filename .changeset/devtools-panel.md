@@ -1,7 +1,0 @@
----
-"@paramour-js/devtools": minor
-"@paramour-js/next": minor
-"paramour": minor
----
-
-New `@paramour-js/devtools` package: a TanStack Devtools panel for paramour routes (design-12). The `@paramour-js/next` hooks now emit one observation per decode change — the live route object, the wire snapshot the decode saw, the full pre-`select` `SafeResult` (or `pending`), which hook reported, and a `navigate` capability — into a dependency-free `Symbol.for("paramour.devtools.seam")` global slot (DT4/DT5), with every emit site behind a `process.env.NODE_ENV !== "production"` guard and `sideEffects: false` so production bundles erase it all (DT6); the seam's types publish via the new types-only `@paramour-js/next/devtools-seam` subpath. The panel (DT7–DT18) shows a session sidebar plus a current-route inspector — per-key wire vs parsed tables with codec shapes from `describeRoute`, default/catch attribution, prominent `issues[]`, and Pages `pending` as a first-class status — and makes search params editable: per-kind widgets with live single-key validation, a raw-wire mode for reproducing invalid values, and commit-to-push through `buildSearchString` (spaces stay `%20`) and the emitting hook's router. Core gains `parseValue(codec, raw)`, the parse twin of `serializeValue`, so tooling can probe a parse without `.catch()` recovery (DT7).

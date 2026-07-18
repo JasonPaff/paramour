@@ -1,5 +1,21 @@
 # paramour
 
+## 0.3.0
+
+### Minor Changes
+
+- [#12](https://github.com/JasonPaff/paramour/pull/12) [`ffd6759`](https://github.com/JasonPaff/paramour/commit/ffd6759f5bcebcef3f8561c18b82e38534ac54c3) Thanks [@JasonPaff](https://github.com/JasonPaff)! - New `p.csv(element?)` codec: a comma-separated scalar list in ONE wire value.
+
+  - Arity-"single", so the full modifier set applies — `.optional()`, `.default([])` (with D8 elision: "no tags" is a bare URL), `.catch()` — unlike `p.stringArray()`'s repeated-key format, which stays first-class for form-shaped interop.
+  - Typed elements by composition: `p.csv(p.integer())` is `number[]` on the wire as `1,2,3`; the element must be an unmodified base scalar (presence, default, and catch belong to the list — modified elements fail to compile, nested csv throws at construction).
+  - Strict grammar: the empty wire string is `[]`; empty segments (`a,,b`, trailing commas) are `ParseError`s, recoverable via the list's `.catch()`.
+  - Serialize-side collision guard: an element serializing to the empty string or containing a comma is a loud `SerializeError` at link-build time — round-trip fidelity over silent corruption.
+  - Reflection: `describeCodec` exposes a nested `element` description (`CodecDescription.element`), and `paramour list` renders `csv<integer>`-style shapes (the `@paramour-js/next` change).
+
+- [#14](https://github.com/JasonPaff/paramour/pull/14) [`f8bc826`](https://github.com/JasonPaff/paramour/commit/f8bc82656031cd74bbae00c49d24ff5da56ce7ab) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Type-level: `.default()` now has two overloads (value vs factory form) driving a literal-typed `~defaultElides` via a new fifth `Codec` type parameter, `E extends boolean = boolean`. Runtime behavior is unchanged; derived surfaces (`@paramour-js/nuqs`) can now distinguish value-form defaults (non-nullable, D8-eliding) from factory defaults (never eliding) in the type system. Existing `Codec<Out, P, C, A>` references remain valid — the new parameter defaults to `boolean`.
+
+- [#15](https://github.com/JasonPaff/paramour/pull/15) [`c828534`](https://github.com/JasonPaff/paramour/commit/c828534b15a7724afe0e1202613b0ee9dab76bb3) Thanks [@JasonPaff](https://github.com/JasonPaff)! - New `@paramour-js/devtools` package: a TanStack Devtools panel for paramour routes (design-12). The `@paramour-js/next` hooks now emit one observation per decode change — the live route object, the wire snapshot the decode saw, the full pre-`select` `SafeResult` (or `pending`), which hook reported, and a `navigate` capability — into a dependency-free `Symbol.for("paramour.devtools.seam")` global slot (DT4/DT5), with every emit site behind a `process.env.NODE_ENV !== "production"` guard and `sideEffects: false` so production bundles erase it all (DT6); the seam's types publish via the new types-only `@paramour-js/next/devtools-seam` subpath. The panel (DT7–DT18) shows a session sidebar plus a current-route inspector — per-key wire vs parsed tables with codec shapes from `describeRoute`, default/catch attribution, prominent `issues[]`, and Pages `pending` as a first-class status — and makes search params editable: per-kind widgets with live single-key validation, a raw-wire mode for reproducing invalid values, and commit-to-push through `buildSearchString` (spaces stay `%20`) and the emitting hook's router. Core gains `parseValue(codec, raw)`, the parse twin of `serializeValue`, so tooling can probe a parse without `.catch()` recovery (DT7).
+
 ## 0.2.1
 
 ### Patch Changes
