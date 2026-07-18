@@ -34,5 +34,8 @@ runs:
     - run: pnpm test:types:next
       shell: bash
 
+    - run: pnpm test:types:nuqs
+      shell: bash
+
     - run: pnpm test:types:registry
       shell: bash

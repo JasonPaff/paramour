@@ -1,0 +1,51 @@
+{
+  "name": "@paramour-js/nuqs",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "dependencies": {
+    "paramour": "workspace:*"
+  },
+  "peerDependencies": {
+    "nuqs": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "nuqs": "^2.9.0",
+    "react": "^19.2.0",
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
+  },
+  "description": "nuqs integration for paramour: derive nuqs parsers from a route's search codecs — presence, defaults, catch recovery, and equality read off the codec once, mechanically.",
+  "author": "Jason Paff <jasonpaff@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JasonPaff/paramour.git",
+    "directory": "packages/nuqs"
+  },
+  "homepage": "https://github.com/JasonPaff/paramour#readme",
+  "bugs": {
+    "url": "https://github.com/JasonPaff/paramour/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
