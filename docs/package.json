@@ -24,12 +24,18 @@
     "shiki": "^4.3.1"
   },
   "devDependencies": {
+    "@paramour-js/devtools": "workspace:*",
+    "@paramour-js/nuqs": "workspace:*",
     "@tailwindcss/postcss": "^4.1.0",
+    "@tanstack/react-devtools": "^0.10.8",
     "@types/mdx": "^2.0.13",
     "@types/node": "^24",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "nuqs": "^2.9.0",
     "tailwindcss": "^4.1.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "valibot": "^1.4.2",
+    "zod": "^4.4.3"
   }
 }
