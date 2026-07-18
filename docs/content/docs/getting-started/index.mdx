@@ -1,0 +1,24 @@
+---
+title: Getting Started
+description: Install paramour and define your first typed route.
+---
+
+<Callout title="Under construction">
+  This page is a stub — the full install → route → params → hooks tutorial
+  lands in a later milestone.
+</Callout>
+
+Paramour routes are plain objects: define one next to its page, and you get
+validated params and typed hrefs everywhere you import it. Hover the code
+below — it is compiled against the real packages on every docs build.
+
+```ts twoslash
+import { defineAppRoute, href, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+
+const link = href(productRoute, { params: { id: 42 } });
+//    ^?
+```

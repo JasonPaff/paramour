@@ -13,5 +13,32 @@ autoInstallPeers: false
 # example never exercises next/image optimization, so the script never needs
 # to run — `false` records the decision and keeps
 # `pnpm install --frozen-lockfile` non-interactive in CI.
+# esbuild (via docs → fumadocs-mdx) resolves its native binary through the
+# @esbuild/* optional deps; its install script only swaps the JS wrapper for
+# the binary as an optimization, so it never needs to run.
 allowBuilds:
+  esbuild: false
   sharp: false
+
+# fumadocs-mdx → yuku-analyzer 0.6.x: yuku-ast versions ≤0.6.6 were
+# unpublished from npm (2026-07-18), so the analyzer versions that pin them
+# no longer install. Force the republished line; drop this once fumadocs-mdx
+# resolves there on its own.
+overrides:
+  yuku-analyzer: ">=0.6.12"
+
+minimumReleaseAgeExclude:
+  - "@yuku-analyzer/binding-darwin-arm64@0.6.12"
+  - "@yuku-analyzer/binding-darwin-x64@0.6.12"
+  - "@yuku-analyzer/binding-freebsd-x64@0.6.12"
+  - "@yuku-analyzer/binding-linux-arm-gnu@0.6.12"
+  - "@yuku-analyzer/binding-linux-arm-musl@0.6.12"
+  - "@yuku-analyzer/binding-linux-arm64-gnu@0.6.12"
+  - "@yuku-analyzer/binding-linux-arm64-musl@0.6.12"
+  - "@yuku-analyzer/binding-linux-x64-gnu@0.6.12"
+  - "@yuku-analyzer/binding-linux-x64-musl@0.6.12"
+  - "@yuku-analyzer/binding-win32-arm64@0.6.12"
+  - "@yuku-analyzer/binding-win32-x64@0.6.12"
+  - "@yuku-toolchain/types@0.6.11"
+  - yuku-analyzer@0.6.12
+  - yuku-ast@0.6.11

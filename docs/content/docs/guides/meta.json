@@ -1,0 +1,11 @@
+{
+  "pages": [
+    "defining-routes",
+    "search-params",
+    "hooks",
+    "cli",
+    "nuqs",
+    "devtools"
+  ],
+  "title": "Guides"
+}
