@@ -5,9 +5,11 @@ import { z } from "zod";
 
 import {
   type Codec,
+  foreignMessage,
   p,
   ParamourError,
   ParseError,
+  parseValue,
   SerializeError,
 } from "../src";
 
@@ -635,5 +637,33 @@ describe("modifier runtime guards (JS consumers)", () => {
     const codec = p.integer().catch(0).optional();
     expect(codec["~presence"]).toBe("optional");
     expect(codec["~caught"]).toBe(true);
+  });
+});
+
+describe("parseValue", () => {
+  it("parses one wire element through the codec", () => {
+    expect(parseValue(p.integer(), "42")).toBe(42);
+    expect(parseValue(p.boolean(), "true")).toBe(true);
+  });
+
+  it("throws ParseError WITHOUT applying .catch() (design-12 DT7)", () => {
+    // The whole reason this exists: decodeSearch would recover this failure
+    // to 0, making "parsed cleanly" and "failed but caught" indistinguishable.
+    const caught = p.integer().catch(0);
+    expect(() => parseValue(caught, "abc")).toThrow(ParseError);
+  });
+
+  it("parses a csv codec's whole comma-joined value (its element IS the list)", () => {
+    expect(parseValue(p.csv(p.integer()), "1,2,3")).toEqual([1, 2, 3]);
+  });
+});
+
+describe("foreignMessage", () => {
+  it("renders Errors by message and survives unstringifiable values", () => {
+    // Public via the barrel so derived tooling (the devtools panel's edit
+    // preview) shares the String()-throw hardening: a null-prototype throw
+    // makes String(value) itself throw a TypeError.
+    expect(foreignMessage(new Error("boom"))).toBe("boom");
+    expect(typeof foreignMessage(Object.create(null))).toBe("string");
   });
 });

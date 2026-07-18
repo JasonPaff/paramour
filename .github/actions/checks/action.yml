@@ -31,6 +31,9 @@ runs:
     - run: pnpm test:types
       shell: bash
 
+    - run: pnpm test:types:devtools
+      shell: bash
+
     - run: pnpm test:types:next
       shell: bash
 

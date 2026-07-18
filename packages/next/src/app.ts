@@ -1,17 +1,30 @@
 "use client";
 
-import { useParams, useSearchParams } from "next/navigation";
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import {
   type AnyAppRoute,
   decodeParams,
   decodeSearch,
   type InferRouteParams,
+  ParamsDecodeError,
   safeDecodeParams,
   safeDecodeSearch,
   type SafeResult,
+  SearchDecodeError,
   type SearchOutputOf,
 } from "paramour";
 
+import { searchWireSnapshot } from "./devtools-seam.js";
+import {
+  makeAppNavigate,
+  type ObservationSpec,
+  useDevtoolsEmitter,
+} from "./observe.js";
 import {
   paramsFingerprint,
   searchParamsFingerprint,
@@ -58,6 +71,29 @@ export type { SelectOptions } from "./select.js";
  * at one of these call sites is a compile error, not a runtime surprise —
  * these hooks read Next's App-Router navigation hooks, whose pages twin has
  * different state cardinality (`@paramour-js/next/pages`).
+ *
+ * Devtools instrumentation (design-12): each hook reports through the shared
+ * emitter in observe.ts — `observe` from inside the `useStableResult`
+ * compute callback, which runs exactly on a `(route, fingerprint)` cache
+ * miss, so the SEL4 fingerprint layer IS the decode-change dedup (DT4;
+ * StrictMode's dev double render reuses the ref cache and cannot
+ * double-emit), and `refresh` after the stable result returns, re-emitting
+ * the CACHED result when the pathname moved under an unchanged decode so
+ * the seam's `navigate`/`pathname` never go stale (DT8). Observations carry
+ * the full pre-`select` result (DT12), and the `OrThrow` hooks report the
+ * error observation BEFORE rethrowing — only render-phase can, since an
+ * effect never runs for a throwing render. Every emit sits behind
+ * `process.env.NODE_ENV !== "production"`, which bundlers constant-fold and
+ * erase along with the seam module (DT6); the spec each hook hands the
+ * emitter is built behind the same literal guard, so prod allocates
+ * nothing. `useRouter` and `usePathname` are called unconditionally in
+ * every hook (rules of hooks — a build-constant-guarded call would make
+ * hook order differ between dev and prod bundles); their cost is a
+ * referentially-stable context read each, and only the dev-only spec
+ * captures them. The `navigate` capability receives the panel's SEARCH
+ * STRING only and resolves it against `usePathname()` — basePath-/locale-
+ * relative, exactly what `router.replace` expects back (DT8; the live hash
+ * is preserved at call time).
  */
 
 /**
@@ -83,9 +119,35 @@ export function useRouteParams<R extends AnyAppRoute, U>(
   options?: SelectOptions<InferRouteParams<R>, U>,
 ): SafeResult<InferRouteParams<R>> | SafeResult<U> {
   const params = useParams() ?? {};
-  const result = useStableResult(route, paramsFingerprint(route, params), () =>
-    safeDecodeParams(route, params),
+  const router = useRouter();
+  const pathname = usePathname();
+  const emitter = useDevtoolsEmitter();
+  const spec: ObservationSpec | undefined =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : {
+          hook: "app.useRouteParams",
+          kind: "params",
+          navigate: makeAppNavigate(router, pathname),
+          pathname,
+          route,
+          routerKind: "app",
+          wire: () => ({ ...params }),
+        };
+  const result = useStableResult(
+    route,
+    paramsFingerprint(route, params),
+    () => {
+      const decoded = safeDecodeParams(route, params);
+      if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+        emitter.observe(spec, decoded);
+      }
+      return decoded;
+    },
   );
+  if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+    emitter.refresh(spec);
+  }
   return useSelectedResult(result, options);
 }
 
@@ -110,9 +172,46 @@ export function useRouteParamsOrThrow<R extends AnyAppRoute, U>(
   options?: SelectOptions<InferRouteParams<R>, U>,
 ): InferRouteParams<R> | U {
   const params = useParams() ?? {};
-  const value = useStableResult(route, paramsFingerprint(route, params), () =>
-    decodeParams(route, params),
-  );
+  const router = useRouter();
+  const pathname = usePathname();
+  const emitter = useDevtoolsEmitter();
+  const spec: ObservationSpec | undefined =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : {
+          hook: "app.useRouteParamsOrThrow",
+          kind: "params",
+          navigate: makeAppNavigate(router, pathname),
+          pathname,
+          route,
+          routerKind: "app",
+          wire: () => ({ ...params }),
+        };
+  const value = useStableResult(route, paramsFingerprint(route, params), () => {
+    // The duplicated decode call across the prod/dev branches is the price
+    // of literal-zero prod cost — the bundler keeps exactly one branch (DT6).
+    if (process.env.NODE_ENV === "production") {
+      return decodeParams(route, params);
+    }
+    try {
+      const data = decodeParams(route, params);
+      if (spec !== undefined) {
+        emitter.observe(spec, { data, status: "success" });
+      }
+      return data;
+    } catch (error) {
+      // Report BEFORE the throw reaches the error boundary (DT4). Only the
+      // decode-error class is observed — foreign errors are not URL facts
+      // the panel explains, matching safeDecode*'s taxonomy.
+      if (error instanceof ParamsDecodeError && spec !== undefined) {
+        emitter.observe(spec, { error, status: "error" });
+      }
+      throw error;
+    }
+  });
+  if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+    emitter.refresh(spec);
+  }
   return useSelectedValue(value, options);
 }
 
@@ -132,11 +231,35 @@ export function useSearch<R extends AnyAppRoute, U>(
   options?: SelectOptions<SearchOutputOf<R["~search"]>, U>,
 ): SafeResult<SearchOutputOf<R["~search"]>> | SafeResult<U> {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const emitter = useDevtoolsEmitter();
+  const spec: ObservationSpec | undefined =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : {
+          hook: "app.useSearch",
+          kind: "search",
+          navigate: makeAppNavigate(router, pathname),
+          pathname,
+          route,
+          routerKind: "app",
+          wire: () => searchWireSnapshot(searchParams),
+        };
   const result = useStableResult(
     route,
     searchParamsFingerprint(route, searchParams),
-    () => safeDecodeSearch(route, searchParams),
+    () => {
+      const decoded = safeDecodeSearch(route, searchParams);
+      if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+        emitter.observe(spec, decoded);
+      }
+      return decoded;
+    },
   );
+  if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+    emitter.refresh(spec);
+  }
   return useSelectedResult(result, options);
 }
 
@@ -157,6 +280,21 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
   options?: SelectOptions<SearchOutputOf<R["~search"]>, U>,
 ): SearchOutputOf<R["~search"]> | U {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const emitter = useDevtoolsEmitter();
+  const spec: ObservationSpec | undefined =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : {
+          hook: "app.useSearchOrThrow",
+          kind: "search",
+          navigate: makeAppNavigate(router, pathname),
+          pathname,
+          route,
+          routerKind: "app",
+          wire: () => searchWireSnapshot(searchParams),
+        };
   const value = useStableResult(
     route,
     searchParamsFingerprint(route, searchParams),
@@ -166,11 +304,37 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
     // on the value side while staying deferred on the annotation side. The
     // cast bridges that inference gap to the SAME (correct) type, so a
     // rawSearch route now infers its schema output here, not a garbage
-    // {~kind, ~schema} shape.
-    () =>
-      decodeSearch(route["~search"], searchParams) as SearchOutputOf<
-        R["~search"]
-      >,
+    // {~kind, ~schema} shape. The cast appears in both branches below — the
+    // prod/dev split (and its duplicated decode call) is the price of
+    // literal-zero prod cost; the bundler keeps exactly one branch (DT6).
+    () => {
+      if (process.env.NODE_ENV === "production") {
+        return decodeSearch(route["~search"], searchParams) as SearchOutputOf<
+          R["~search"]
+        >;
+      }
+      try {
+        const data = decodeSearch(
+          route["~search"],
+          searchParams,
+        ) as SearchOutputOf<R["~search"]>;
+        if (spec !== undefined) {
+          emitter.observe(spec, { data, status: "success" });
+        }
+        return data;
+      } catch (error) {
+        // Report BEFORE the throw reaches the error boundary (DT4); only
+        // the decode-error class is observed, matching safeDecode*'s
+        // taxonomy.
+        if (error instanceof SearchDecodeError && spec !== undefined) {
+          emitter.observe(spec, { error, status: "error" });
+        }
+        throw error;
+      }
+    },
   );
+  if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+    emitter.refresh(spec);
+  }
   return useSelectedValue(value, options);
 }

@@ -10,8 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@paramour-js/devtools": "workspace:*",
     "@paramour-js/next": "workspace:*",
     "@paramour-js/nuqs": "workspace:*",
+    "@tanstack/react-devtools": "^0.10.8",
     "next": "^16.2.0",
     "nuqs": "^2.9.0",
     "paramour": "workspace:*",

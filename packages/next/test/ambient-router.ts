@@ -40,3 +40,12 @@ export const _queryIsWideEnough: AmbientRouter["query"] = paramsSource;
 /** Mutual assignability == `isReady` is exactly `boolean`. */
 export const _isReadyIsNarrowEnough: boolean = ambientRouter.isReady;
 export const _isReadyIsWideEnough: AmbientRouter["isReady"] = someBoolean;
+
+/**
+ * The ambient's `replace` is the 1-arity `Promise<boolean>` view `pages.ts`
+ * consumes for the devtools `navigate` capability (design-12 DT8);
+ * `examples/next-compat/src/router.ts` owns the claim that real Next's
+ * `replace(url, as?, options?)` stays assignable.
+ */
+export const _replaceIsCallable: (url: string) => Promise<boolean> = (url) =>
+  ambientRouter.replace(url);

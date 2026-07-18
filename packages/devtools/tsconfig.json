@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src", "test"],
+  // Type tests are checked by tstyche (see tsconfig.tstyche.json), not tsc.
+  "exclude": ["test/**/*.tst.*"]
+}

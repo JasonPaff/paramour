@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import { Devtools } from "./devtools";
 import { Nav } from "./nav";
 
 export const metadata: Metadata = {
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </header>
           {children}
         </div>
+        <Devtools />
       </body>
     </html>
   );

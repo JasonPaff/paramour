@@ -1,0 +1,63 @@
+{
+  "name": "@paramour-js/devtools",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "peerDependencies": {
+    "@paramour-js/next": "workspace:^",
+    "@tanstack/react-devtools": ">=0.10.0",
+    "paramour": "workspace:^",
+    "react": ">=18.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@paramour-js/next": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@paramour-js/next": "workspace:*",
+    "@tanstack/react-devtools": "^0.10.8",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.1.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "happy-dom": "^15.11.0",
+    "paramour": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
+  },
+  "description": "Paramour devtools: a TanStack Devtools panel showing live route observations — wire vs parsed values, codec shapes, default/catch attribution, decode issues, and editable search params.",
+  "author": "Jason Paff <jasonpaff@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JasonPaff/paramour.git",
+    "directory": "packages/devtools"
+  },
+  "homepage": "https://github.com/JasonPaff/paramour#readme",
+  "bugs": {
+    "url": "https://github.com/JasonPaff/paramour/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

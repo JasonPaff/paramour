@@ -353,6 +353,23 @@ export function isRawSearch(
 }
 
 /**
+ * Invokes a codec's element parser on one wire string — the parse twin of
+ * {@link serializeValue}, and the ONE sanctioned way to run a parse WITHOUT
+ * the codec's `.catch()` recovery applied (decodeSearch always recovers a
+ * caught failure, so a probe through it cannot tell "parsed cleanly" from
+ * "failed and was caught"). Exists for reflection-driven tooling — the
+ * devtools panel's catch-attribution probe (design-12 DT7) — and any other
+ * derived surface that must observe the raw parse outcome. A parse failure
+ * throws the codec's own {@link ParseError}; foreign throws from a custom
+ * codec propagate unwrapped, matching decodeSearch's taxonomy. For
+ * arity-"many" codecs this parses ONE element of the repeated-key array,
+ * not the whole array (the same contract as `~parseElement` itself).
+ */
+export function parseValue(codec: AnyCodec, raw: string): unknown {
+  return codec["~parseElement"](raw);
+}
+
+/**
  * The whole-object search escape hatch (design-04 SS1, maintainer ruling):
  * an explicit, greppable wrapper around a bare Standard Schema so a route's
  * `search:` slot never falls into the degraded raw mode by accident — a

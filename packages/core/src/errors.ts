@@ -145,8 +145,12 @@ export function describeType(value: unknown): string {
 }
 
 /**
- * Best-effort human-readable message for a foreign (non-paramour) throw.
- * Not exported from the package — internal to error branding.
+ * Best-effort human-readable message for a foreign (non-paramour) throw:
+ * an `Error`'s message, else a {@link showValue}-hardened `String()` — safe
+ * even for values whose primitive conversion itself throws (null-prototype
+ * objects, `Symbol.toPrimitive` throwers). Public via the barrel so derived
+ * tooling that catches user-code throws (the devtools panel's edit preview)
+ * shares the hardening instead of re-implementing it minus the guard.
  */
 export function foreignMessage(error: unknown): string {
   return error instanceof Error ? error.message : showValue(error);

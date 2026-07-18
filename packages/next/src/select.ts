@@ -50,10 +50,21 @@ interface SelectedResultCache<T, U> {
   readonly wrapped: { data: U; status: "success" };
 }
 
+/**
+ * Both arms of a compute are cacheable (SEL8): a THROWING decode is as much
+ * a function of `(route, fingerprint)` as a success is, so the same invalid
+ * URL rethrows the SAME error without recomputing — which also keeps the
+ * OrThrow hooks' error observation from re-emitting on every re-render
+ * while the URL stays invalid (DT4).
+ */
+type StableOutcome<T> =
+  | { readonly status: "thrown"; readonly thrown: unknown }
+  | { readonly status: "value"; readonly value: T };
+
 interface StableResultCache<T> {
   readonly fingerprint: string;
+  readonly outcome: StableOutcome<T>;
   readonly route: AnyRoute;
-  readonly value: T;
 }
 
 /**
@@ -203,15 +214,35 @@ export function useStableResult<T>(
     cached.route === route &&
     cached.fingerprint === fingerprint
   ) {
-    return cached.value;
+    if (cached.outcome.status === "thrown") throw cached.outcome.thrown;
+    return cached.outcome.value;
   }
-  // Cleared BEFORE computing (SEL8): a throwing decode must not strand the
-  // previous entry, or the rerender after an error boundary reset would
-  // serve a stale value under the new fingerprint.
+  // Cleared BEFORE computing (SEL8): no half-computed state may survive a
+  // throw, and a NEW fingerprint always recomputes — an error boundary
+  // reset after the URL is fixed can never be served a stale entry.
   cache.current = null;
-  const value = compute();
-  cache.current = { fingerprint, route, value };
-  return value;
+  try {
+    const value = compute();
+    cache.current = {
+      fingerprint,
+      outcome: { status: "value", value },
+      route,
+    };
+    return value;
+  } catch (error) {
+    // Cache the throw under ITS fingerprint (see StableOutcome): update
+    // renders share this ref with the committed fiber, so re-render
+    // attempts while the URL stays invalid rethrow instead of re-decoding
+    // (and re-emitting). A throwing MOUNT discards its work-in-progress
+    // hooks, so replayed mounts still recompute — per-instance semantics,
+    // same as the success arm's.
+    cache.current = {
+      fingerprint,
+      outcome: { status: "thrown", thrown: error },
+      route,
+    };
+    throw error;
+  }
 }
 
 /**

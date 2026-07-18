@@ -41,5 +41,15 @@ export const _routerIsTyped: false = routerIsAny;
  * `string | string[] | undefined`, or if the router value goes async), and
  * `isReady` is a plain boolean.
  */
+export const _asPathIsString: string = realRouter.asPath;
 export const _isReadyIsBoolean: boolean = realRouter.isReady;
 export const _queryFeedsDecoder: ParamsSource = realRouter.query;
+
+/**
+ * The ambient's devtools claim (design-12 DT8): real
+ * `replace(url, as?, options?): Promise<boolean>` stays call-compatible with
+ * the 1-arity `(url: string) => Promise<boolean>` view `pages.ts` consumes
+ * for `navigate`.
+ */
+export const _replaceIsCallable: (url: string) => Promise<boolean> = (url) =>
+  realRouter.replace(url);

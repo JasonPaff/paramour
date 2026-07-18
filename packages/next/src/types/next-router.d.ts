@@ -10,19 +10,25 @@
  * Next resolves the runtime import.
  *
  * It covers exactly what `pages.ts` consumes: `useRouter()` returning
- * `query` + `isReady`. `query` is declared as core's `ParamsSource` rather
- * than a hand-copied `Record<...>` — it is forwarded straight into core's
- * decoders, and naming the type instead of restating it removes the drift.
+ * `query` + `isReady`, plus `asPath` (the basePath-/locale-relative
+ * resolution base) and `replace` for the devtools `navigate` capability
+ * (design-12 DT8). `query` is declared as core's `ParamsSource`
+ * rather than a hand-copied `Record<...>` — it is forwarded straight into
+ * core's decoders, and naming the type instead of restating it removes the
+ * drift. Real Next's `replace(url, as?, options?): Promise<boolean>` is
+ * call-compatible with the 1-arity view declared here.
  * `examples/next-compat/src/router.ts` pins real Next's `useRouter().query`
- * against `ParamsSource` on every supported major, which — because the
- * ambient IS `ParamsSource` — is exactly a check that this declaration
- * still holds. (`useRouter`'s throw-on-unmounted under `app/` is runtime
- * behavior — covered by `pages.test.tsx` and the example apps, not
- * pinnable here.)
+ * against `ParamsSource` (and `replace`'s assignability) on every supported
+ * major, which — because the ambient IS `ParamsSource` — is exactly a
+ * check that this declaration still holds. (`useRouter`'s
+ * throw-on-unmounted under `app/` is runtime behavior — covered by
+ * `pages.test.tsx` and the example apps, not pinnable here.)
  */
 declare module "next/router" {
   export function useRouter(): {
+    asPath: string;
     isReady: boolean;
     query: import("paramour").ParamsSource;
+    replace(url: string): Promise<boolean>;
   };
 }

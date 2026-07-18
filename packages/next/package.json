@@ -11,11 +11,15 @@
       "types": "./dist/app.d.ts",
       "default": "./dist/app.js"
     },
+    "./devtools-seam": {
+      "types": "./dist/devtools-seam.d.ts"
+    },
     "./pages": {
       "types": "./dist/pages.d.ts",
       "default": "./dist/pages.js"
     }
   },
+  "sideEffects": false,
   "bin": {
     "paramour": "./bin/paramour.js"
   },
