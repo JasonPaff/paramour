@@ -4,6 +4,8 @@ import type {
   RouteDescription,
 } from "paramour";
 
+import { formatCodecDescription } from "paramour";
+
 import type {
   DuplicateDefinition,
   LoadFailure,
@@ -49,25 +51,11 @@ export function buildListJson(report: ListReport): unknown {
 
 /**
  * `integer`, `enum(a, b)`, `string[]`, `csv<integer>`, with annotations in
- * fixed order: presence, default, catch.
+ * fixed order: presence, default, catch — core's shared walk in its verbose
+ * skin, so the CLI and the devtools panel can never drift on the field set.
  */
 export function formatCodec(description: CodecDescription): string {
-  let base = formatKind(description);
-  if (description.element !== undefined) {
-    base = `${base}<${formatKind(description.element)}>`;
-  }
-  if (description.arity === "many") base += "[]";
-  const notes: string[] = [];
-  if (description.presence === "optional") notes.push("(optional)");
-  if (description.defaultValue !== undefined) {
-    notes.push(
-      description.defaultValue.kind === "value"
-        ? `(default: ${description.defaultValue.wire})`
-        : "(default: factory)",
-    );
-  }
-  if (description.caught) notes.push("(catch)");
-  return [base, ...notes].join(" ");
+  return formatCodecDescription(description, "verbose");
 }
 
 /** Human report; one string per output line. */
@@ -114,15 +102,6 @@ function definitionJson(definition: DescribedDefinition): unknown {
     router: definition.description.router,
     search: definition.description.search,
   };
-}
-
-/** `integer`, or `enum(a, b)` when members are carried. */
-function formatKind(
-  description: Pick<CodecDescription, "enumMembers" | "kind">,
-): string {
-  return description.enumMembers === undefined
-    ? description.kind
-    : `enum(${description.enumMembers.join(", ")})`;
 }
 
 /**

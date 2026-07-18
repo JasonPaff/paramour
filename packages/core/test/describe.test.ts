@@ -6,6 +6,7 @@ import {
   definePagesRoute,
   describeCodec,
   describeRoute,
+  formatCodecDescription,
   p,
   rawSearch,
 } from "../src";
@@ -207,5 +208,64 @@ describe("describeRoute", () => {
       search: rawSearch(z.object({ q: z.string() })),
     });
     expect(describeRoute(route).search).toEqual({ kind: "raw" });
+  });
+});
+
+describe("formatCodecDescription", () => {
+  it("compact skin: inline glyphs for presence, defaults, catch", () => {
+    expect(formatCodecDescription(describeCodec(p.integer()), "compact")).toBe(
+      "integer",
+    );
+    expect(
+      formatCodecDescription(describeCodec(p.string().optional()), "compact"),
+    ).toBe("string?");
+    expect(
+      formatCodecDescription(
+        describeCodec(p.enum(["asc", "desc"]).catch("asc").default("asc")),
+        "compact",
+      ),
+    ).toBe("enum(asc|desc) =asc catch");
+    expect(
+      formatCodecDescription(
+        describeCodec(p.integer().default(() => 1)),
+        "compact",
+      ),
+    ).toBe("integer =ƒ()");
+    expect(
+      formatCodecDescription(describeCodec(p.stringArray()), "compact"),
+    ).toBe("string[]");
+    expect(
+      formatCodecDescription(
+        describeCodec(p.csv(p.enum(["a", "b"]))),
+        "compact",
+      ),
+    ).toBe("csv<enum(a|b)>");
+  });
+
+  it("verbose skin: parenthesized annotations in presence/default/catch order", () => {
+    expect(
+      formatCodecDescription(
+        describeCodec(p.enum(["asc", "desc"]).catch("asc").default("asc")),
+        "verbose",
+      ),
+    ).toBe("enum(asc, desc) (default: asc) (catch)");
+    expect(
+      formatCodecDescription(describeCodec(p.string().optional()), "verbose"),
+    ).toBe("string (optional)");
+    expect(
+      formatCodecDescription(
+        describeCodec(p.integer().default(() => 1)),
+        "verbose",
+      ),
+    ).toBe("integer (default: factory)");
+    expect(
+      formatCodecDescription(
+        describeCodec(p.csv(p.enum(["a", "b"]))),
+        "verbose",
+      ),
+    ).toBe("csv<enum(a, b)>");
+    expect(
+      formatCodecDescription(describeCodec(p.stringArray()), "verbose"),
+    ).toBe("string[]");
   });
 });

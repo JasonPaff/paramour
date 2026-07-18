@@ -23,8 +23,18 @@
  * coalesces that `null` to `{}` so the hooks degrade to "params missing"
  * instead of crashing. `examples/next-compat` typechecks real Next's (non-null)
  * return against `ParamsSource` on every supported major.
+ *
+ * `useRouter` is declared at exactly the arity/shape `app.ts` consumes for
+ * the devtools `navigate` capability (design-12 DT8): real Next's
+ * `replace(href, options?)` is call-compatible with the 1-arity view, and
+ * its `void` return matches. `usePathname` is the capability's resolution
+ * base — basePath-/locale-relative, which is what `replace` expects back.
+ * `examples/next-compat/src/navigation.ts` pins the real signatures'
+ * assignability on every supported major.
  */
 declare module "next/navigation" {
   export function useParams(): import("paramour").ParamsSource | null;
+  export function usePathname(): string;
+  export function useRouter(): { replace(href: string): void };
   export function useSearchParams(): URLSearchParams;
 }

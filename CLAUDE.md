@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Paramour — a type-safe routing companion for the Next.js App Router (validated route/search params, typed path building, explicit URL serialization) using Standard Schema for bring-your-own-validator support. It is pre-release: `packages/core` holds the routing library; `packages/next` holds the Next.js integration (`withTypedRoutes`, hooks, and the `paramour` CLI: `generate`/`check`/`init`/`list`/`doctor`); `packages/nuqs` holds `@paramour-js/nuqs`, a thin adapter deriving nuqs parsers from a route's search codecs (design-10, `NQ*`); `packages/codemod` and `docs/` are placeholders.
+Paramour — a type-safe routing companion for the Next.js App Router (validated route/search params, typed path building, explicit URL serialization) using Standard Schema for bring-your-own-validator support. It is pre-release: `packages/core` holds the routing library; `packages/next` holds the Next.js integration (`withTypedRoutes`, hooks, and the `paramour` CLI: `generate`/`check`/`init`/`list`/`doctor`); `packages/nuqs` holds `@paramour-js/nuqs`, a thin adapter deriving nuqs parsers from a route's search codecs (design-10, `NQ*`); `packages/devtools` holds `@paramour-js/devtools`, a TanStack Devtools panel fed by an observation seam in the next-package hooks (design-12, `DT*` — seam contract of record: `packages/next/src/devtools-seam.ts`, published types-only as `@paramour-js/next/devtools-seam`); `packages/codemod` and `docs/` are placeholders.
 
 ## Commands
 
@@ -13,16 +13,17 @@ pnpm monorepo (pnpm 11, Node >= 24.18). Run from the repo root:
 - `pnpm test` — runtime tests (vitest, matches `packages/*/test/**/*.test.ts`)
 - `pnpm test packages/core/test/codecs.test.ts` — single test file; add `-t "name"` to filter by test name
 - `pnpm test:types` — type tests (tstyche, matches `packages/core/test/**/*.tst.*`); pass a path fragment to filter, e.g. `pnpm test:types codec-api`
+- `pnpm test:types:devtools` — type tests for `packages/devtools` (`packages/devtools/test/**/*.tst.*`, own tstyche/tsconfig pair)
 - `pnpm test:types:next` — type tests for `packages/next` (`packages/next/test/**/*.tst.*`, own tstyche/tsconfig pair)
 - `pnpm test:types:nuqs` — type tests for `packages/nuqs` (same pattern: own tstyche/tsconfig pair)
 - `pnpm test:types:registry` — world-B type tests (`packages/core/test-registry/`, its own tstyche/tsconfig pair): post-generation registry behavior via a hand-authored `declare module "paramour"` augmentation. A separate compilation unit on purpose — module augmentation is program-global, so these files must never move into `test/`
 - `pnpm typecheck` — `tsc --noEmit` in every package; includes `examples/basic`, which needs the packages built first
-- `pnpm build` — topological: core tsc → next tsc (dist + the `paramour` CLI bin) → `examples/basic` `next build`. `pnpm build:packages` skips the example for fast package-only builds. `test/cli-dist.test.ts` and `test:types:registry` need a build to have run
+- `pnpm build` — topological: core tsc → next tsc (dist + the `paramour` CLI bin) → devtools tsc → `examples/basic` `next build`. `pnpm build:packages` skips the example for fast package-only builds. `test/cli-dist.test.ts`, `test:types:registry`, and `packages/devtools` (whose seam types resolve from next's dist) need a build to have run
 - `pnpm lint:fix` — ESLint with auto-fix (type-checked rules; slow-ish)
 - `pnpm format` / `pnpm format:check` — Prettier
 - `pnpm changeset` — add a changeset (changesets is the release mechanism)
 
-CI runs, in order: `format:check`, `build`, `lint`, `typecheck`, `test`, `test:types`, `test:types:next`, `test:types:nuqs`, `test:types:registry`. All nine must pass (`build` precedes `lint` and `typecheck` so the type-checked sources and the example resolve the packages' dist types).
+CI runs, in order: `format:check`, `build`, `lint`, `typecheck`, `test`, `test:types`, `test:types:devtools`, `test:types:next`, `test:types:nuqs`, `test:types:registry`. All ten must pass (`build` precedes `lint` and `typecheck` so the type-checked sources and the example resolve the packages' dist types).
 
 ## Two kinds of tests
 

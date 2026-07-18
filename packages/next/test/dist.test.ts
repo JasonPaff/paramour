@@ -15,6 +15,12 @@ const distPagesJs = fileURLToPath(new URL("../dist/pages.js", import.meta.url));
 const distPagesDts = fileURLToPath(
   new URL("../dist/pages.d.ts", import.meta.url),
 );
+const distSeamJs = fileURLToPath(
+  new URL("../dist/devtools-seam.js", import.meta.url),
+);
+const distSeamDts = fileURLToPath(
+  new URL("../dist/devtools-seam.d.ts", import.meta.url),
+);
 
 /**
  * Every import specifier reachable from `entry` through RELATIVE imports —
@@ -91,6 +97,26 @@ describe.skipIf(!existsSync(distPagesJs))(
       const specifiers = reachableSpecifiers(distPagesJs);
       expect(specifiers).toContain("next/router");
       expect(specifiers).not.toContain("next/navigation");
+    });
+  },
+);
+
+describe.skipIf(!existsSync(distSeamJs))(
+  "dist devtools-seam entry (packaging, design-12 DT6)",
+  () => {
+    it("dist/devtools-seam.js imports NOTHING (erasability precondition)", () => {
+      // Every consumer call site sits behind a constant-folded NODE_ENV
+      // guard; with sideEffects:false the module drops from prod bundles
+      // only if its own emitted JS pulls in nothing else.
+      const specifiers = reachableSpecifiers(distSeamJs);
+      expect(specifiers.size).toBe(0);
+    });
+
+    it("dist/devtools-seam.d.ts references only paramour types (hermeticity)", () => {
+      const content = readFileSync(distSeamDts, "utf8");
+      expect(content).toContain('from "paramour"');
+      expect(content).not.toContain("next/navigation");
+      expect(content).not.toContain("next/router");
     });
   },
 );

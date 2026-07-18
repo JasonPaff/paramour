@@ -19,10 +19,11 @@
  * `examples/next-compat` owns the other half — that *real* Next still returns
  * something assignable to `ParamsSource` — on every supported major.
  */
-import type { useParams, useSearchParams } from "next/navigation";
+import type { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { ParamsSource } from "paramour";
 
 type AmbientParams = ReturnType<typeof useParams>;
+type AmbientRouter = ReturnType<typeof useRouter>;
 type AmbientSearch = ReturnType<typeof useSearchParams>;
 
 // `declare const` rather than `{} as T`: an empty object literal is assignable
@@ -41,3 +42,14 @@ export const _ambientAdmitsNull: AmbientParams = null;
 
 /** The search half is a plain `URLSearchParams` (real Next returns a subclass). */
 export const _ambientSearchIsUrlSearchParams: URLSearchParams = ambientSearch;
+
+/**
+ * The router half declares exactly the 1-arity `replace` view `app.ts`
+ * consumes for the devtools `navigate` capability (design-12 DT8): a single
+ * string href, `void` return. `examples/next-compat/src/navigation.ts` owns
+ * the claim that real Next's `replace(href, options?)` stays call-compatible.
+ */
+declare const ambientRouter: AmbientRouter;
+export const _ambientReplaceIsCallable: (href: string) => void = (href) => {
+  ambientRouter.replace(href);
+};

@@ -1,0 +1,8 @@
+{
+  // tstyche-only config: same compiler options as the package tsconfig, but
+  // *.tst.* files are not excluded, so type tests certify the panel's public
+  // surface under the repo's real settings (exactOptionalPropertyTypes etc.),
+  // not tstyche's built-in baseline. Mirrors packages/core/tsconfig.tstyche.json.
+  "extends": "./tsconfig.json",
+  "exclude": []
+}

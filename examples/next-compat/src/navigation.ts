@@ -14,16 +14,25 @@
  * Type-level only: the hooks are never called (this file is `tsc --noEmit`'d,
  * never executed, and calling a client hook outside React would throw).
  */
-import { useParams, useSearchParams } from "next/navigation";
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import type { ParamsSource, SearchSource } from "paramour";
 
 type RealParams = ReturnType<typeof useParams>;
+type RealPathname = ReturnType<typeof usePathname>;
+type RealRouter = ReturnType<typeof useRouter>;
 type RealSearch = ReturnType<typeof useSearchParams>;
 
 // `declare const`, not `{} as T`: an empty object literal satisfies these
 // receivers on its own, so an assertion would let the check pass without ever
 // involving Next's real types.
 declare const realParams: RealParams;
+declare const realPathname: RealPathname;
+declare const realRouter: RealRouter;
 declare const realSearch: RealSearch;
 
 /**
@@ -54,3 +63,22 @@ export const _searchFeedDecoder: SearchSource = realSearch;
  * `URLSearchParams` return holds. Fails if Next breaks that inheritance.
  */
 export const _searchIsUrlSearchParams: URLSearchParams = realSearch;
+
+/**
+ * The ambient's devtools claim (design-12 DT8): real `useRouter().replace`
+ * stays call-compatible with the 1-arity `(href: string) => void` view the
+ * hooks consume for `navigate`. Fails if Next makes `replace`'s first
+ * parameter non-string or starts returning a value the `void` view can't
+ * absorb.
+ */
+export const _replaceIsCallable: (href: string) => void = (href) => {
+  realRouter.replace(href);
+};
+
+/**
+ * The ambient's second devtools claim (design-12 DT8): real `usePathname()`
+ * returns a string — the basePath-/locale-relative resolution base the
+ * hooks join the panel's search-only navigate strings onto. Fails if Next
+ * makes the return nullable or non-string.
+ */
+export const _pathnameIsString: string = realPathname;

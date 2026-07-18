@@ -5,6 +5,7 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Suspense } from "react";
 
 import "./globals.css";
+import { Devtools } from "./devtools";
 import { Nav } from "./nav";
 import { UrlBar } from "./url-bar";
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             {children}
           </div>
         </NuqsAdapter>
+        <Devtools />
       </body>
     </html>
   );

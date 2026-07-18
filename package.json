@@ -15,6 +15,7 @@
     "lint:fix": "eslint . --fix --cache",
     "test": "vitest run",
     "test:types": "tstyche",
+    "test:types:devtools": "tstyche --config ./tstyche.devtools.json",
     "test:types:next": "tstyche --config ./tstyche.next.json",
     "test:types:nuqs": "tstyche --config ./tstyche.nuqs.json",
     "test:types:registry": "tstyche --config ./tstyche.registry.json",

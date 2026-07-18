@@ -32,6 +32,9 @@ export interface CodecDescription {
   readonly presence: Presence;
 }
 
+/** Rendering styles accepted by {@link formatCodecDescription}. */
+export type CodecFormatStyle = "compact" | "verbose";
+
 /** A param codec plus the dynamic-segment kind that hosts it. */
 export interface ParamDescription extends CodecDescription {
   readonly segmentKind: "catchall" | "optional-catchall" | "single";
@@ -104,6 +107,58 @@ export function describeRoute(route: AnyRoute): RouteDescription {
     router: route["~router"],
     search: describeSearch(route["~search"] as SearchSlot),
   };
+}
+
+/**
+ * One-line label for a {@link CodecDescription} — THE shared walk over the
+ * description's fields, so every consumer (the devtools panel's shape
+ * column, `paramour list`'s annotations) renders the same structure and a
+ * future field lands everywhere at once. Two skins over one walk:
+ *
+ * - `"compact"`: `enum(asc|desc)? =asc catch`, `csv<enum(a|b)>`, `string[]`
+ *   — `?` for optional presence, the default's wire form (`=3`) or `=ƒ()`
+ *   for a factory default, bare `catch`.
+ * - `"verbose"`: `enum(asc, desc) (optional) (default: asc) (catch)` —
+ *   parenthesized annotations in fixed order: presence, default, catch.
+ */
+export function formatCodecDescription(
+  description: CodecDescription,
+  style: CodecFormatStyle,
+): string {
+  const memberSeparator = style === "compact" ? "|" : ", ";
+  const kindLabel = (
+    part: Pick<CodecDescription, "enumMembers" | "kind">,
+  ): string =>
+    part.enumMembers === undefined
+      ? part.kind
+      : `enum(${part.enumMembers.join(memberSeparator)})`;
+  let label =
+    description.element === undefined
+      ? kindLabel(description)
+      : `${description.kind}<${kindLabel(description.element)}>`;
+  if (description.arity === "many") label += "[]";
+  if (style === "compact") {
+    if (description.presence === "optional") label += "?";
+    if (description.defaultValue !== undefined) {
+      label +=
+        description.defaultValue.kind === "value"
+          ? ` =${description.defaultValue.wire}`
+          : " =ƒ()";
+    }
+    if (description.caught) label += " catch";
+    return label;
+  }
+  const notes: string[] = [];
+  if (description.presence === "optional") notes.push("(optional)");
+  if (description.defaultValue !== undefined) {
+    notes.push(
+      description.defaultValue.kind === "value"
+        ? `(default: ${description.defaultValue.wire})`
+        : "(default: factory)",
+    );
+  }
+  if (description.caught) notes.push("(catch)");
+  return [label, ...notes].join(" ");
 }
 
 /**

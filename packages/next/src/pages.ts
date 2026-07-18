@@ -10,6 +10,12 @@ import {
   type SearchOutputOf,
 } from "paramour";
 
+import { recordWireSnapshot } from "./devtools-seam.js";
+import {
+  makePagesNavigate,
+  type ObservationSpec,
+  useDevtoolsEmitter,
+} from "./observe.js";
 import {
   paramsFingerprint,
   PENDING_FINGERPRINT,
@@ -45,6 +51,15 @@ export type { SelectOptions } from "./select.js";
  * `query` (+ `isReady`), then an optional `{ select }` projection with
  * result-equality checking — the `pending` arm passes through the selector
  * untouched (SEL2), and `PENDING` itself is one referentially stable object.
+ *
+ * Devtools instrumentation (design-12): each hook reports through the
+ * shared emitter in observe.ts — `observe` from inside the `useStableResult`
+ * compute callback (DT4 — the fingerprint cache miss IS the decode-change
+ * dedup; see app.ts's fuller account), `refresh` after it for pathname
+ * moves under an unchanged decode (DT8). The `pending` arm emits as a
+ * first-class observation (DT11), keyed by `PENDING_FINGERPRINT` so the
+ * pre-`isReady` render reports exactly once. Every emit sits behind
+ * `process.env.NODE_ENV !== "production"` (DT6).
  */
 
 /**
@@ -73,19 +88,42 @@ export function useRouteParams<R extends AnyPagesRoute, U>(
   route: R,
   options?: SelectOptions<InferRouteParams<R>, U>,
 ): RouterResult<InferRouteParams<R>> | RouterResult<U> {
-  const { isReady, query } = usePagesRouter();
+  const router = usePagesRouter();
+  const { isReady, query } = router;
+  const pathname = asPathPathname(router.asPath);
+  const emitter = useDevtoolsEmitter();
+  const spec: ObservationSpec | undefined =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : {
+          hook: "pages.useRouteParams",
+          kind: "params",
+          navigate: makePagesNavigate(router, pathname),
+          pathname,
+          route,
+          routerKind: "pages",
+          wire: () => ({ ...query }),
+        };
   const result = useStableResult(
     route,
     isReady ? paramsFingerprint(route, query) : PENDING_FINGERPRINT,
     (): RouterResult<InferRouteParams<R>> => {
-      if (!isReady) return PENDING;
       // The merged query is a legal params source as-is: decodeParams reads
       // only the route's own segment names, never unknown keys. R5: next/router
       // has already percent-decoded `query`, so skip core's decode to avoid a
       // double-decode (`/product/a%2520b` → `"a%20b"` must survive as-is).
-      return safeDecodeParams(route, query, { percentDecode: false });
+      const decoded = isReady
+        ? safeDecodeParams(route, query, { percentDecode: false })
+        : PENDING;
+      if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+        emitter.observe(spec, decoded);
+      }
+      return decoded;
     },
   );
+  if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+    emitter.refresh(spec);
+  }
   return useSelectedResult(result, options);
 }
 
@@ -104,16 +142,49 @@ export function useSearch<R extends AnyPagesRoute, U>(
   route: R,
   options?: SelectOptions<SearchOutputOf<R["~search"]>, U>,
 ): RouterResult<SearchOutputOf<R["~search"]>> | RouterResult<U> {
-  const { isReady, query } = usePagesRouter();
+  const router = usePagesRouter();
+  const { isReady, query } = router;
+  const pathname = asPathPathname(router.asPath);
+  const emitter = useDevtoolsEmitter();
+  const spec: ObservationSpec | undefined =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : {
+          hook: "pages.useSearch",
+          kind: "search",
+          navigate: makePagesNavigate(router, pathname),
+          pathname,
+          route,
+          routerKind: "pages",
+          // Lazy, so the path-param subtraction only runs when an emission
+          // actually snapshots the wire.
+          wire: () => recordWireSnapshot(omitPathParams(query, route)),
+        };
   const result = useStableResult(
     route,
     isReady ? queryFingerprint(route, query) : PENDING_FINGERPRINT,
     (): RouterResult<SearchOutputOf<R["~search"]>> => {
-      if (!isReady) return PENDING;
-      return safeDecodeSearch(route, omitPathParams(query, route));
+      const source = omitPathParams(query, route);
+      const decoded = isReady ? safeDecodeSearch(route, source) : PENDING;
+      if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+        emitter.observe(spec, decoded);
+      }
+      return decoded;
     },
   );
+  if (process.env.NODE_ENV !== "production" && spec !== undefined) {
+    emitter.refresh(spec);
+  }
   return useSelectedResult(result, options);
+}
+
+/**
+ * `asPath`'s path part: basePath-/locale-relative — exactly what
+ * `replace()` expects back — so the panel's search-only string (DT8)
+ * resolves without doubling a configured basePath.
+ */
+function asPathPathname(asPath: string): string {
+  return asPath.split(/[#?]/)[0] ?? "/";
 }
 
 /**
