@@ -16,7 +16,7 @@ import {
   ParseError,
   SerializeError,
 } from "./errors.js";
-import { encodeComponent, readInputValue } from "./search.js";
+import { encodeComponent, readInputValue, serializeValue } from "./search.js";
 
 /**
  * Decode-policy knob for {@link decodeParams} / {@link safeDecodeParams} (R5).
@@ -559,24 +559,18 @@ function serializeDynamicSegment(
 }
 
 /**
- * Serializes one segment value into its wire-string form. Enforces the
- * serializer's string contract exactly as search.ts's serializeValue does —
- * a plain-JS custom codec returning a non-string must never reach the byte
- * layer as the literal text "undefined". Percent-encoding is deliberately
- * NOT applied here: that is encodeParams' byte-layer step (S7), and the
- * static surfaces must skip it.
+ * Serializes one segment value into its wire-string form. The string
+ * contract is search.ts's shared {@link serializeValue}; the path surface
+ * layers R4 on top (a segment additionally can't be empty).
+ * Percent-encoding is deliberately NOT applied here: that is encodeParams'
+ * byte-layer step (S7), and the static surfaces must skip it.
  */
 function serializeSegmentValue(
   codec: AnyCodec,
   name: string,
   value: unknown,
 ): string {
-  const serialized: unknown = codec["~serializeElement"](value);
-  if (typeof serialized !== "string") {
-    throw new SerializeError(
-      `serializer for route param "${name}" must return a string, got ${typeof serialized}`,
-    );
-  }
+  const serialized = serializeValue(codec, `route param "${name}"`, value);
   if (serialized === "") {
     // R4: "" would produce "//" or a vanishing segment — same rationale as R3.
     throw new SerializeError(

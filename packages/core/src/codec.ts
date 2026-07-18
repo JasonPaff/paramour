@@ -19,9 +19,10 @@ export type Arity = "many" | "single";
 /**
  * A bidirectional wire codec.
  *
- * `Out` is the decoded in-memory type. `P`, `C`, and `A` are type-state:
+ * `Out` is the decoded in-memory type. `P`, `C`, `A`, and `E` are type-state:
  * modifier methods are conditionally `never`, so illegal chains
  * (`.optional().default()`, double `.catch()`) fail to compile (design-02 D3).
+ * `E` carries `~defaultElides` as a literal after `.default()` (NQ6a).
  * Presence modifiers are also `never` for arity-"many" codecs: absent and `[]`
  * are the same wire state (S6/P6), so `.default()`/`.optional()` could never
  * round-trip there.
@@ -40,18 +41,35 @@ export interface Codec<
   P extends Presence = "required",
   C extends boolean = false,
   A extends Arity = "single",
+  E extends boolean = boolean,
 > {
   readonly catch: C extends false
-    ? (fallback: (() => Out) | Out) => Codec<Out, P, true, A>
+    ? (fallback: (() => Out) | Out) => Codec<Out, P, true, A, E>
     : never;
+  /**
+   * Overloaded so the value/factory split is visible in type-state (NQ6a):
+   * the factory overload comes FIRST and must stay first. The runtime
+   * {@link isFactory} check treats ANY function as a factory, so a function
+   * argument must either match the factory overload or fail to compile
+   * ({@link NonFactoryValue}) — E=true is only ever inferred for arguments
+   * the runtime will also treat as values. The one statically-invisible
+   * residue: an argument whose static type is not a function (e.g.
+   * `unknown`) but holds one at runtime lands on the runtime's factory
+   * branch anyway; no type-level check can see that.
+   */
   readonly default: A extends "single"
     ? P extends "required"
-      ? (value: (() => Out) | Out) => Codec<Out, "defaulted", C, A>
+      ? {
+          (value: () => Out): Codec<Out, "defaulted", C, A, false>;
+          <V extends Out>(
+            value: NonFactoryValue<V> & V,
+          ): Codec<Out, "defaulted", C, A, true>;
+        }
       : never
     : never;
   readonly optional: A extends "single"
     ? P extends "required"
-      ? () => Codec<Out, "optional", C, A>
+      ? () => Codec<Out, "optional", C, A, E>
       : never
     : never;
   readonly "~arity": A;
@@ -64,8 +82,15 @@ export interface Codec<
    * re-serialized per encode. Factory defaults never elide: a time-varying
    * factory would elide an explicitly-passed value that later decodes as a
    * different one.
+   *
+   * Literal-typed via `E` (NQ6a) so derived surfaces (`@paramour-js/nuqs`)
+   * can give value-defaulted keys non-nullable reads while keeping
+   * factory-defaulted keys honestly nullable. A hand-written
+   * `Codec<…, "defaulted">` leaves `E` at its `boolean` default, which
+   * consumers must treat as the factory (nullable) branch — the safe
+   * reading.
    */
-  readonly "~defaultElides": boolean;
+  readonly "~defaultElides": E;
   /** Stored as a thunk regardless of the form passed to `.default()`. */
   readonly "~defaultValue": (() => Out) | undefined;
   /**
@@ -115,6 +140,20 @@ interface CodecState<Out> {
   readonly presence: Presence;
   readonly serializeElement: (value: unknown) => string;
 }
+
+/**
+ * Rejects value-form `.default()` arguments whose static type includes any
+ * function member: runtime {@link isFactory} would treat them as factories,
+ * so letting them infer the value branch would let type-state assert an
+ * elision (`E = true`) the runtime never performs (NQ6a). Non-distributive
+ * on purpose — a union with a function member is rejected whole, since its
+ * runtime branch is unknowable at compile time.
+ */
+type NonFactoryValue<V> = [Extract<V, (...args: never[]) => unknown>] extends [
+  never,
+]
+  ? unknown
+  : never;
 
 /** Internal factory used by the `p.*` builders. */
 export function createCodec<Out, A extends Arity = "single">(impl: {

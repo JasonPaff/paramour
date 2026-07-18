@@ -33,6 +33,47 @@ test("modifiers update presence type-state", () => {
   expect(p.integer().catch(0).default(1)["~presence"]).type.toBe<"defaulted">();
 });
 
+test(".default() overloads expose value vs factory form in type-state (NQ6a)", () => {
+  // Value form participates in D8 elision; factory form never does. The
+  // literal-typed ~defaultElides lets derived surfaces (@paramour-js/nuqs)
+  // give value-defaulted keys non-nullable reads.
+  expect(p.integer().default(1)["~defaultElides"]).type.toBe<true>();
+  expect(p.integer().default(() => 1)["~defaultElides"]).type.toBe<false>();
+  // The literal survives further chaining, in either modifier order.
+  expect(p.integer().default(1).catch(0)["~defaultElides"]).type.toBe<true>();
+  expect(
+    p
+      .integer()
+      .default(() => 1)
+      .catch(0)["~defaultElides"],
+  ).type.toBe<false>();
+  expect(p.integer().catch(0).default(1)["~defaultElides"]).type.toBe<true>();
+  // Before .default() the flag is unresolved type-state (runtime false).
+  expect(p.integer()["~defaultElides"]).type.toBe<boolean>();
+});
+
+test(".default() never infers the value branch for a function argument (NQ6a)", () => {
+  // Runtime isFactory treats ANY function as a factory, so a function
+  // argument must either match the factory overload or fail to compile —
+  // an inferred E=true that the runtime would contradict (absent key reads
+  // null where the type promises the default) is never allowed.
+  const fnOut = p.custom<() => string>({
+    parse: () => () => "hi",
+    serialize: () => "hi",
+  });
+  // A function-typed Out can only be defaulted through the factory form...
+  expect(fnOut.default(() => () => "hi")["~defaultElides"]).type.toBe<false>();
+  // ...a bare function (the runtime would invoke it) is rejected.
+  expect(fnOut.default).type.not.toBeCallableWith(() => "hi");
+  // Wide Out: a non-nullary function is neither a factory nor a value.
+  const wide = p.custom<unknown>({ parse: (raw) => raw, serialize: String });
+  expect(wide.default).type.not.toBeCallableWith((x: number) => x);
+  // A union that may be a function at runtime resolves neither branch.
+  expect(p.integer().default).type.not.toBeCallableWith(
+    0 as number | (() => number),
+  );
+});
+
 test("modifier arguments are typed", () => {
   expect(p.integer().default).type.toBeCallableWith(1);
   expect(p.integer().default).type.not.toBeCallableWith("x");

@@ -303,7 +303,10 @@ export function encodeSearch<S extends SearchSlot>(
       }
       // Array codecs cannot carry defaults, so no elision applies.
       for (const element of value) {
-        pairs.push([key, serializeValue(codec, key, element)]);
+        pairs.push([
+          key,
+          serializeValue(codec, `search param "${key}"`, element),
+        ]);
       }
       continue;
     }
@@ -315,7 +318,7 @@ export function encodeSearch<S extends SearchSlot>(
       continue; // absent optional/defaulted param → key omitted (S3)
     }
 
-    const serialized = serializeValue(codec, key, value);
+    const serialized = serializeValue(codec, `search param "${key}"`, value);
 
     // D8 elision, gated on an elidable default existing — an ungated
     // comparison would let a (contract-violating) serialize that returns
@@ -323,7 +326,8 @@ export function encodeSearch<S extends SearchSlot>(
     if (
       codec["~defaultElides"] &&
       codec["~defaultValue"] !== undefined &&
-      serialized === serializeValue(codec, key, codec["~defaultValue"]())
+      serialized ===
+        serializeValue(codec, `search param "${key}"`, codec["~defaultValue"]())
     ) {
       continue;
     }
@@ -335,10 +339,12 @@ export function encodeSearch<S extends SearchSlot>(
 }
 
 /**
- * Runtime discriminant for the `search:` slot (design-04 SS2): the reserved
- * `~kind` marker is unambiguous against a codec map, which never carries a
- * top-level `~`-prefixed key. Module-exported for standard-schema.ts, not
- * barrel-exported.
+ * Runtime discriminant for the `search:` slot (design-04 SS2): probes the
+ * `~kind` marker's VALUE, which is unambiguous against a codec map — a map
+ * key literally named "~kind" would hold a codec object, never the marker
+ * string. Exported from the package barrel so derived surfaces
+ * (`@paramour-js/nuqs`) share the discriminant instead of duplicating the
+ * literal.
  */
 export function isRawSearch(
   config: SearchSlot,
@@ -414,6 +420,31 @@ export function searchToString<S extends SearchSlot>(
   input: SearchInputOf<S>,
 ): string {
   return buildSearchString(encodeSearch(config, input));
+}
+
+/**
+ * Invokes a codec's serializer and enforces its string contract: a custom
+ * codec written in plain JS can return undefined, which would otherwise
+ * reach the byte layer as the literal text "undefined" — or, worse, match
+ * an absent default and silently drop the param. `label` names the value's
+ * site in the error (`search param "q"`, `route param "id"`, …). Exported
+ * from the package barrel as the ONE implementation of this contract:
+ * path.ts segments and derived surfaces (`@paramour-js/nuqs` eq/
+ * clearOnDefault) share it so their judgment stays identical to D8
+ * elision's by construction, not by parallel copies.
+ */
+export function serializeValue(
+  codec: AnyCodec,
+  label: string,
+  value: unknown,
+): string {
+  const serialized: unknown = codec["~serializeElement"](value);
+  if (typeof serialized !== "string") {
+    throw new SerializeError(
+      `serializer for ${label} must return a string, got ${typeof serialized}`,
+    );
+  }
+  return serialized;
 }
 
 /**
@@ -666,20 +697,4 @@ function requireRawSearchString(key: string, value: unknown): string {
     );
   }
   return value;
-}
-
-/**
- * Invokes a codec's serializer and enforces its string contract: a custom
- * codec written in plain JS can return undefined, which would otherwise
- * reach the byte layer as the literal text "undefined" — or, worse, match
- * an absent default and silently drop the param.
- */
-function serializeValue(codec: AnyCodec, key: string, value: unknown): string {
-  const serialized: unknown = codec["~serializeElement"](value);
-  if (typeof serialized !== "string") {
-    throw new SerializeError(
-      `serializer for search param "${key}" must return a string, got ${typeof serialized}`,
-    );
-  }
-  return serialized;
 }
