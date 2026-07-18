@@ -40,10 +40,17 @@ test("factory defaults stay honestly nullable (NQ6/NQ6a)", () => {
 });
 
 test("arity-many codecs derive a non-nullable multi parser (NQ8a)", () => {
-  const parser = nuqsParser(p.stringArray());
+  const parser = nuqsParser(p.array());
   expect(parser.defaultValue).type.toBe<string[]>();
   expect(parser.serialize).type.toBeCallableWith(["a"]);
   expect(parser.parse).type.toBeCallableWith(["a", "b"]);
+});
+
+test("typed array elements carry E[] through the multi parser (PP1)", () => {
+  const parser = nuqsParser(p.array(p.integer()));
+  expect(parser.defaultValue).type.toBe<number[]>();
+  expect(parser.serialize).type.toBeCallableWith([1, 2]);
+  expect(parser.serialize).type.not.toBeCallableWith(["a"]);
 });
 
 test("the derived map is ordinary nuqs currency with per-key nullability", () => {
@@ -52,7 +59,7 @@ test("the derived map is ordinary nuqs currency with per-key nullability", () =>
     page: p.integer().default(1),
     q: p.string().optional(),
     stamp: p.isoDate().default(() => new Date(0)),
-    tags: p.stringArray(),
+    tags: p.array(),
   });
   expect<inferParserType<typeof map>>().type.toBe<{
     labels: null | string[];

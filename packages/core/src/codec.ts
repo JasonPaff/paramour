@@ -94,8 +94,8 @@ export interface Codec<
   /** Stored as a thunk regardless of the form passed to `.default()`. */
   readonly "~defaultValue": (() => Out) | undefined;
   /**
-   * Element codec of a composite list codec (currently `p.csv`) — the
-   * per-segment scalar; undefined for every non-composite kind (CV6).
+   * Element codec of a composite list codec (`p.csv`, `p.array`) — the
+   * per-segment/per-key scalar; undefined for every non-composite kind (CV6).
    */
   readonly "~element": AnyCodec | undefined;
   /** Members of a `p.enum` codec; undefined for every other kind. */

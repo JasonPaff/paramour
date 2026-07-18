@@ -320,7 +320,7 @@ describe("full loop: parse ∘ href ≅ id", () => {
         labels: p.csv(),
         n: p.integer().default(5),
         q: p.string(),
-        tags: p.stringArray(),
+        tags: p.array(),
       },
     });
     // CV4: csv elements must be non-empty and comma-free to serialize.

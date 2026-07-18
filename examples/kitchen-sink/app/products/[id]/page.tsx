@@ -59,7 +59,7 @@ export default async function ProductPage(props: RouteProps) {
         </dt>
         <dd>{search.minPrice ?? "(absent — optional)"}</dd>
         <dt>
-          <code>search.tags</code> — <code>p.stringArray()</code>
+          <code>search.tags</code> — <code>p.array()</code>
         </dt>
         <dd>
           {search.tags.length > 0 ? search.tags.join(", ") : "(empty array)"}{" "}

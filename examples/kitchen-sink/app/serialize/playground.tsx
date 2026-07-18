@@ -138,7 +138,7 @@ export function Playground() {
               onChange={setLabels}
               value={labels}
             />
-            <Field label="tags (stringArray)" onChange={setTags} value={tags} />
+            <Field label="tags (array)" onChange={setTags} value={tags} />
             <Field
               label="page (default 1 — elided when it equals 1)"
               onChange={setPage}

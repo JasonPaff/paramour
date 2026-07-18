@@ -116,7 +116,9 @@ export function CodecInput({
 
   const type = raw
     ? "text"
-    : description.kind === "integer" || description.kind === "number"
+    : description.kind === "index" ||
+        description.kind === "integer" ||
+        description.kind === "number"
       ? "number"
       : description.kind === "isoDate"
         ? "date"
@@ -125,7 +127,10 @@ export function CodecInput({
     ? "raw wire value"
     : description.kind === "timestamp"
       ? "2026-01-01T00:00:00.000Z"
-      : description.element !== undefined
+      : // An element here means csv's one comma-joined wire value — arrays
+        // also carry an element (PP1) but never reach this input: arity
+        // "many" takes the textarea above.
+        description.element !== undefined
         ? `${description.element.kind},…`
         : "";
 
@@ -133,6 +138,8 @@ export function CodecInput({
     <input
       aria-label={raw ? `raw wire for ${dataKey}` : `edit ${dataKey}`}
       className="pmr-input"
+      // The 1-based wire floor (PP5) — the draft currency is the WIRE string.
+      min={description.kind === "index" ? "1" : undefined}
       onBlur={() => {
         onCommit();
       }}
@@ -143,7 +150,11 @@ export function CodecInput({
         commitOnEnter(event.key);
       }}
       placeholder={placeholder}
-      step={description.kind === "integer" ? "1" : "any"}
+      step={
+        description.kind === "index" || description.kind === "integer"
+          ? "1"
+          : "any"
+      }
       type={type}
       value={draftText}
     />
@@ -160,19 +171,19 @@ export function CodecInput({
  */
 /**
  * Which keys get the multi-line textarea (one wire value per line):
- * repeated-key array codecs in codec mode. Csv keeps its single
- * comma-joined wire value (element present) and raw mode always edits one
- * wire value in a mono input. Exported so the row's draft SEEDING can
- * agree: only this widget may be seeded with a newline join — single-line
- * inputs value-sanitize the `\n` away, fabricating a merged value.
+ * repeated-key (arity "many") codecs in codec mode. Arity alone decides —
+ * element presence stopped implying csv when p.array gained `~element`
+ * (PP1); csv stays arity "single", so its one comma-joined wire value edits
+ * in the plain input below, and raw mode always edits one wire value in a
+ * mono input. Exported so the row's draft SEEDING can agree: only this
+ * widget may be seeded with a newline join — single-line inputs
+ * value-sanitize the `\n` away, fabricating a merged value.
  */
 export function isMultilineWidget(
   description: CodecDescription,
   raw: boolean,
 ): boolean {
-  return (
-    !raw && description.arity === "many" && description.element === undefined
-  );
+  return !raw && description.arity === "many";
 }
 
 /**

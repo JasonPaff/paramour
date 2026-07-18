@@ -22,7 +22,7 @@ const kitchenRoute = defineAppRoute("/kitchen/[id]", {
     num: p.number().optional(),
     page: p.integer().default(1),
     q: p.string().optional(),
-    tags: p.stringArray(),
+    tags: p.array(),
     ts: p.timestamp().optional(),
   },
 });

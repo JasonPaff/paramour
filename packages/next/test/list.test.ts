@@ -80,7 +80,7 @@ export const product = defineAppRoute("/product/[id]", {
     labels: p.csv(p.integer()),
     q: p.string().optional(),
     sort: p.enum(["name", "price"]).default("name"),
-    tags: p.stringArray(),
+    tags: p.array(),
   },
 });
 

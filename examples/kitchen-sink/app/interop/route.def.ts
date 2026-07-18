@@ -21,6 +21,6 @@ export const interopRoute = defineAppRoute("/interop", {
     since: p.isoDate().optional(),
     // Repeated-key array (?tags=a&tags=b): derived as a nuqs multi parser
     // (NQ8a) — both sides speak the same repeated-key wire format.
-    tags: p.stringArray(),
+    tags: p.array(),
   },
 });

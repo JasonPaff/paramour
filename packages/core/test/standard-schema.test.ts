@@ -24,7 +24,7 @@ const mixedRoute = defineAppRoute("/items", {
     flag: p.boolean().catch(false),
     page: p.integer().default(1),
     q: p.string().optional(),
-    tags: p.stringArray(),
+    tags: p.array(),
   },
 });
 

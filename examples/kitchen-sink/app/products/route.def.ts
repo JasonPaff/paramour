@@ -19,7 +19,7 @@ export const productsListSearch = {
   sort: p.enum(["name", "newest", "price"]).default("name"),
   // Arity-"many": ?tags=a&tags=b ⇄ ["a","b"]; [] ≡ absent (S6), so clearing
   // every checkbox cleans the URL.
-  tags: p.stringArray(),
+  tags: p.array(),
 } satisfies SearchConfig;
 
 export const productsListRoute = defineAppRoute("/products", {

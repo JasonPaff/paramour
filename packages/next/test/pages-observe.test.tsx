@@ -29,7 +29,7 @@ const userRoute = definePagesRoute("/user/[id]", {
   params: { id: p.integer() },
   search: {
     tab: p.string().optional(),
-    tag: p.stringArray(),
+    tag: p.array(),
   },
 });
 

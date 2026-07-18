@@ -38,7 +38,7 @@ const docsRoute = definePagesRoute("/docs/[[...path]]", {
 });
 
 const tagsRoute = definePagesRoute("/tags", {
-  search: { tag: p.stringArray() },
+  search: { tag: p.array() },
 });
 
 // A STRICT raw schema: any undeclared key fails the decode. The subtraction

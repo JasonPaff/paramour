@@ -24,7 +24,7 @@ export interface CodecDescription {
   readonly defaultValue?: CodecDefaultDescription;
   /**
    * Nested description of a composite list codec's element scalar (CV6;
-   * currently `p.csv`).
+   * `p.csv` and `p.array`).
    */
   readonly element?: CodecDescription;
   readonly enumMembers?: readonly string[];
@@ -73,8 +73,9 @@ export function describeCodec(codec: AnyCodec): CodecDescription {
     arity: codec["~arity"],
     caught: codec["~caught"],
     ...(defaultValue === undefined ? {} : { defaultValue }),
-    // Recursion terminates: nested csv is rejected at construction (CV2),
-    // and element codecs are unmodified scalars with no element of their own.
+    // Recursion terminates: composite nesting is bounded at construction —
+    // csv rejects nested csv (CV2) and array rejects arity-many inners
+    // (PP1), so the deepest legal chain is array<csv<scalar>>.
     ...(element === undefined ? {} : { element: describeCodec(element) }),
     ...(enumMembers === undefined ? {} : { enumMembers }),
     kind: codec["~kind"],
@@ -132,11 +133,23 @@ export function formatCodecDescription(
     part.enumMembers === undefined
       ? part.kind
       : `enum(${part.enumMembers.join(memberSeparator)})`;
-  let label =
-    description.element === undefined
-      ? kindLabel(description)
-      : `${description.kind}<${kindLabel(description.element)}>`;
-  if (description.arity === "many") label += "[]";
+  // Composite labels: a one-key list wraps its element (`csv<integer>`); a
+  // repeated-key list IS its element, pluralized (`integer[]`) — the
+  // "array" kind never appears in a label, the `[]` carries it. The elision
+  // keys on the kind, NOT arity: consumers force arity "many" onto
+  // non-array descriptions (render.ts's catch-all params), where a csv
+  // wrapper must survive as `csv<integer>[]`. Recursive so `array<csv<E>>`
+  // renders `csv<E>[]`.
+  const shapeLabel = (part: CodecDescription): string => {
+    const base =
+      part.element === undefined
+        ? kindLabel(part)
+        : part.kind === "array"
+          ? shapeLabel(part.element)
+          : `${part.kind}<${shapeLabel(part.element)}>`;
+    return part.arity === "many" ? `${base}[]` : base;
+  };
+  let label = shapeLabel(description);
   if (style === "compact") {
     if (description.presence === "optional") label += "?";
     if (description.defaultValue !== undefined) {

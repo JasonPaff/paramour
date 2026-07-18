@@ -19,7 +19,7 @@ export const findSearch = {
   // The Valibot refinement gives strings a failure mode of their own:
   // /find?q=a fails min-length-2 and lands in the same error arm.
   q: p.string(searchQuery).optional(),
-  tag: p.stringArray(),
+  tag: p.array(),
 } satisfies SearchConfig;
 
 export const findRoute = definePagesRoute("/find", { search: findSearch });

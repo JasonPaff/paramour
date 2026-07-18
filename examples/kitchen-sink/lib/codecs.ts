@@ -15,5 +15,5 @@ export const demoSearch = {
   labels: p.csv(),
   page: p.integer().default(1),
   q: p.string().optional(),
-  tags: p.stringArray(),
+  tags: p.array(),
 } satisfies SearchConfig;

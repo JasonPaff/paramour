@@ -11,7 +11,7 @@ p.string().optional().optional();
 p.string().optional().default("a");
 
 // @expect-error TS2349 — array codecs reject .default(): absent already means []
-p.stringArray().default(["a"]);
+p.array().default(["a"]);
 
 // @expect-error TS2349 — .catch() may only be applied once
 p.integer().catch(0).catch(1);

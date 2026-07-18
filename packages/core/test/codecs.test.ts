@@ -512,7 +512,7 @@ describe("p.csv", () => {
       p.integer().catch(0) as unknown as Codec<unknown>,
       p.integer().default(1) as unknown as Codec<unknown>,
       p.integer().optional() as unknown as Codec<unknown>,
-      p.stringArray() as unknown as Codec<unknown>,
+      p.array() as unknown as Codec<unknown>,
     ];
     for (const inner of modified) {
       expect(() => p.csv(inner)).toThrow(ParamourError);
@@ -571,6 +571,85 @@ describe("p.csv", () => {
   });
 });
 
+describe("p.array (design-13 PP1)", () => {
+  it("composes the element codec per repeated wire value", () => {
+    expect(parse(p.array(), "x")).toBe("x");
+    expect(parse(p.array(p.integer()), "7")).toBe(7);
+    expect(serialize(p.array(p.integer()), 7)).toBe("7");
+    expect(parse(p.array(p.enum(["a", "b"])), "a")).toBe("a");
+    expect(() => parse(p.array(p.enum(["a", "b"])), "c")).toThrow(ParseError);
+  });
+
+  it("an element parse failure surfaces as the element codec's own ParseError", () => {
+    expect(() => parse(p.array(p.integer()), "x")).toThrow(ParseError);
+    expect(() => parse(p.array(p.integer()), "x")).toThrow(/is not an integer/);
+  });
+
+  it("PP1: a modified or arity-many element is a construction-time ParamourError (runtime mirror of the type-state)", () => {
+    const modified: Codec<unknown>[] = [
+      p.integer().catch(0) as unknown as Codec<unknown>,
+      p.integer().default(1) as unknown as Codec<unknown>,
+      p.integer().optional() as unknown as Codec<unknown>,
+      p.array() as unknown as Codec<unknown>,
+    ];
+    for (const inner of modified) {
+      expect(() => p.array(inner)).toThrow(ParamourError);
+      expect(() => p.array(inner)).toThrow(/cannot carry modifiers/);
+    }
+  });
+
+  it("PP1: a csv element is legal — one whole comma-packed value per repeated key", () => {
+    const codec = p.array(p.csv(p.integer()));
+    expect(parse(codec, "1,2")).toEqual([1, 2]);
+    expect(serialize(codec, [1, 2])).toBe("1,2");
+  });
+});
+
+describe("p.index (design-13 PP5)", () => {
+  it("shifts the 1-based wire form to a 0-based in-memory index and back", () => {
+    expect(parse(p.index(), "1")).toBe(0);
+    expect(parse(p.index(), "5")).toBe(4);
+    expect(serialize(p.index(), 0)).toBe("1");
+    expect(serialize(p.index(), 4)).toBe("5");
+  });
+
+  it("PP5: wire values below 1 are a ParseError", () => {
+    expect(() => parse(p.index(), "0")).toThrow(ParseError);
+    expect(() => parse(p.index(), "0")).toThrow(/below the 1-based wire floor/);
+    expect(() => parse(p.index(), "-3")).toThrow(ParseError);
+  });
+
+  it("shares p.integer's strict wire grammar", () => {
+    for (const raw of ["", "1e3", "1.0", "0x10", " 12", "+5", "abc"]) {
+      expect(() => parse(p.index(), raw)).toThrow(ParseError);
+    }
+    expect(parse(p.index(), "007")).toBe(6);
+  });
+
+  it("PP5: a negative in-memory index is a SerializeError at link-build time", () => {
+    expect(() => serialize(p.index(), -1)).toThrow(SerializeError);
+    expect(() => serialize(p.index(), -1)).toThrow(/negative/);
+  });
+
+  it("rejects non-integers and wire-overflowing values at serialize time", () => {
+    expect(() => serialize(p.index(), 1.5)).toThrow(SerializeError);
+    expect(() => serialize(p.index(), "0")).toThrow(SerializeError);
+    // MAX_SAFE_INTEGER itself is a legal index, but its 1-based wire form
+    // is not a safe integer — the round-trip would be lossy, so fail loud.
+    expect(() => serialize(p.index(), Number.MAX_SAFE_INTEGER)).toThrow(
+      SerializeError,
+    );
+  });
+
+  it("the optional schema sees the in-memory 0-based value on both sides", () => {
+    const capped = p.index(z.number().max(9));
+    expect(parse(capped, "10")).toBe(9);
+    expect(() => parse(capped, "11")).toThrow(ParseError);
+    expect(serialize(capped, 9)).toBe("10");
+    expect(() => serialize(capped, 10)).toThrow(SerializeError);
+  });
+});
+
 describe("p.string serialize contract", () => {
   it("rejects non-strings at serialize time", () => {
     expect(() => serialize(p.string(), 5)).toThrow(SerializeError);
@@ -602,7 +681,7 @@ describe("modifier runtime guards (JS consumers)", () => {
   });
 
   it("rejects presence modifiers on array codecs", () => {
-    const arr = p.stringArray() as unknown as {
+    const arr = p.array() as unknown as {
       default: (value: string[]) => unknown;
       optional: () => unknown;
     };

@@ -45,7 +45,7 @@ export default function FindPage() {
             </dt>
             <dd>{search.data.q ?? "(absent)"}</dd>
             <dt>
-              <code>search.tag</code> — <code>p.stringArray()</code>
+              <code>search.tag</code> — <code>p.array()</code>
             </dt>
             <dd>
               {search.data.tag.length > 0
