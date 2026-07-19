@@ -1,5 +1,12 @@
 # paramour
 
+## 0.5.1
+
+### Patch Changes
+
+- [#27](https://github.com/JasonPaff/paramour/pull/27) [`eff721a`](https://github.com/JasonPaff/paramour/commit/eff721a2f7b49fb5c49663742bf0c8d0af504b35) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Point package metadata at the paramour.dev docs site: real READMEs for every
+  published package, `homepage` deep links into the docs, and npm keywords.
+
 ## 0.5.0
 
 ### Minor Changes
