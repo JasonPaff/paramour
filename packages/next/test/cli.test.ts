@@ -9,7 +9,7 @@ import {
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { emitArtifact } from "../src";
+import { emitArtifact } from "../src/emit.js";
 import { watcherLockPath } from "../src/lock.js";
 import { type CliIo, runCli } from "../src/run-cli.js";
 import { makeTempDir, makeTree } from "./helpers.js";
