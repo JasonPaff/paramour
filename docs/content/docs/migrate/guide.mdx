@@ -1,0 +1,408 @@
+---
+title: Step-by-Step Guide
+description: Migrate route by route with both libraries installed.
+---
+
+This guide migrates an app incrementally: both libraries stay installed,
+each route moves over one at a time, and `next-typesafe-url` is removed
+only at the end. The app builds and runs at every step — there is no
+broken intermediate state, and you can ship mid-migration.
+
+The steps were executed literally, in this order, against a real
+`next-typesafe-url` v6.1.0 app on Next 15 before being written down.
+
+<Callout title="URLs change per route">
+  As each route migrates, the URL format of its object-valued search
+  params changes at that moment — not at the end. Step 6 is the decision
+  point; read it before migrating any route whose search params carry
+  objects or arrays.
+</Callout>
+
+## Step 1: Install paramour alongside
+
+```package-install
+paramour @paramour-js/next
+```
+
+There is no peer conflict: paramour does not require zod, so your
+existing zod install keeps serving `next-typesafe-url` and doubles as
+refinement schemas inside codecs. One version note: `next-typesafe-url`
+declares support through Next 15 while `@paramour-js/next` supports
+Next 15 and up — so the migration happens on Next 15, and upgrading to
+Next 16 becomes available the moment the old library is gone.
+
+## Step 2: Run both codegens side by side
+
+```bash
+npx paramour init
+```
+
+`init` scaffolds `paramour.config.ts`, wraps your `next.config` with
+[`withTypedRoutes`](/docs/reference/next/with-typed-routes), adds a
+`paramour` script, and runs the first generate. All of it coexists with
+`next-typesafe-url`: the two artifacts have different filenames
+(`paramour-env.d.ts` vs `_next-typesafe-url_.d.ts`) and augment different
+modules, so neither build step interferes with the other.
+
+```json title="package.json (during migration)"
+{
+  "scripts": {
+    "dev": "concurrently \"next-typesafe-url -w\" \"next dev\"",
+    "build": "next-typesafe-url && next build",
+    "paramour": "paramour generate"
+  }
+}
+```
+
+Your existing `next-typesafe-url` watcher keeps running exactly as
+before; `withTypedRoutes` regenerates the paramour artifact inside
+`next dev` and `next build`, so no second watcher is needed. The
+[CLI guide](/docs/guides/cli) covers the commands in depth.
+
+## Step 3: Pick a route and translate its definition
+
+Start with a leaf route — something few pages link to. The translation
+is mechanical: each zod schema field becomes a codec.
+
+Before:
+
+```ts title="app/product/[productID]/routeType.ts"
+import { type DynamicRoute } from "next-typesafe-url";
+import { z } from "zod";
+
+export const Route = {
+  routeParams: z.object({
+    productID: z.number(),
+  }),
+  searchParams: z.object({
+    location: z.enum(["us", "eu"]).optional(),
+    userInfo: z.object({
+      name: z.string(),
+      age: z.number(),
+    }),
+  }),
+} satisfies DynamicRoute;
+export type RouteType = typeof Route;
+```
+
+After:
+
+```ts twoslash title="app/product/[productID]/route.def.ts"
+import { defineAppRoute, p } from "paramour";
+import { z } from "zod";
+
+export const productRoute = defineAppRoute("/product/[productID]", {
+  params: { productID: p.number() },
+  search: {
+    location: p.enum(["us", "eu"]).optional(),
+    // p.json preserves the old URL format — step 6 covers the alternative
+    userInfo: p.json(z.object({ name: z.string(), age: z.number() })),
+  },
+});
+```
+
+The recurring translations, in one place:
+
+| zod pattern                                | codec                                           |
+| ------------------------------------------ | ----------------------------------------------- |
+| `z.number()` / `z.string()` / `z.boolean()` | `p.number()` / `p.string()` / `p.boolean()`     |
+| `z.enum([...])`                            | `p.enum([...])`                                 |
+| `.optional()` / `.default(v)`              | `.optional()` / `.default(v)`                   |
+| `z.object(...)` / `z.array(...)` values    | `p.json(schema)` — or flatten, see step 6       |
+| Date via `z.string().transform(...)`       | `p.isoDate()` or `p.timestamp()`                |
+| Catch-all `z.array(z.string())`            | An element codec: `slug: p.string()`            |
+
+Keep `routeType.ts` around for now — it still serves any `$path` call
+sites you haven't reached yet. The [concept map](/docs/migrate/concept-map)
+has the full vocabulary table, and the
+[p.* reference](/docs/reference/core/p-builders) the full catalog.
+
+One structural note for the Pages Router: `next-typesafe-url` defined
+`Route` inside the page file, but every file in `pages/` is a page, so
+paramour route objects for Pages routes live in a shared module instead
+(say `lib/routes.ts`) using `definePagesRoute` — same config shape.
+
+## Step 4: Swap the links
+
+Before:
+
+```ts
+import { $path } from "next-typesafe-url";
+
+const link = $path({
+  route: "/product/[productID]",
+  routeParams: { productID: 23 },
+  searchParams: { userInfo: { name: "bob", age: 23 }, location: "us" },
+});
+```
+
+After:
+
+```ts twoslash
+import { defineAppRoute, href, p } from "paramour";
+import { z } from "zod";
+
+const productRoute = defineAppRoute("/product/[productID]", {
+  params: { productID: p.number() },
+  search: {
+    location: p.enum(["us", "eu"]).optional(),
+    userInfo: p.json(z.object({ name: z.string(), age: z.number() })),
+  },
+});
+// ---cut---
+const link = href(productRoute, {
+  params: { productID: 23 },
+  search: { location: "us", userInfo: { name: "bob", age: 23 } },
+});
+
+link;
+// ^?
+```
+
+Do this app-wide for the migrated route now: grep for its string key
+(`"/product/[productID]"`) to find every `$path` call site. A call site
+still on `$path` keeps producing old-format URLs for this route. Once the
+last one is gone, delete the route's `routeType.ts` and re-run both
+codegens. See the [href reference](/docs/reference/core/href) for what
+the branded return type buys.
+
+## Step 5: Replace withParamValidation with a parse call
+
+Before:
+
+```tsx title="app/product/[productID]/page.tsx"
+import { withParamValidation } from "next-typesafe-url/app/hoc";
+import type { InferPagePropsType } from "next-typesafe-url";
+import { Route, type RouteType } from "./routeType";
+
+type PageProps = InferPagePropsType<RouteType>;
+
+async function Page({ routeParams, searchParams }: PageProps) {
+  const { productID } = await routeParams;
+  const { userInfo } = await searchParams;
+  return <h1>Product {productID}, viewed by {userInfo.name}</h1>;
+}
+
+export default withParamValidation(Page, Route);
+```
+
+After — no wrapper; the page parses its own props:
+
+```tsx twoslash title="app/product/[productID]/page.tsx"
+// @filename: app/product/[productID]/route.def.ts
+import { defineAppRoute, p } from "paramour";
+import { z } from "zod";
+
+export const productRoute = defineAppRoute("/product/[productID]", {
+  params: { productID: p.number() },
+  search: {
+    userInfo: p.json(z.object({ name: z.string(), age: z.number() })),
+  },
+});
+
+// @filename: app/product/[productID]/page.tsx
+import type { RouteProps } from "paramour";
+
+import { notFound } from "next/navigation";
+
+import { productRoute } from "./route.def";
+
+export default async function Page(props: RouteProps) {
+  const result = await productRoute.safeParse(props);
+  if (result.status === "error") notFound();
+
+  const { params, search } = result.data;
+  return <h1>Product {params.productID}, viewed by {search.userInfo.name}</h1>;
+}
+```
+
+Where you previously caught a `ZodError`, you now branch on
+`result.status` — or use `parse` and let the error reach your nearest
+`error.tsx`. The [defining-routes guide](/docs/guides/defining-routes)
+compares the two, and the
+[routes reference](/docs/reference/core/routes) lists the halves
+(`parseParams` / `parseSearch`) when a layout or `generateMetadata` needs
+only one side.
+
+<Callout title="On Next 15, type the page with Next's PageProps">
+  Next 15's build-time page check requires props typed as plain
+  promises, which rejects paramour's `RouteProps` (it also accepts
+  Next 14's sync props). Type the page with Next's own generated helper
+  instead — it flows into `safeParse` unchanged:
+
+  ```tsx
+  export default async function Page(props: PageProps<"/product/[productID]">) {
+    const result = await productRoute.safeParse(props);
+    // ...
+  }
+  ```
+
+  On Next 16 this check is gone and `RouteProps` works as written above.
+</Callout>
+
+## Step 6: Decide the URL story for this route
+
+`next-typesafe-url` wrote scalar search params conventionally and
+JSON-encoded everything object- or array-valued. Scalars therefore carry
+over untouched — a route like `/search?q=hi&page=2` parses identically
+before and after migration. The decision is only about the JSON-blob
+keys, and it's per key:
+
+**Preserve** — keep `p.json(schema)` for each formerly-object key, as in
+step 3. Old bookmarked and shared URLs keep working; the wire stays
+JSON. This is the zero-risk default, and you can revisit it later.
+
+**Modernize** — flatten the object into per-key codecs. URLs become
+human-readable, but old links to this route stop parsing:
+
+```txt
+preserve:   /product/23?location=us&userInfo=%7B%22name%22%3A%22bob%22%2C%22age%22%3A23%7D
+modernize:  /product/23?age=23&location=us&name=bob
+```
+
+<Callout title="Old links break here">
+  If a modernized route had object-valued URLs shared in the wild, add a
+  redirect in `middleware.ts` that rewrites the old shape before it
+  reaches the route. A route that never leaked such URLs (internal
+  navigation only) can modernize freely — every `href` call site is
+  already emitting the new format.
+</Callout>
+
+Two smaller wire changes apply either way. Paramour elides value-form
+defaults — `page: 1` with `.default(1)` never appears in the URL, where
+the old library serialized it. And paramour's grammars are strict:
+`p.isoDate()` accepts ISO dates only, where a `z.string().transform()`
+quietly accepted anything `new Date()` could chew on. Both are covered in
+[differences](/docs/migrate/differences), and the
+[wire-format spec](/docs/reference/wire-format) states every rule.
+
+## Step 7: Migrate the client hooks
+
+Before:
+
+```tsx title="app/search/search-status.tsx"
+"use client";
+
+import { useSearchParams } from "next-typesafe-url/app";
+import { Route } from "./routeType";
+
+export function SearchStatus() {
+  const { data, isLoading, isError, error } = useSearchParams(Route.searchParams);
+
+  if (isLoading) return <p>Loading…</p>;
+  if (isError) return <p>Bad search params: {error.message}</p>;
+
+  return <p>q={data.q}</p>;
+}
+```
+
+After — the hook takes the whole route and returns a two-arm
+`SafeResult`:
+
+```tsx twoslash title="app/search/search-status.tsx"
+// @filename: app/search/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const searchRoute = defineAppRoute("/search", {
+  search: { page: p.integer().default(1), q: p.string() },
+});
+
+// @filename: app/search/search-status.tsx
+"use client";
+
+import { useSearch } from "@paramour-js/next/app";
+
+import { searchRoute } from "./route.def";
+
+export function SearchStatus() {
+  const search = useSearch(searchRoute);
+
+  if (search.status === "error") {
+    return <p role="alert">{search.error.message}</p>;
+  }
+
+  return <p>q={search.data.q}</p>;
+}
+```
+
+There is no `isLoading` branch to write: App-Router params are
+synchronously available and SSR-consistent, so the loading arm your old
+components carried is dead code after migration
+([why](/docs/migrate/differences#app-router-hooks-lose-isloading)). Pages
+Router components keep a genuine third state — `status: "pending"`
+replaces `isLoading` before the router is ready. The
+[hooks guide](/docs/guides/hooks) and
+[Pages hooks reference](/docs/reference/next/pages-hooks) cover both
+routers.
+
+<Callout title="Pages Router on Next 15: add transpilePackages">
+  On Next 15, importing `@paramour-js/next/pages` fails at build with
+  `ERR_MODULE_NOT_FOUND` for `next/router` — Next 15's page-data
+  collector loads externalized ESM with Node resolution rules that the
+  extensionless import doesn't satisfy (Next 16 is unaffected;
+  `next-typesafe-url`'s own `/pages` entry has the same problem). Until
+  it's fixed upstream, bundle the package instead:
+
+  ```js title="next.config.mjs"
+  const nextConfig = {
+    transpilePackages: ["@paramour-js/next"],
+  };
+  ```
+</Callout>
+
+## Step 8: Repeat per route, in this order
+
+- **Leaf routes first** — few inbound links means few `$path` call sites
+  to chase per route.
+- **Object-valued search params last** — those routes need the step 6
+  decision; scalar-only routes migrate mechanically.
+- **Catch-alls translate directly** — an element codec on the segment,
+  nothing special
+  ([defining routes](/docs/guides/defining-routes#dynamic-segments)).
+
+During the whole migration, `paramour list` doubles as the checklist:
+filesystem routes without a `route.def.ts` are flagged
+`filesystem only (no route definition found)`, so the remaining work is
+always one command away.
+
+## Step 9: Remove next-typesafe-url
+
+Once `paramour list` shows every route defined and no `$path` call sites
+remain:
+
+```bash
+npm uninstall next-typesafe-url
+```
+
+Then sweep the config surface — this grep list caught every leftover in
+our test migration:
+
+- `_next-typesafe-url_.d.ts` — delete the generated artifact, and drop
+  it from `tsconfig.json`'s `include`.
+- `package.json` — remove `next-typesafe-url` from the `dev` and `build`
+  scripts (the `concurrently` wrapper usually goes with it; a paramour
+  build gate is `paramour check && next build` — see
+  [check](/docs/reference/next/cli/check)).
+- `next.config` — remove `next-typesafe-url` from `transpilePackages`
+  if you had it there.
+- Source: grep for `$path(`, `withParamValidation`, `InferRoute`, and
+  `next-typesafe-url/` imports — all should be gone.
+
+Finish with a health check:
+
+```bash
+npx paramour doctor
+```
+
+`doctor` verifies the config, the artifact, the `withTypedRoutes` wrap,
+and the tsconfig include in one pass
+([reference](/docs/reference/next/cli/doctor)).
+
+## Where next
+
+- [Differences](/docs/migrate/differences) — the full list of behavioral
+  deltas, including what paramour deliberately doesn't have.
+- [nuqs adapter](/docs/guides/nuqs) — client-side search-param *writing*
+  (`useState`-for-the-URL), something `next-typesafe-url` never offered.
+- [CLI workflows](/docs/guides/cli) — `paramour check` as a CI gate so
+  route drift fails the build.
