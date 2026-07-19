@@ -1,0 +1,17 @@
+# lychee link-checker configuration (.github/workflows/link-check.yml).
+# Root-relative links in markdown/MDX resolve against --base-url
+# (https://paramour.dev), so a link added in the same PR as its page 404s
+# until deployed — the weekly scheduled run is the live-site guard.
+
+accept = ["200..=299", "403", "429"]
+max_retries = 3
+
+exclude = [
+  # Hosts that block or rate-limit bots unpredictably.
+  "^https://(www\\.)?linkedin\\.com",
+  "^https://(www\\.)?twitter\\.com",
+  "^https://x\\.com",
+  # Placeholder/example hosts that appear in docs snippets.
+  "^https?://example\\.com",
+  "^https?://localhost",
+]

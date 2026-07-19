@@ -1,0 +1,45 @@
+name: Link check
+
+# Deliberately not part of ci.yml: external-host flakes must never block the
+# required "CI OK" context. The PR run guards links touched in review; the
+# weekly run is the live-site guard (catches pages that moved or rotted
+# after deploy).
+on:
+  pull_request:
+    paths:
+      - ".github/**/*.md"
+      - "README.md"
+      - "docs/README.md"
+      - "docs/content/**"
+      - "packages/**/README.md"
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lychee:
+    name: lychee
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --config lychee.toml
+            --base-url https://paramour.dev
+            --no-progress
+            README.md
+            docs/README.md
+            "docs/content/**/*.mdx"
+            "packages/*/README.md"
+          fail: true
+        env:
+          # Authenticated requests avoid github.com rate-limit flakes.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
