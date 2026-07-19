@@ -39,8 +39,10 @@ jobs:
       - uses: ./.github/actions/setup
 
       # OIDC trusted publishing requires npm >= 11.5.1; don't trust whatever
-      # the runner's Node image happens to bundle.
-      - run: npm install -g npm@^11
+      # the runner's Node image happens to bundle. Exact-pinned (CI-U2) so a
+      # regressed npm release (precedent: npm/cli#8976) can't break publishing
+      # with no repo change to bisect; Renovate bumps the pin.
+      - run: npm install -g npm@11.18.0 # renovate: datasource=npm depName=npm
 
       # The full ci.yml `checks` gate. It must run again here because CI
       # never runs on the Version Packages PR: PRs created with GITHUB_TOKEN
