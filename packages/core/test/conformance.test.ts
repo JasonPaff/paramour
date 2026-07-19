@@ -17,9 +17,11 @@ import {
   encodeParams,
   encodeSearch,
   encodeStaticParams,
+  href,
   p,
   ParamourError,
   ParseError,
+  rawSearch,
   SearchDecodeError,
   searchToString,
   SerializeError,
@@ -81,7 +83,7 @@ describe("numeric grammars over the wire", () => {
 });
 
 describe("duplicate keys", () => {
-  it("C6: duplicates on a scalar codec are a parse error", () => {
+  it("C6/P5: duplicates on a scalar codec are a parse error, never disambiguated", () => {
     const source = new URLSearchParams("page=2&page=3");
     expect(() => decodeSearch({ page: p.integer() }, source)).toThrow(
       SearchDecodeError,
@@ -1030,6 +1032,128 @@ describe("default and catch value isolation", () => {
     expect((caught as Error).message).toMatch(
       /\.catch\(\) factory threw: nope/,
     );
+  });
+});
+
+describe("href emission (S9/S10)", () => {
+  it("S9: only schema-declared search params are emitted", () => {
+    expect(
+      encodeSearch({ q: p.string() }, { junk: "x", q: "a" } as unknown as {
+        q: string;
+      }),
+    ).toEqual([["q", "a"]]);
+  });
+
+  it("S10: the fragment comes only from the explicit hash option, verbatim", () => {
+    const about = defineAppRoute("/about", {});
+    expect(href(about, { hash: "team" })).toBe("/about#team");
+    expect(href(about, { hash: "" })).toBe("/about");
+    // Verbatim means verbatim — the caller owns escaping.
+    expect(href(about, { hash: "#top" })).toBe("/about##top");
+  });
+});
+
+describe("rawSearch over the wire (design-04)", () => {
+  it("SS3: the schema receives every key, collapsed to Next's searchParams shape", () => {
+    const schema = z.object({ q: z.string(), tags: z.array(z.string()) });
+    expect(
+      decodeSearch(rawSearch(schema), new URLSearchParams("q=a&tags=x&tags=y")),
+    ).toEqual({ q: "a", tags: ["x", "y"] });
+  });
+
+  it("SS4: schema issue paths become issue keys; a root-level issue keys as <search>", () => {
+    let caught: unknown;
+    try {
+      decodeSearch(rawSearch(z.object({ n: z.number() })), { n: "2" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SearchDecodeError);
+    expect(
+      (caught as SearchDecodeError).issues.map((issue) => issue.key),
+    ).toEqual(["n"]);
+
+    let rootCaught: unknown;
+    try {
+      decodeSearch(rawSearch(z.string()), new URLSearchParams("q=hi"));
+    } catch (error) {
+      rootCaught = error;
+    }
+    expect(rootCaught).toBeInstanceOf(SearchDecodeError);
+    expect(
+      (rootCaught as SearchDecodeError).issues.map((issue) => issue.key),
+    ).toEqual(["<search>"]);
+  });
+
+  it("SS5: encode is a raw pass-through — the schema never runs", () => {
+    // A schema no input could satisfy: encode succeeding is the proof.
+    const schema = z.object({ q: z.literal("never-run-on-encode") });
+    expect(
+      searchToString(rawSearch(schema), { q: "hi", tags: ["a", "b"] }),
+    ).toBe("?q=hi&tags=a&tags=b");
+  });
+});
+
+describe("catch-all element semantics (D6)", () => {
+  it("D6: each failing element recovers independently through .catch()", () => {
+    const files = defineAppRoute("/files/[...path]", {
+      params: { path: p.integer().catch(0) },
+    });
+    expect(decodeParams(files, { path: ["1", "x", "3"] })).toEqual({
+      path: [1, 0, 3],
+    });
+  });
+
+  it("D6: an absent optional catch-all normalizes to []", () => {
+    const docs = defineAppRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+    });
+    expect(decodeParams(docs, {})).toEqual({ slug: [] });
+  });
+});
+
+describe("two list spellings (CV1/CV7)", () => {
+  it("CV1: csv packs the list into ONE comma-separated wire value", () => {
+    expect(searchToString({ tags: p.csv() }, { tags: ["a", "b"] })).toBe(
+      "?tags=a%2Cb",
+    );
+  });
+
+  it("CV7: p.array repeats the key instead — same value, two first-class spellings", () => {
+    expect(searchToString({ tags: p.array() }, { tags: ["a", "b"] })).toBe(
+      "?tags=a&tags=b",
+    );
+  });
+});
+
+describe("route segment shapes (R1/R3/R6)", () => {
+  it("R1: a single param contributes exactly one encoded segment", () => {
+    const user = defineAppRoute("/user/[id]", { params: { id: p.string() } });
+    expect(buildPath(user, { id: "a b" })).toBe("/user/a%20b");
+  });
+
+  it("R3: an optional catch-all given [] or nothing elides to the base path", () => {
+    const docs = defineAppRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+    });
+    expect(buildPath(docs, {})).toBe("/docs");
+    expect(buildPath(docs, { slug: [] })).toBe("/docs");
+  });
+
+  it("R3: a required catch-all given [] is a SerializeError", () => {
+    const files = defineAppRoute("/files/[...path]", {
+      params: { path: p.string() },
+    });
+    expect(() => buildPath(files, { path: [] })).toThrow(SerializeError);
+  });
+
+  it('R6: the root route builds "/" and no href gains a trailing slash', () => {
+    const root = defineAppRoute("/", {});
+    expect(href(root)).toBe("/");
+    const docs = defineAppRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+    });
+    expect(href(docs, { params: { slug: [] } })).toBe("/docs");
   });
 });
 
