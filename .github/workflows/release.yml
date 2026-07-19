@@ -15,10 +15,21 @@ permissions:
   id-token: write # npm trusted publishing (OIDC)
 
 jobs:
+  # The compat matrix must also gate publishing (CI-B3): ci.yml never runs on
+  # the Version Packages PR (PRs created with GITHUB_TOKEN don't trigger other
+  # workflows), so this call is the only Next 15/16 compat check on the tree
+  # that reaches npm. Job-level permissions drop this workflow's write/OIDC
+  # grants — the compat legs only need to read the repo.
+  next-compat:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/next-compat.yml
+
   release:
     name: Version PR / publish
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: next-compat
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
@@ -28,9 +39,11 @@ jobs:
       # the runner's Node image happens to bundle.
       - run: npm install -g npm@^11
 
-      # The full ci.yml gate. It must run again here because CI never runs on
-      # the Version Packages PR: PRs created with GITHUB_TOKEN don't trigger
-      # other workflows, so this is the only pre-publish check.
+      # The full ci.yml `checks` gate. It must run again here because CI
+      # never runs on the Version Packages PR: PRs created with GITHUB_TOKEN
+      # don't trigger other workflows, so this plus the next-compat job above
+      # are the only pre-publish checks. Running it in THIS job also leaves
+      # the built dist/ in place for `changeset publish` below.
       - uses: ./.github/actions/checks
 
       # No NPM_TOKEN on purpose: auth is OIDC via the trusted publisher

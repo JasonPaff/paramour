@@ -1,0 +1,77 @@
+# DESIGN §12: "Next: latest two majors. Verified in CI matrix."
+#
+# Reusable (workflow_call) on purpose (CI-M2): ci.yml runs it as the PR/main
+# gate, and release.yml runs it as a pre-publish gate (CI-B3). The Version
+# Packages PR is created with GITHUB_TOKEN and so never triggers ci.yml —
+# without the release-side call, the compat matrix would never run on the
+# tree that actually publishes to npm. A reusable workflow (not a third
+# composite action) because the matrix below cannot be expressed in a
+# composite, and callers get parallel legs for free.
+#
+# Only `examples/next-compat` is version-sensitive. packages/next declares
+# `next` as a peer and stubs `next/navigation` in its unit tests, so `test`,
+# `test:types` and `test:types:registry` are Next-agnostic — running them per
+# leg would cost minutes and prove nothing. The compat package covers two
+# layers per leg: `typecheck` pins paramour's hand-written assumptions about
+# Next (the `next/navigation` ambient, the hardcoded phase strings,
+# RouteProps, the config-function shape) against a REAL Next, and
+# `build:gate` runs a REAL `next build` over a minimal app — the layer that
+# caught what types never can (Node ESM resolution of the externalized
+# package at "Collecting page data", and Next 15.5's generated `.next/types`
+# page-props check; see build-app/).
+#
+# The callers' `checks` job/composite is the frozen-lockfile gate on the
+# canonical Next version.
+name: Next compat
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  next-compat:
+    name: Next ${{ matrix.next }} compat
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # Latest patch of each supported major, one entry per line so the
+        # Renovate custom manager (.github/renovate.json5) can bump each pin.
+        # Majors are excluded there: a new Next major is a deliberate matrix
+        # change, never a bot PR. React is NOT swapped: 15.x and 16.x accept
+        # the same React peer range.
+        next:
+          # renovate: datasource=npm depName=next
+          - "15.5.20"
+          # renovate: datasource=npm depName=next
+          - "16.2.10"
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - uses: ./.github/actions/setup
+
+      # The compat package resolves @paramour-js/next through its built dist.
+      - run: pnpm build:packages
+
+      # Reinstall the workspace packages as file: deps (hard COPIES inside
+      # node_modules, packed now that dist/ exists — with the peer `next`
+      # linked beside them in .pnpm). Through the default workspace SYMLINKS
+      # the packages resolve outside node_modules and Next silently bundles
+      # them, which is exactly the externalization gap that let the
+      # extensionless `next/router` import build green while failing every
+      # real Next 15 install — the copy topology makes `build:gate` see what
+      # a real npm install sees. Runner-only mutation, like the Next swap
+      # below.
+      - run: pnpm --filter example-next-compat add "paramour@file:../../packages/core" "@paramour-js/next@file:../../packages/next"
+
+      # Swap only this package's Next. Mutates the runner's package.json and
+      # lockfile, never the repo; the callers' `checks` gate stays
+      # --frozen-lockfile, so genuine lockfile drift is still caught there.
+      - run: pnpm --filter example-next-compat add -D next@${{ matrix.next }}
+
+      - run: pnpm --filter example-next-compat run typecheck
+
+      - run: pnpm --filter example-next-compat run build:gate
