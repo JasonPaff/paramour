@@ -1,5 +1,22 @@
 # paramour
 
+## 0.5.0
+
+### Minor Changes
+
+- [#20](https://github.com/JasonPaff/paramour/pull/20) [`981759c`](https://github.com/JasonPaff/paramour/commit/981759c83057867c2d27b5a5704cc44987e6d828) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Move `parseValue` and `foreignMessage` off the main barrel to a new `paramour/internal` entry point. Both exist for derived tooling (reflection-driven probes, error-message hardening), not app authors; the new subpath is explicitly unstable and outside the documented public API.
+
+- [#23](https://github.com/JasonPaff/paramour/pull/23) [`5c6bb83`](https://github.com/JasonPaff/paramour/commit/5c6bb83f43b271690db2dcf825fe0b843cf62787) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `RouteProps`, `ParamsProps`, and `SearchProps` are now promise-only, so a
+  page typed `props: RouteProps` passes Next 15.5's generated `.next/types`
+  page check (`params` must be `Promise<any> | undefined`) instead of failing
+  `next build`. The parse surface stays lenient: `parse`/`safeParse`/
+  `parseParams`/`parseSearch` now accept the new `RoutePropsInput` /
+  `ParamsPropsInput` / `SearchPropsInput` types, which keep admitting plain
+  sync objects (tests, server code). Breaking only for code that annotated
+  sync props with the old types — annotate with the `*Input` types instead.
+
+- [#24](https://github.com/JasonPaff/paramour/pull/24) [`bfd1585`](https://github.com/JasonPaff/paramour/commit/bfd158538fba154bfbbbe23268804a8e35025d6f) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Declare `engines.node: ">=22.13.0"` in every published package. Node 18 is EOL and was never executed by CI; the supported floor is now Node 22.13 (22 LTS), and CI runs the runtime test suite on exactly that version.
+
 ## 0.4.0
 
 ### Minor Changes

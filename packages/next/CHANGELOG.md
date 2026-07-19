@@ -1,5 +1,27 @@
 # @paramour-js/next
 
+## 0.3.0
+
+### Minor Changes
+
+- [#24](https://github.com/JasonPaff/paramour/pull/24) [`bfd1585`](https://github.com/JasonPaff/paramour/commit/bfd158538fba154bfbbbe23268804a8e35025d6f) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Declare `engines.node: ">=22.13.0"` in every published package. Node 18 is EOL and was never executed by CI; the supported floor is now Node 22.13 (22 LTS), and CI runs the runtime test suite on exactly that version.
+
+- [#20](https://github.com/JasonPaff/paramour/pull/20) [`981759c`](https://github.com/JasonPaff/paramour/commit/981759c83057867c2d27b5a5704cc44987e6d828) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Remove the codegen toolchain from the public barrel (`emitArtifact`, `writeIfChanged`, `acquireWatcherLock`, `scanRoutes`, `scanAppRoutes`, `scanPagesRoutes`, `resolveRouteDirs`, `watchRouteDirs`, `DEFAULT_DEBOUNCE_MS`, `DEFAULT_PAGE_EXTENSIONS`, and their companion types). These were build-internal plumbing for `withTypedRoutes` and the `paramour` CLI, not app-author API. The public surface is now `withTypedRoutes`, `WithTypedRoutesOptions`, `ParamourConfig`, and `RouteCollisionError`.
+
+### Patch Changes
+
+- [#23](https://github.com/JasonPaff/paramour/pull/23) [`5c6bb83`](https://github.com/JasonPaff/paramour/commit/5c6bb83f43b271690db2dcf825fe0b843cf62787) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Two Next 15 fixes: `@paramour-js/next/pages` no longer fails `next build`
+  on Next 15 with `ERR_MODULE_NOT_FOUND` for `next/router` (the import is now
+  the extensionful `next/router.js`, which survives Node ESM resolution when
+  the package is loaded as an external during page-data collection — no
+  `transpilePackages` workaround needed), and `paramour doctor`'s versions
+  check now verifies the installed `paramour` against the exact version
+  `@paramour-js/next` declares as its dependency instead of warning that the
+  two packages' own versions differ — they version independently, so the old
+  "release in lockstep" warning fired on every correct install.
+- Updated dependencies [[`981759c`](https://github.com/JasonPaff/paramour/commit/981759c83057867c2d27b5a5704cc44987e6d828), [`5c6bb83`](https://github.com/JasonPaff/paramour/commit/5c6bb83f43b271690db2dcf825fe0b843cf62787), [`bfd1585`](https://github.com/JasonPaff/paramour/commit/bfd158538fba154bfbbbe23268804a8e35025d6f)]:
+  - paramour@0.5.0
+
 ## 0.2.1
 
 ### Patch Changes
