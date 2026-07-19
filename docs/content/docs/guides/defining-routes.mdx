@@ -3,6 +3,154 @@ title: Defining Routes
 description: Static, dynamic, and catch-all routes with defineAppRoute.
 ---
 
-<Callout title="Under construction">
-  This page is a stub — content lands in a later milestone.
-</Callout>
+Recipes for declaring routes and parsing them on the server. If you haven't
+read [Route Objects as Currency](/docs/concepts/route-objects), the one-line
+version: define each route once in a `route.def.ts` beside its page, import
+the object everywhere.
+
+## Static routes
+
+No params, no config — but still worth defining, because a static route
+object gives you a registry-checked, typo-proof `href`:
+
+```ts twoslash
+import { defineAppRoute, href } from "paramour";
+
+export const aboutRoute = defineAppRoute("/about", {});
+
+const link = href(aboutRoute);
+//    ^?
+```
+
+When a route needs nothing, `href`'s options are omittable entirely.
+
+## Dynamic segments
+
+One codec per `[segment]`, keyed by the segment name. The params config must
+match the path's segments exactly — a missing or misnamed key is a compile
+error:
+
+```ts twoslash
+import { defineAppRoute, p } from "paramour";
+
+export const orderRoute = defineAppRoute("/orders/[orderId]/items/[line]", {
+  params: {
+    line: p.index(),
+    orderId: p.string(),
+  },
+});
+```
+
+Any codec works in a param position — `p.index()` here gives 1-based URLs
+(`/orders/A1/items/1`) over 0-based array indices in memory.
+
+## Catch-all segments
+
+A catch-all's codec describes **one segment element**; the array-ness comes
+from the segment kind. `[...slug]` (required) decodes to a non-empty array;
+`[[...slug]]` (optional) also matches the bare path and decodes it to `[]`:
+
+```ts twoslash
+import { defineAppRoute, href, p } from "paramour";
+
+export const docsRoute = defineAppRoute("/docs/[[...slug]]", {
+  params: { slug: p.string() },
+});
+
+declare const props: import("paramour").RouteProps;
+const { slug } = await docsRoute.parseParams(props);
+//      ^?
+
+const deep = href(docsRoute, { params: { slug: ["guides", "hooks"] } });
+const root = href(docsRoute, { params: { slug: [] } });
+// => "/docs/guides/hooks" and "/docs"
+```
+
+(This exact route serves the page you're reading.)
+
+## Parsing on the server
+
+App routes expose two parse styles, and the choice is about who made the
+mistake:
+
+- **`parse`** — throws a structured error to your nearest `error.tsx`. Right
+  when a malformed URL is exceptional and a generic error page is the
+  correct answer.
+- **`safeParse`** — returns `{ status: "success" | "error" }`. Right when you
+  want to decide — most commonly, treating a bad URL as a 404:
+
+```tsx twoslash title="app/product/[id]/page.tsx"
+// @filename: app/product/[id]/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: { page: p.integer().default(1) },
+});
+
+// @filename: app/product/[id]/page.tsx
+import type { RouteProps } from "paramour";
+
+import { notFound } from "next/navigation";
+
+import { productRoute } from "./route.def";
+
+export default async function ProductPage(props: RouteProps) {
+  const result = await productRoute.safeParse(props);
+  if (result.status === "error") notFound();
+
+  const { params, search } = result.data;
+  return (
+    <h1>
+      Product #{params.id}, page {search.page}
+    </h1>
+  );
+}
+```
+
+Both styles come in halves, too: `parseParams` / `parseSearch` (and their
+`safe*` twins) when a call site only needs one side. `generateMetadata` is
+the classic case:
+
+```tsx twoslash title="app/product/[id]/page.tsx"
+// @filename: app/product/[id]/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+
+// @filename: app/product/[id]/page.tsx
+import type { Metadata } from "next";
+import type { RouteProps } from "paramour";
+
+import { productRoute } from "./route.def";
+
+export async function generateMetadata(props: RouteProps): Promise<Metadata> {
+  const { id } = await productRoute.parseParams(props);
+  return { title: `Product #${String(id)}` };
+}
+```
+
+Parsing and metadata see identical decoding — there is one definition of
+what `/product/42` means.
+
+## Pages Router
+
+`definePagesRoute` declares routes for `pages/` with the same config shape;
+parsing happens through the sync, context-based `parseContext` /
+`safeParseContext` in `getServerSideProps` and friends. The
+[hooks guide](/docs/guides/hooks#pages-router) walks through the full Pages
+surface, client side included.
+
+## After adding a route
+
+Regenerate the registry so the new path joins the compile-time union:
+
+```npm
+npm run paramour
+```
+
+During `next dev` the `withTypedRoutes` wrapper does this automatically;
+`paramour generate --watch` covers non-dev workflows. See
+[CLI workflows](/docs/guides/cli) for the drift-checking story in CI.

@@ -84,9 +84,18 @@ importers:
         specifier: ^4.3.1
         version: 4.3.1
     devDependencies:
+      '@paramour-js/devtools':
+        specifier: workspace:*
+        version: link:../packages/devtools
+      '@paramour-js/nuqs':
+        specifier: workspace:*
+        version: link:../packages/nuqs
       '@tailwindcss/postcss':
         specifier: ^4.1.0
         version: 4.3.3
+      '@tanstack/react-devtools':
+        specifier: ^0.10.8
+        version: 0.10.8(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@types/mdx':
         specifier: ^2.0.13
         version: 2.0.14
@@ -99,12 +108,21 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.0
         version: 19.2.3(@types/react@19.2.17)
+      nuqs:
+        specifier: ^2.9.0
+        version: 2.9.0(next@16.2.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       tailwindcss:
         specifier: ^4.1.0
         version: 4.3.3
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      valibot:
+        specifier: ^1.4.2
+        version: 1.4.2(typescript@6.0.3)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   examples/basic:
     dependencies:

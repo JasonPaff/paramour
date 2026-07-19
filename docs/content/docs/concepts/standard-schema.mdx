@@ -6,6 +6,136 @@ description: Bring Zod, Valibot, ArkType — any Standard Schema validator.
 Paramour codecs accept any Standard Schema validator for refinement, so you
 keep your existing validation library instead of learning a new one.
 
-<Callout title="Under construction">
-  This page is a stub — content lands in a later milestone.
-</Callout>
+## A seam, not an adapter
+
+[Standard Schema](https://standardschema.dev) is a tiny spec that validation
+libraries (Zod, Valibot, ArkType, and a growing list) all implement: one
+`~standard.validate` interface that any consumer can call without knowing
+which library produced the schema.
+
+Paramour consumes that interface directly. There is no `@paramour-js/zod`,
+no `@paramour-js/valibot`, and there never needs to be — the division of
+labor is:
+
+- **The codec owns the wire**: what the value looks like in the URL, how it
+  parses, how it serializes. That knowledge is paramour's whole job, and
+  validators don't have it (Standard Schema is validate-only — it has no
+  serialize direction).
+- **Your schema owns the domain**: which *values* are acceptable once
+  decoded. Minimum lengths, ranges, formats — rules about your data, written
+  in the library you already use.
+
+## Where a schema slots in
+
+The string and numeric builders take an optional schema; `p.json` requires
+one (unvalidated `JSON.parse` output would poison the types). The same route,
+refined with two different validators:
+
+<Tabs groupId="validator" items={["Zod", "Valibot"]}>
+
+<Tab value="Zod">
+
+```ts twoslash
+import { defineAppRoute, p } from "paramour";
+import { z } from "zod";
+
+const slug = z.string().regex(/^[a-z0-9-]+$/);
+const limit = z.number().int().min(1).max(100);
+
+export const postsRoute = defineAppRoute("/posts/[slug]", {
+  params: { slug: p.string(slug) },
+  search: { limit: p.integer(limit).default(20) },
+});
+
+declare const props: import("paramour").RouteProps;
+const { params, search } = await postsRoute.parse(props);
+
+params.slug;
+//      ^?
+
+search.limit;
+//      ^?
+```
+
+</Tab>
+
+<Tab value="Valibot">
+
+```ts twoslash
+import { defineAppRoute, p } from "paramour";
+import * as v from "valibot";
+
+const slug = v.pipe(v.string(), v.regex(/^[a-z0-9-]+$/));
+const limit = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100));
+
+export const postsRoute = defineAppRoute("/posts/[slug]", {
+  params: { slug: p.string(slug) },
+  search: { limit: p.integer(limit).default(20) },
+});
+
+declare const props: import("paramour").RouteProps;
+const { params, search } = await postsRoute.parse(props);
+
+params.slug;
+//      ^?
+
+search.limit;
+//      ^?
+```
+
+</Tab>
+
+</Tabs>
+
+Note the layering in `p.integer(limit)`: the codec's grammar runs first
+(`"abc"` is rejected as not-an-integer before your schema ever sees it), then
+the schema refines the decoded number. `/posts/hello-world?limit=200` fails
+with a schema issue on `limit`; `?limit=abc` fails with a grammar issue.
+Either way it's the same structured `issues[]` you get from any
+[decode failure](/docs/concepts/serialization#when-decoding-fails).
+
+## Refinement runs in both directions
+
+The schema validates on decode — and *again on serialize*. Building a link
+with a schema-invalid value throws at `href` time, in the component that made
+the mistake, rather than shipping a URL that will fail for whoever clicks it.
+This is the same ethos as the rest of the library: errors surface where the
+bad value is introduced, not two navigations later.
+
+One honest limitation follows from serialization being paramour's job:
+**transforming schemas are parse-only**. A schema whose output type differs
+from its input (say, string in, `URL` object out) can refine a decode, but
+its output would fail validation on the way back — there is no
+inverse-transform in Standard Schema to call. If you need a bidirectional
+transform, that's a wire concern, and the tool is
+[`p.custom`](/docs/concepts/codecs#the-catalog) — parse *and* serialize,
+stated explicitly.
+
+## The seam runs the other way too
+
+Paramour can also *produce* a Standard Schema. `standardSearchSchema(route)`
+exports a route's entire search contract as a spec-compliant schema — wire
+strings in, decoded values out, byte-identical semantics to the route's own
+parse (defaults apply, `.catch()` recovers, unknown keys strip):
+
+```ts twoslash
+import { defineAppRoute, p, standardSearchSchema } from "paramour";
+
+const productsRoute = defineAppRoute("/products", {
+  search: { page: p.integer().default(1), q: p.string().optional() },
+});
+
+const schema = standardSearchSchema(productsRoute);
+//    ^?
+```
+
+Hand it to anything that speaks the spec — a tRPC input, TanStack Router's
+`validateSearch` — and those tools now enforce the same URL contract as your
+pages, from one definition.
+
+There's also an escape hatch in the opposite spirit: `rawSearch(schema)`
+hands a route's *whole* search slot to one schema of yours, bypassing
+per-key codecs entirely (and giving up round-trip encoding and per-key
+defaults in the bargain). The
+[search-params guide](/docs/guides/search-params) covers when that trade is
+worth it.

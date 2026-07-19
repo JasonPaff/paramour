@@ -7,7 +7,115 @@ Standard Schema is validate-only, so paramour owns serialization: every codec
 defines exactly how values appear in the URL, per a numbered wire-format
 spec.
 
-<Callout title="Under construction">
-  This page is a stub — content and a link to the wire-format spec and
-  interactive explorer land in a later milestone.
-</Callout>
+## URLs are public API
+
+People copy URLs into Slack, bookmark them, and put them in support tickets.
+Other services parse them. Your analytics segment on them. A URL outlives the
+deploy that produced it — which makes its format a public contract, whether
+you treat it as one or not.
+
+Most routing setups leave that contract implicit: whatever
+`String(value)` happens to produce, whatever `URLSearchParams` happens to
+accept. Paramour's position is that every serialization decision should be
+explicit, documented, and stable. If you can predict the exact URL from the
+value — and the exact value from the URL — the format is doing its job.
+
+## What values look like on the wire
+
+Every example below is real output from the shipped library (the docs build
+runs these codecs):
+
+| Codec | In memory | On the wire |
+| --- | --- | --- |
+| `p.boolean()` | `true` | `?debug=true` |
+| `p.isoDate()` | `Date` (2026-07-18 UTC) | `?since=2026-07-18` |
+| `p.timestamp()` | `Date` | `?at=2026-07-18T12%3A30%3A00.000Z` |
+| `p.index()` | `0` | `?page=1` (1-based on the wire) |
+| `p.json(schema)` | `{ a: 1 }` | `?f=%7B%22a%22%3A1%7D` |
+| `p.array()` | `["sale", "new"]` | `?tags=sale&tags=new` |
+| `p.csv()` | `["sale", "new"]` | `?tags=sale%2Cnew` |
+| `p.string()` | `"wool socks"` | `?q=wool%20socks` |
+
+Two layers are visible here. The **value layer** is each codec's grammar —
+`true`/`false` for booleans, `YYYY-MM-DD` for dates, one repeated key per
+array element. The **byte layer** is percent-encoding, which paramour also
+pins down deliberately: spaces are `%20` (never `+`), and encoding is
+`encodeURIComponent`-strict, so a decoded URL means the same thing everywhere.
+
+## Round-tripping
+
+The route methods and `href` do all of this for you, but the machinery is
+public — useful in route handlers, middleware, or anywhere you hold a search
+config without a request:
+
+```ts twoslash
+import { decodeSearch, p, searchToString } from "paramour";
+
+const search = {
+  page: p.integer().default(1),
+  since: p.isoDate().optional(),
+  tags: p.csv(),
+};
+
+const qs = searchToString(search, {
+  page: 1,
+  since: new Date("2026-07-18T00:00:00Z"),
+  tags: ["sale", "new"],
+});
+// => "?tags=sale%2Cnew&since=2026-07-18"
+
+const decoded = decodeSearch(search, new URLSearchParams(qs));
+//    ^?
+```
+
+(`searchToString` composes two smaller pieces — `encodeSearch` to ordered
+key/value pairs, `buildSearchString` to bytes — if you need to intervene
+between them.)
+
+Notice what happened to `page`. It was passed as `1`, equal to its
+`.default(1)` — so it was **elided**. Serializing a state and decoding the
+result always lands on the same state, and every state has exactly *one*
+canonical URL: no `?page=1` and `?` aliases of each other, no cache keys that
+differ by a default. (Only value-form defaults elide; factory defaults never
+do — see [modifiers](/docs/concepts/codecs#modifiers).)
+
+Absent optionals are omitted entirely, and on decode, keys paramour doesn't
+own are ignored: `?utm_source=…` can never fail your parse.
+
+## When decoding fails
+
+Strictness needs good failure ergonomics. A failed decode aggregates *every*
+bad key into one structured error — `issues[]`, one entry per key, not a
+throw on the first problem:
+
+```ts twoslash
+import { defineAppRoute, p, safeDecodeSearch } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: { page: p.integer().default(1), tags: p.csv() },
+});
+
+const result = safeDecodeSearch(
+  productRoute,
+  new URLSearchParams("?page=abc&tags=sale,new"),
+);
+
+if (result.status === "error") {
+  result.error.issues;
+  //           ^?
+  // => [{ key: "page", message: '"abc" is not an integer' }]
+}
+```
+
+The same `issues[]` shape appears everywhere a decode can fail — route
+methods, hooks, the standalone helpers — so error rendering is written once.
+Per-key recovery is opt-in via [`.catch()`](/docs/concepts/codecs#modifiers).
+
+## The normative spec
+
+Everything on this page is behavior; the letter of the law is a numbered
+rule set (each rule pinned by the library's conformance test suite),
+republished as the [wire-format spec](/docs/reference/wire-format). An
+interactive explorer — compose codecs, watch the URL, paste a query string,
+watch it decode — lands on that page in a later milestone.

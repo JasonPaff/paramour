@@ -3,6 +3,92 @@ title: Devtools Panel
 description: Observe route parsing live with the TanStack Devtools panel.
 ---
 
-<Callout title="Under construction">
-  This page is a stub — content lands in a later milestone.
-</Callout>
+`@paramour-js/devtools` is a [TanStack Devtools](https://tanstack.com/devtools)
+panel that watches your routes decode in real time. Every
+[hook](/docs/guides/hooks) call reports what it saw — which route, the raw
+wire values, the decoded result, or the exact `issues[]` when a decode
+failed — and the panel renders it as a live, inspectable session per route.
+
+Concretely, that means: a sidebar of every route your components have
+observed, params and search tables showing wire string → decoded value per
+key (defaults and `.catch()` recoveries attributed, not silently blended
+in), decode errors with their issues, and editable search inputs that
+navigate the app to the URL you compose — handy for poking at a filter
+page's edge cases without hand-editing the address bar.
+
+## Setup
+
+```package-install
+@paramour-js/devtools @tanstack/react-devtools
+```
+
+You own the TanStack shell; paramour is a plugin in it. Mount it once,
+dev-conditionally:
+
+```tsx twoslash title="app/devtools.tsx"
+"use client";
+
+import { paramourDevtoolsPlugin } from "@paramour-js/devtools";
+import { TanStackDevtools } from "@tanstack/react-devtools";
+
+export function Devtools() {
+  if (process.env.NODE_ENV === "production") return null;
+  return <TanStackDevtools plugins={[paramourDevtoolsPlugin()]} />;
+}
+```
+
+```tsx twoslash title="app/layout.tsx"
+// @filename: app/devtools.tsx
+"use client";
+
+import { paramourDevtoolsPlugin } from "@paramour-js/devtools";
+import { TanStackDevtools } from "@tanstack/react-devtools";
+
+export function Devtools() {
+  if (process.env.NODE_ENV === "production") return null;
+  return <TanStackDevtools plugins={[paramourDevtoolsPlugin()]} />;
+}
+
+// @filename: app/layout.tsx
+import type { ReactNode } from "react";
+
+import { Devtools } from "./devtools";
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <Devtools />
+      </body>
+    </html>
+  );
+}
+```
+
+That's the whole integration. Any component using `useRouteParams` /
+`useSearch` (App or Pages) starts reporting automatically — there is
+nothing to register per route.
+
+`paramourDevtoolsPlugin({ defaultOpen: true })` opens the panel on load if
+you want it in your face during a debugging session. If you're composing a
+custom devtools shell, `ParamourDevtoolsPanel` is also exported directly —
+the plugin helper is just `{ id, name, render: <ParamourDevtoolsPanel /> }`.
+
+## Production cost: none
+
+Instrumentation lives behind `process.env.NODE_ENV !== "production"` checks
+that bundlers constant-fold, so the observation seam is erased from
+production bundles — the hooks compile down to exactly what they'd be
+without devtools installed. The `NODE_ENV` guard in your `Devtools`
+component does the same for the panel itself. Ship the code as-is; nothing
+needs unwiring.
+
+## How observations reach the panel
+
+The hooks in `@paramour-js/next` emit through a small dev-only seam, and the
+panel subscribes to it — the devtools package never re-implements decoding,
+so what you see is what your components actually got. The seam's contract is
+published (types-only) as `@paramour-js/next/devtools-seam` for anyone
+building other observers; its reference documentation lives with the
+[devtools package reference](/docs/reference/devtools).

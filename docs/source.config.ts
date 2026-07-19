@@ -1,7 +1,8 @@
-import { rehypeCodeDefaultOptions } from "fumadocs-core/mdx-plugins";
+import { rehypeCodeDefaultOptions, remarkNpm } from "fumadocs-core/mdx-plugins";
 import { defineConfig, defineDocs } from "fumadocs-mdx/config";
 import { transformerTwoslash } from "fumadocs-twoslash";
 import { createFileSystemTypesCache } from "fumadocs-twoslash/cache-fs";
+import { JsxEmit } from "typescript";
 
 export const docs = defineDocs({ dir: "content/docs" });
 
@@ -17,8 +18,18 @@ export default defineConfig({
       },
       transformers: [
         ...(rehypeCodeDefaultOptions.transformers ?? []),
-        transformerTwoslash({ typesCache: createFileSystemTypesCache() }),
+        transformerTwoslash({
+          // tsx twoslash snippets (hooks, devtools, nuqs guides) contain JSX,
+          // and dev-gating snippets read process.env — match a real Next app.
+          twoslashOptions: {
+            compilerOptions: { jsx: JsxEmit.ReactJSX, types: ["node"] },
+          },
+          typesCache: createFileSystemTypesCache(),
+        }),
       ],
     },
+    // ```package-install``` blocks render as npm/pnpm/yarn/bun tabs; the
+    // persist id keeps the reader's package-manager choice across pages.
+    remarkPlugins: [[remarkNpm, { persist: { id: "package-manager" } }]],
   },
 });

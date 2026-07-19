@@ -7,6 +7,145 @@ Codecs are paramour's core primitive: bidirectional converters between typed
 values and URL strings, whose modifier methods (`.optional()`, `.default()`,
 `.catch()`) are tracked in the type system so invalid chains fail to compile.
 
-<Callout title="Under construction">
-  This page is a stub — content lands in a later milestone.
-</Callout>
+## Why codecs exist
+
+A URL is made of strings. Your program is not. Something has to own the
+conversion in *both* directions — decoding `"42"` into the number `42` when a
+request comes in, and serializing `42` back into `"42"` when you build a link.
+
+Validation libraries only cover half of this. A Zod or Valibot schema can
+check a value, but it cannot tell you how a `Date` should look in a URL, or
+turn one back into a string. That gap is the reason paramour exists: every
+param and search param is described by a **codec**, a small object that knows
+how to parse a wire string and how to serialize a value — and both directions
+are strict. Malformed input fails with a structured error instead of becoming
+`NaN`; an unserializable value fails at link-build time instead of producing
+a URL that can never round-trip.
+
+Decoding is strict in a way `Number()` never was: each codec matches an
+anchored grammar, so `"1.5"` is not an integer, `" 42"` is not a number, and
+`"0x10"` is not sixteen.
+
+## The catalog
+
+You'll rarely build a codec by hand — the `p.*` builders cover the useful
+wire shapes:
+
+```ts twoslash
+import { defineAppRoute, p } from "paramour";
+
+const eventsRoute = defineAppRoute("/events/[date]", {
+  params: { date: p.isoDate() },
+  search: {
+    limit: p.integer().optional(),
+    tags: p.array(),
+    view: p.enum(["day", "week", "month"]).default("month"),
+  },
+});
+
+declare const props: import("paramour").RouteProps;
+const { params, search } = await eventsRoute.parse(props);
+
+params.date;
+//      ^?
+
+search.view;
+//      ^?
+
+search.tags;
+//      ^?
+```
+
+**Scalars.** `p.string()`, `p.number()`, `p.integer()`, `p.boolean()`
+(exactly `"true"`/`"false"` on the wire), and `p.enum(["a", "b"])`, which
+narrows to the member union. The string and numeric builders optionally take
+a [Standard Schema](/docs/concepts/standard-schema) for domain refinement.
+
+**Temporal.** `p.isoDate()` decodes `2026-07-18` into a UTC-midnight `Date`
+and rejects dates that don't exist on a calendar (`2026-02-30` fails rather
+than silently becoming March 2nd). `p.timestamp()` handles full ISO-8601 UTC
+instants (`2026-07-18T12:30:00.000Z`) with the same no-silent-normalization
+stance.
+
+**Lists.** Two first-class wire shapes for the same in-memory type:
+`p.array()` repeats the key (`?tags=a&tags=b`), while `p.csv()` packs one
+key (`?tags=a,b`). Both take an optional element codec — `p.csv(p.integer())`
+gives you `number[]`. The [serialization page](/docs/concepts/serialization)
+covers how the two differ on the wire.
+
+**Structured.** `p.json(schema)` round-trips any JSON value through a single
+param, validated by the schema you pass (required here — unvalidated
+`JSON.parse` output would poison the types). `p.index()` is a
+pagination-friendly integer that is 1-based on the wire and 0-based in
+memory: `?page=1` decodes to index `0`.
+
+**Escape hatches.** `p.custom({ parse, serialize })` wraps any bidirectional
+pair of functions; `createCodec` is the lower-level factory the `p.*`
+builders themselves use. Reach for these when your wire shape isn't covered —
+not to skip validation.
+
+## Modifiers
+
+Three chainable modifiers adjust presence and failure behavior:
+
+```ts twoslash
+import { p } from "paramour";
+
+const q = p.string().optional();
+const page = p.integer().default(1);
+const view = p.enum(["grid", "list"]).catch("grid");
+```
+
+- **`.optional()`** — the param may be absent; the decoded type gains
+  `| undefined`, and serializing `undefined` omits the key.
+- **`.default(value)`** — absent decodes as `value`, and (in the other
+  direction) serializing a value equal to the default **elides** it from the
+  URL, so there's exactly one URL per state. The factory form
+  (`.default(() => new Date())`) computes a fresh default per decode — and
+  deliberately never elides, since a time-varying default could swallow an
+  explicitly-passed value.
+- **`.catch(fallback)`** — a malformed wire value recovers to `fallback`
+  instead of failing the decode. Use it for params you'd rather degrade than
+  404 on (a view mode, a sort order). It recovers *parse* failures only:
+  misconfiguration and serialization bugs stay loud.
+
+## The type-state system
+
+Some modifier combinations are contradictions. What should
+`.optional().default(1)` mean — absent, or `1`? Can a `.catch()` have two
+fallbacks? Many libraries answer with runtime throws or silently-last-wins.
+Paramour answers at compile time: each codec's type tracks which modifiers
+have been applied, and an illegal chain makes the *method itself* unavailable
+— so the mistake is a red squiggle, not a production incident:
+
+```ts twoslash
+// @errors: 2349
+import { p } from "paramour";
+
+p.string().optional().optional();
+
+p.string().optional().default("a");
+
+p.array().default(["a"]);
+
+p.integer().catch(0).catch(1);
+```
+
+Each error reads oddly ("This expression is not callable… type 'never'")
+because the illegal modifier has literally been removed from the type. The
+third case is worth dwelling on: `p.array()` rejects `.default()` because an
+absent repeated-key param already decodes as `[]` — a default could never be
+observed.
+
+These rules aren't types-only theater. The same chains throw at runtime for
+plain-JavaScript consumers — the type-state is a compile-time mirror of real
+constraints. And this documentation is itself compiled: the squiggles above
+come from the real packages, the same way the repo's own type tests pin them.
+
+## Where codecs come from and go
+
+Codecs are inert descriptions — defining one does nothing until a [route
+object](/docs/concepts/route-objects) carries it to a parse call, an `href`,
+a [hook](/docs/guides/hooks), or the [nuqs adapter](/docs/guides/nuqs). Their
+exact wire behavior is specified, rule by rule, in
+[Serialization & the Wire Format](/docs/concepts/serialization).

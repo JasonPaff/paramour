@@ -1,16 +1,104 @@
 ---
 title: Getting Started
-description: Install paramour and define your first typed route.
+description: Install paramour in a fresh Next.js app and build your first fully typed route, end to end.
 ---
 
-<Callout title="Under construction">
-  This page is a stub — the full install → route → params → hooks tutorial
-  lands in a later milestone.
-</Callout>
-
 Paramour routes are plain objects: define one next to its page, and you get
-validated params and typed hrefs everywhere you import it. Hover the code
-below — it is compiled against the real packages on every docs build.
+validated params and typed hrefs everywhere you import it. This tutorial takes
+you from an empty project to a working typed route — params, search params,
+client hooks, and the compile-time route registry — in about ten minutes.
+
+Every code block on this page is compiled against the real packages on every
+docs build. Hover anything to see what the compiler sees.
+
+## Create a project
+
+Start from a fresh Next.js app (TypeScript and the App Router are the
+defaults):
+
+```bash
+npx create-next-app@latest my-app
+cd my-app
+```
+
+Already have an App Router project? Skip ahead — nothing below assumes a clean
+slate except the route paths.
+
+## Install
+
+Paramour is two packages: `paramour` (the core — codecs, route objects,
+`href`) and `@paramour-js/next` (the Next.js integration — hooks, build
+plugin, and the `paramour` CLI).
+
+```package-install
+paramour @paramour-js/next
+```
+
+## Initialize
+
+One command wires everything up:
+
+```bash
+npx paramour init
+```
+
+```txt
+paramour init
+  ✔ created paramour.config.ts
+  ✔ wrapped next.config.ts with withTypedRoutes
+  ✔ added "paramour" script to package.json
+  ✔ wrote paramour-env.d.ts (1 route)
+
+setup:
+  ✔ route directories: app/
+  ✔ dependencies declared: paramour, @paramour-js/next
+  ✔ tsconfig.json includes paramour-env.d.ts
+
+Commit the generated artifact — `paramour check` verifies it stays current in CI.
+```
+
+### What init just did
+
+Four things, each idempotent (rerunning init never clobbers your edits):
+
+1. **Created `paramour.config.ts`** — CLI configuration. Every field in the
+   scaffold is a commented-out default, so you can delete the file and nothing
+   changes. You'll only touch it if your project uses non-standard directories.
+2. **Wrapped `next.config.ts` with `withTypedRoutes`** — the build-time
+   integration that keeps the generated registry in sync while `next dev` runs.
+3. **Added a `"paramour"` script to `package.json`** — shorthand for
+   `paramour generate`, which you'll run whenever you add or move a route.
+4. **Ran the first generate** — wrote `paramour-env.d.ts`, a small generated
+   file that teaches the compiler which routes exist. That file is the route
+   registry; commit it like a lockfile. The
+   [registry page](/docs/concepts/registry) explains how it works.
+
+## Define your first route
+
+A paramour route lives in a `route.def.ts` file next to the page it describes.
+Create the page directory `app/product/[id]/` and define the route:
+
+```ts twoslash title="app/product/[id]/route.def.ts"
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+```
+
+`p.integer()` is a **codec**: it decodes the raw `[id]` segment into a real
+`number` (rejecting `"abc"` and `"1.5"` with a clear error) and serializes
+numbers back into the URL when you build links. Every param and search param
+gets one — that's how both directions stay typed.
+
+Tell the registry about the new route:
+
+```bash
+npx paramour generate
+```
+
+The payoff is immediate. `href` builds URLs from the route object — params are
+required, typed, and serialized for you:
 
 ```ts twoslash
 import { defineAppRoute, href, p } from "paramour";
@@ -18,7 +106,223 @@ import { defineAppRoute, href, p } from "paramour";
 const productRoute = defineAppRoute("/product/[id]", {
   params: { id: p.integer() },
 });
-
+// ---cut---
 const link = href(productRoute, { params: { id: 42 } });
 //    ^?
 ```
+
+`href` returns a string subtype, so it drops straight into `<Link href={...}>`
+or `router.push(...)` — no casts, no template literals, no `[id]` left in by
+accident.
+
+## Read params in the page
+
+The route object is also how the page reads its own URL. Type the page's props
+with `RouteProps` and parse:
+
+```tsx twoslash title="app/product/[id]/page.tsx"
+// @filename: app/product/[id]/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+
+// @filename: app/product/[id]/page.tsx
+import type { RouteProps } from "paramour";
+
+import { productRoute } from "./route.def";
+
+export default async function ProductPage(props: RouteProps) {
+  const { params } = await productRoute.parse(props);
+  //      ^?
+
+  return <h1>Product #{params.id}</h1>;
+}
+```
+
+Visit `/product/42` and `params.id` is the number `42` — not the string
+`"42"`. Visit `/product/abc` and `parse` throws a structured error before your
+component logic runs, which your nearest `error.tsx` boundary catches. Prefer
+handling bad URLs yourself (a 404, say)? `safeParse` returns a discriminated
+result instead of throwing — the [defining-routes
+guide](/docs/guides/defining-routes) covers when to use which.
+
+## Add search params
+
+Search params are declared on the same route object, with the same codecs.
+Extend the definition:
+
+```ts twoslash title="app/product/[id]/route.def.ts"
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+  },
+});
+```
+
+The modifiers do what they say: `q` may be absent (its type gains
+`| undefined`), and `page` falls back to `1` when missing — so your component
+never handles "no page" as a special case:
+
+```ts twoslash
+import { defineAppRoute, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+  },
+});
+declare const props: import("paramour").RouteProps;
+// ---cut---
+const search = await productRoute.parseSearch(props);
+//    ^?
+```
+
+Link building understands search params too — and it's deliberate about the
+URL it produces:
+
+```ts twoslash
+import { defineAppRoute, href, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+  },
+});
+// ---cut---
+const link = href(productRoute, {
+  params: { id: 42 },
+  search: { page: 1, q: "wool socks" },
+});
+// => "/product/42?q=wool%20socks"
+```
+
+`page: 1` vanished from the URL: values equal to their `.default()` are
+elided, so there is exactly one URL for each state. Paramour treats the URL as
+public API — every serialization rule is explicit and documented in the
+[wire format](/docs/concepts/serialization).
+
+## Read on the client
+
+Client components use hooks from `@paramour-js/next/app` — same route object,
+same types, no loading state (App Router params are synchronously available):
+
+```tsx twoslash title="app/product/[id]/params-panel.tsx"
+// @filename: app/product/[id]/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+  },
+});
+
+// @filename: app/product/[id]/params-panel.tsx
+"use client";
+
+import { useRouteParams, useSearch } from "@paramour-js/next/app";
+
+import { productRoute } from "./route.def";
+
+export function ParamsPanel() {
+  const params = useRouteParams(productRoute);
+  const search = useSearch(productRoute);
+
+  if (params.status === "error") {
+    return <p role="alert">{params.error.message}</p>;
+  }
+
+  return (
+    <p>
+      Product #{params.data.id}
+      {/*                  ^? */}
+      {search.status === "success" && search.data.q && (
+        <> — searching “{search.data.q}”</>
+      )}
+    </p>
+  );
+}
+```
+
+Render it from the page (`<ParamsPanel />` below the `<h1>`), then visit
+`/product/42?q=wool%20socks` — the server and client read the same URL through
+the same route object.
+
+A malformed URL surfaces as the `status: "error"` arm rather than a throw, so
+the component renders a fallback instead of crashing. If you'd rather let an
+error boundary handle it, `useRouteParamsOrThrow` exists — the [hooks
+guide](/docs/guides/hooks) compares the two styles.
+
+## Catch drift in CI
+
+You've run `paramour generate` once by hand. Two things keep the registry
+honest from here on:
+
+- **During development**, `withTypedRoutes` (wired by init) regenerates the
+  registry as routes appear and disappear under `next dev`.
+- **In CI**, `paramour check` verifies the committed artifact matches the
+  filesystem — it never writes, and exits non-zero on drift:
+
+```bash
+npx paramour check
+```
+
+Add it in front of your build and a stale registry becomes a failed build, not
+a runtime surprise:
+
+```json title="package.json"
+{
+  "scripts": {
+    "build": "paramour check && next build"
+  }
+}
+```
+
+Why care? Because the registry is what makes route paths *compile-time
+checked*. Once `paramour-env.d.ts` exists, the route constructors only accept
+paths that actually exist in your app — typos included:
+
+```ts twoslash
+// @errors: 2345
+// @filename: paramour-env.d.ts
+import "paramour";
+
+declare module "paramour" {
+  interface ParamourRegister {
+    appRoutes: "/" | "/product/[id]";
+  }
+}
+
+// @filename: app/product/[id]/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[productId]", {
+  params: { productId: p.integer() },
+});
+```
+
+The route on disk is `/product/[id]`; the typo'd `[productId]` fails to
+compile. This is paramour's habit everywhere: mistakes that are traditionally
+found by clicking around are moved into the type checker.
+
+## Where next
+
+- [Codecs & the type-state API](/docs/concepts/codecs) — the full `p.*`
+  catalog and why illegal codec chains don't compile.
+- [Route objects as currency](/docs/concepts/route-objects) — the design idea
+  the whole library hangs off.
+- [Defining routes](/docs/guides/defining-routes) — recipes for catch-alls,
+  multiple params, and safe parsing.
+- [CLI workflows](/docs/guides/cli) — `generate`, `check`, `init`, `list`,
+  and `doctor` in depth.

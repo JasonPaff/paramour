@@ -7,6 +7,113 @@ Every paramour route is a plain exported object you import wherever you build
 links or parse props. There is no central runtime registry — routes are
 currency, passed by import.
 
-<Callout title="Under construction">
-  This page is a stub — content lands in a later milestone.
-</Callout>
+## One definition, many consumers
+
+A route object is created once, next to the page it describes:
+
+```ts twoslash title="app/product/[id]/route.def.ts"
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: { q: p.string().optional() },
+});
+```
+
+Everything else in the system *takes the object*:
+
+- **Server components** call `productRoute.parse(props)`.
+- **Client components** pass it to
+  [`useRouteParams` / `useSearch`](/docs/guides/hooks).
+- **Links** are built with `href(productRoute, …)`.
+- **The [nuqs adapter](/docs/guides/nuqs)** derives client-state parsers from
+  it.
+- **The [devtools panel](/docs/guides/devtools)** observes decodes through it.
+
+Because the route is the unit of exchange, the params/search contract is
+stated exactly once. Rename a param, change a codec, add a search key — every
+consumer's types update in the same keystroke, and anything now inconsistent
+fails to compile:
+
+```ts twoslash
+import { defineAppRoute, href, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: { q: p.string().optional() },
+});
+// ---cut---
+const link = href(productRoute, { params: { id: 42 }, search: { q: "socks" } });
+//    ^?
+```
+
+## Why not a string-keyed registry?
+
+The other common design is a central map: register every route in one module,
+look routes up by name or path string. Paramour rejects that shape on
+purpose, for two reasons.
+
+**Tree-shaking.** A central registry is a single object that references every
+route in the app — import one route and you've imported all of them, plus
+every codec they mention. With route objects as currency, a page that links
+to two routes bundles exactly those two. There is no paramour runtime state
+anywhere: the library is only the functions you call and the objects you
+import. (The [generated registry](/docs/concepts/registry) is types-only and
+compiles to nothing.)
+
+**Refactorability.** An imported object participates in every tool your
+editor already has — go-to-definition, find-all-references, rename-symbol.
+A string key participates in none of them.
+
+## Convention: `route.def.ts` beside the page
+
+Route objects live in a `route.def.ts` file colocated with their `page.tsx`.
+The name is a convention, not a requirement — but colocation is worth
+keeping: the definition sits next to the file whose URL it describes, and
+moving the page directory moves its contract with it.
+
+One real constraint: definition files should be **import-safe** — free of
+side effects and importable outside Next.js — because `paramour list` and the
+[devtools panel](/docs/guides/devtools) evaluate them to inspect route
+shapes. A `route.def.ts` that only calls `defineAppRoute`/`definePagesRoute`
+is always safe; avoid dragging server-only modules into it.
+
+## Two constructors, two surfaces
+
+Next.js has two routers with genuinely different data flows, and paramour
+does not paper over that. `defineAppRoute` produces a route whose parse
+surface is async and props-based (`parse`, `parseParams`, `parseSearch`, and
+their `safe*` twins). `definePagesRoute` produces one whose surface is sync
+and context-based (`parseContext`, `safeParseContext`), for
+`getServerSideProps` and friends.
+
+The compiler enforces the split — an App-router method does not exist on a
+Pages route, and vice versa:
+
+```ts twoslash
+// @errors: 2339
+import { defineAppRoute, definePagesRoute, p } from "paramour";
+
+const appRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+const pagesRoute = definePagesRoute("/legacy/[id]", {
+  params: { id: p.integer() },
+});
+
+pagesRoute.parse;
+
+appRoute.parseContext;
+```
+
+The same gate runs through the [hooks](/docs/guides/hooks): hooks from
+`@paramour-js/next/app` accept only App routes, hooks from
+`@paramour-js/next/pages` only Pages routes. Mixing them up is a compile
+error, not a hydration mystery.
+
+## Where next
+
+- [Defining routes](/docs/guides/defining-routes) — recipes: catch-alls,
+  multiple params, `parse` vs `safeParse`.
+- [The generated registry](/docs/concepts/registry) — how route *paths*
+  become compile-time checked too.
