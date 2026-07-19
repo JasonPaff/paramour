@@ -29,7 +29,7 @@
     "typecheck": "tsc --noEmit"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "dependencies": {
     "jiti": "^2.7.0",
