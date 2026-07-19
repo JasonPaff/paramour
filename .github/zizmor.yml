@@ -1,0 +1,18 @@
+# zizmor configuration (auto-discovered at .github/zizmor.yml). zizmor runs
+# as a blocking CI job (ci.yml `zizmor`, CI-P3); every ignore below carries
+# its rationale — do not add ignores without one.
+rules:
+  artipacked:
+    ignore:
+      # changesets/action pushes the version branch and release tags using
+      # the git credentials that checkout persists; persist-credentials:
+      # false here would break the Version Packages flow. Every other
+      # checkout in the repo does set persist-credentials: false.
+      - release.yml
+  adhoc-packages:
+    ignore:
+      # npm >= 11.5.1 is required on the runner for OIDC trusted publishing
+      # (see the comment in release.yml); a global runner install has no
+      # lockfile to pin against. The version is exact-pinned in the workflow
+      # and Renovate-managed instead (CI-U2).
+      - release.yml

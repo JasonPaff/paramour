@@ -10,10 +10,11 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "check:publish": "publint --strict && attw --pack . --profile esm-only",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
-    "node": ">=18.18.0"
+    "node": ">=22.13.0"
   },
   "peerDependencies": {
     "@paramour-js/next": "workspace:^",

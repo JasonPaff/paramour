@@ -19,11 +19,12 @@ pnpm monorepo (pnpm 11, Node >= 24.18). Run from the repo root:
 - `pnpm test:types:registry` — world-B type tests (`packages/core/test-registry/`, its own tstyche/tsconfig pair): post-generation registry behavior via a hand-authored `declare module "paramour"` augmentation. A separate compilation unit on purpose — module augmentation is program-global, so these files must never move into `test/`
 - `pnpm typecheck` — `tsc --noEmit` in every package; includes `examples/basic`, which needs the packages built first
 - `pnpm build` — topological: core tsc → next tsc (dist + the `paramour` CLI bin) → devtools tsc → `examples/basic` `next build`. `pnpm build:packages` skips the example for fast package-only builds. `test/cli-dist.test.ts`, `test:types:registry`, and `packages/devtools` (whose seam types resolve from next's dist) need a build to have run
+- `pnpm check:publish` — publint + attw (`--profile esm-only`) per published package; verifies exports map/types resolution on the packed tarball. Needs a build first
 - `pnpm lint:fix` — ESLint with auto-fix (type-checked rules; slow-ish)
 - `pnpm format` / `pnpm format:check` — Prettier
 - `pnpm changeset` — add a changeset (changesets is the release mechanism)
 
-CI runs, in order: `format:check`, `build`, `lint`, `typecheck`, `test`, `test:types`, `test:types:devtools`, `test:types:next`, `test:types:nuqs`, `test:types:registry`. All ten must pass (`build` precedes `lint` and `typecheck` so the type-checked sources and the example resolve the packages' dist types).
+CI runs, in order: `format:check`, `build`, `check:publish`, `lint`, `typecheck`, `test`, `test:types`, `test:types:devtools`, `test:types:next`, `test:types:nuqs`, `test:types:registry`. All eleven must pass (`build` precedes `check:publish`, `lint`, and `typecheck` so the packed-tarball checks, the type-checked sources, and the example resolve the packages' dist types).
 
 ## Two kinds of tests
 

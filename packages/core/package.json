@@ -14,7 +14,11 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "check:publish": "publint --strict && attw --pack . --profile esm-only",
     "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   },
   "description": "Type-safe routing companion for the Next.js App Router: validated route params and search params, typed path building, and explicit URL serialization.",
   "keywords": [
