@@ -5,13 +5,23 @@
   "type": "module",
   "description": "Type-level compatibility checks: pins paramour's hand-written assumptions about Next against a real Next install, on every supported major.",
   "scripts": {
+    "build:gate": "next build build-app",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@paramour-js/next": "workspace:*",
     "paramour": "workspace:*"
   },
+  "dependenciesMeta": {
+    "@paramour-js/next": {
+      "injected": true
+    },
+    "paramour": {
+      "injected": true
+    }
+  },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "next": "16.2.10",
     "react": "^19.2.0",

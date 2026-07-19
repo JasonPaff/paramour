@@ -124,9 +124,9 @@ coverage report. `--json` emits the same data machine-readably. Details:
 ## doctor
 
 Diagnoses the whole setup — config validity, route-directory discovery,
-artifact freshness, `next.config` wrapping, version alignment between the
-two packages, tsconfig coverage of the artifact, and route-definition
-discovery:
+artifact freshness, `next.config` wrapping, the installed `paramour` copy
+matching what `@paramour-js/next` depends on, tsconfig coverage of the
+artifact, and route-definition discovery:
 
 ```bash
 npx paramour doctor
@@ -137,13 +137,12 @@ npx paramour doctor
   ✔ route directories: app/
   ✔ artifact: paramour-env.d.ts is up to date
   ✔ next.config: next.config.ts wraps withTypedRoutes
-  ⚠ versions: paramour 0.4.0 != @paramour-js/next 0.2.1
-      align the two versions — they release in lockstep
+  ✔ versions: paramour 0.4.0 satisfies @paramour-js/next 0.2.1's declared dependency
   ✔ tsconfig: tsconfig.json includes paramour-env.d.ts
   ✔ route definitions: 3 found in 3 modules
       3 of 3 filesystem routes have definitions
 
-doctor: 7 checks — 0 failed, 1 warning
+doctor: 7 checks — 0 failed, 0 warnings
 ```
 
 Warnings exit `0`; any failed check exits `1` (so doctor can run in CI too,

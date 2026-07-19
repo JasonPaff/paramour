@@ -1,16 +1,29 @@
 # examples/next-compat
 
-Type-level compatibility checks: pins paramour's hand-written assumptions
-about Next against a real Next install, on every supported major.
+Compatibility checks: pins paramour's hand-written assumptions about Next
+against a real Next install, on every supported major — at the type level
+(`src/`) and through a real `next build` (`build-app/`).
 
-There is no app here and nothing ever runs. `@paramour-js/next` is hermetic —
-it declares `next` as a peer only and typechecks against hand-authored
-ambients (`declare module "next/navigation"`, hardcoded phase strings,
-structural context/props shapes). Each of those is a claim about a package
-the shipped code never sees. This package is where a real Next IS installed,
-so the claims get checked: `tsc --noEmit` is the only entry point, and CI
-runs it once per supported Next major (DESIGN §12: latest two majors),
-swapping only this package's `next` per matrix leg.
+`@paramour-js/next` is hermetic — it declares `next` as a peer only and
+typechecks against hand-authored ambients (`declare module
+"next/navigation"`, hardcoded phase strings, structural context/props
+shapes). Each of those is a claim about a package the shipped code never
+sees. This package is where a real Next IS installed, so the claims get
+checked twice per CI matrix leg (DESIGN §12: latest two majors, swapping
+only this package's `next`):
+
+- `tsc --noEmit` over `src/` — the type pins below.
+- `next build build-app` — a minimal two-router app, for the failures the
+  type layer can never see. The workspace packages are installed as
+  INJECTED deps (`dependenciesMeta.injected` — hard copies inside
+  node_modules, not symlinks) so Next's default externals treatment matches
+  a real install: the `pages/` route proves the package survives Node ESM
+  resolution when loaded as an external at "Collecting page data" (the
+  extensionless `next/router` import built green through workspace symlinks
+  while failing every real Next 15 install), and the `app/` route proves
+  `props: RouteProps` survives Next 15.5's generated `.next/types`
+  page-props check. Injected copies are materialized at INSTALL time — after
+  changing `packages/*`, rebuild then re-run `pnpm install` to sync them.
 
 ## What each file pins
 
@@ -40,9 +53,12 @@ From the repo root:
 
 ```sh
 pnpm build:packages   # the pins resolve @paramour-js/next through its built dist
+pnpm install          # re-sync the injected copies with that dist
 pnpm --filter example-next-compat typecheck
+pnpm --filter example-next-compat build:gate
 ```
 
 That checks against the version pinned in this package.json (the canonical
 lockfile leg). To reproduce another matrix leg locally, swap this package's
-Next first: `pnpm --filter example-next-compat add -D next@15.5.20`.
+Next first: `pnpm --filter example-next-compat add -D next@15.5.20` (the
+`add` is itself an install, so it re-syncs the injected copies too).

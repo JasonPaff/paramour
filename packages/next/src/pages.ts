@@ -1,4 +1,10 @@
-import { useRouter } from "next/router";
+// Extensionful on purpose: `next` ships no `exports` map, so when this
+// package is loaded as an external (Node ESM resolution during Next 15's
+// "Collecting page data") the bare `next/router` specifier dies with
+// ERR_MODULE_NOT_FOUND — only the physical root stub `next/router.js`
+// resolves, and it is the exact module the bare specifier aliases to under
+// every bundler. Guarded by the examples/next-compat build-app.
+import { useRouter } from "next/router.js";
 import {
   type AnyPagesRoute,
   type InferRouteParams,

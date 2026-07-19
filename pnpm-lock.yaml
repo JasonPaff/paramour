@@ -211,11 +211,19 @@ importers:
     dependencies:
       '@paramour-js/next':
         specifier: workspace:*
-        version: link:../../packages/next
+        version: file:packages/next(next@16.2.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       paramour:
         specifier: workspace:*
         version: link:../../packages/core
+    dependenciesMeta:
+      '@paramour-js/next':
+        injected: true
+      paramour:
+        injected: true
     devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.2
       '@types/react':
         specifier: ^19.2.0
         version: 19.2.17
@@ -1082,6 +1090,14 @@ packages:
 
   '@oxc-project/types@0.138.0':
     resolution: {integrity: sha512-1a7ZKmrRTCoN1XMZ4L0PyyqrMnrNlLyPuOkdSX2MZg7IiIGRUyurNhAm73ptDOraoBcIordsIGKNPKUzy3ZmfA==}
+
+  '@paramour-js/next@file:packages/next':
+    resolution: {directory: packages/next, type: directory}
+    engines: {node: '>=18.18.0'}
+    hasBin: true
+    peerDependencies:
+      next: '>=15'
+      react: '>=18.2.0'
 
   '@radix-ui/number@1.1.2':
     resolution: {integrity: sha512-ceTwaxc4I5IOi97DgCotl3pqiyRGvffcc0oOsE2dQYaJOFIDsDt4VWG6xEbg1QePv9QWausCEIppud/tJ1wNig==}
@@ -4412,6 +4428,15 @@ snapshots:
   '@orama/orama@3.1.18': {}
 
   '@oxc-project/types@0.138.0': {}
+
+  '@paramour-js/next@file:packages/next(next@16.2.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      jiti: 2.7.0
+      magicast: 0.3.5
+      next: 16.2.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      paramour: link:packages/core
+      react: 19.2.7
+      tinyglobby: 0.2.17
 
   '@radix-ui/number@1.1.2': {}
 

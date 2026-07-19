@@ -18,9 +18,12 @@ interface NextPageProps {
 declare const nextPageProps: NextPageProps;
 
 /**
- * `RouteProps` types both members as optional `MaybePromise<ParamsSource>`, so
- * a page's required-and-promised props are assignable to it. This is the
- * assignment every `route.parse(props)` call site relies on.
+ * `RouteProps` types both members as optional `Promise<ParamsSource>`, so a
+ * page's required-and-promised props are assignable to it. This is the
+ * assignment every `route.parse(props)` call site relies on. (The build-app
+ * sibling check covers the other direction: Next 15.5's generated page check
+ * requires the members to be promise-only, so `RouteProps` must not regrow
+ * a sync arm.)
  */
 export const _propsAssignable: RouteProps = nextPageProps;
 

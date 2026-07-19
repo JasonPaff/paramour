@@ -233,48 +233,75 @@ async function discoveryCheck(
   }
 }
 
-function readVersion(projectRoot: string, name: string): string | undefined {
+function readManifest(
+  projectRoot: string,
+  name: string,
+): undefined | { dependencies?: Record<string, string>; version?: unknown } {
   // Walks upward like Node resolution: workspaces hoist dependencies to a
   // parent node_modules, so a single project-root read hard-fails healthy
   // monorepo setups.
   for (let dir = projectRoot; ; dir = dirname(dir)) {
     try {
-      const parsed = JSON.parse(
+      return JSON.parse(
         readFileSync(
           join(dir, "node_modules", ...name.split("/"), "package.json"),
           "utf8",
         ),
-      ) as { version?: unknown };
-      return typeof parsed.version === "string" ? parsed.version : undefined;
+      ) as { dependencies?: Record<string, string>; version?: unknown };
     } catch {
       if (dirname(dir) === dir) return undefined;
     }
   }
 }
 
+/** `1.2.3` / `1.2.3-beta.1` — the shape a published `workspace:*` pin takes. */
+const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[\w.-]+)?$/;
+
 function versionCheck(projectRoot: string): DoctorCheck {
-  const core = readVersion(projectRoot, "paramour");
-  const next = readVersion(projectRoot, "@paramour-js/next");
+  const coreManifest = readManifest(projectRoot, "paramour");
+  const nextManifest = readManifest(projectRoot, "@paramour-js/next");
+  const core =
+    typeof coreManifest?.version === "string"
+      ? coreManifest.version
+      : undefined;
+  const next =
+    typeof nextManifest?.version === "string"
+      ? nextManifest.version
+      : undefined;
   const missing = [
     ...(next === undefined ? ["@paramour-js/next"] : []),
     ...(core === undefined ? ["paramour"] : []),
   ];
-  if (missing.length > 0) {
+  if (missing.length > 0 || core === undefined || next === undefined) {
     return {
       detail: ["install dependencies and re-run"],
       label: `versions: ${missing.join(", ")} not resolvable in node_modules`,
       status: "fail",
     };
   }
-  if (core !== next) {
+  // The packages version INDEPENDENTLY (changesets); comparing the two
+  // installed versions against each other warns on every correct install.
+  // The real invariant is that the installed core is the one the installed
+  // @paramour-js/next declares — `workspace:*` publishes as an exact pin, so
+  // when the declaration is exact this is string equality. A non-exact
+  // declaration (a range, or `workspace:*` inside this monorepo itself) is
+  // the package manager's to enforce; no claim to check.
+  const declared = nextManifest?.dependencies?.paramour;
+  if (
+    declared !== undefined &&
+    EXACT_VERSION.test(declared) &&
+    core !== declared
+  ) {
     return {
-      detail: ["align the two versions — they release in lockstep"],
-      label: `versions: paramour ${core ?? ""} != @paramour-js/next ${next ?? ""}`,
+      detail: [
+        "your package manager should have matched these — check for overrides/resolutions or a stale lockfile, then reinstall",
+      ],
+      label: `versions: installed paramour ${core} != ${declared}, the version @paramour-js/next ${next} depends on`,
       status: "warn",
     };
   }
   return {
-    label: `versions: paramour and @paramour-js/next are both ${core ?? ""}`,
+    label: `versions: paramour ${core} satisfies @paramour-js/next ${next}'s declared dependency`,
     status: "pass",
   };
 }

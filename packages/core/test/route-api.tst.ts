@@ -25,9 +25,11 @@ import type {
   InferStaticParams,
   PagesContext,
   ParamsProps,
+  ParamsPropsInput,
   RegisteredStaticRoutePaths,
   RouteDecodeError,
   RouteProps,
+  RoutePropsInput,
   SafeResult,
 } from "../src";
 
@@ -274,19 +276,26 @@ test("parse methods: bare-surface results carry no wrapper (RL6)", () => {
   >();
 });
 
-test("props are structural and MaybePromise-valued (RL6)", () => {
+test("props are structural and promise-only on the annotation types (RL6)", () => {
   interface NextStylePageProps {
     params: Promise<{ id: string }>;
     searchParams: Promise<Record<string, string | string[] | undefined>>;
   }
   expect<NextStylePageProps>().type.toBeAssignableTo<RouteProps>();
-  // Plain objects (tests, other frameworks) and absent members work too.
-  expect<{ params: { id: string } }>().type.toBeAssignableTo<RouteProps>();
   expect<Record<never, never>>().type.toBeAssignableTo<RouteProps>();
   // Layout props (no searchParams member) satisfy the params surface.
   expect<{
     params: Promise<{ slug: string[] }>;
   }>().type.toBeAssignableTo<ParamsProps>();
+  // The annotation types are promise-only — a sync arm would fail Next
+  // 15.5's generated `.next/types` page check (see MaybePromise in route.ts).
+  expect<{ params: { id: string } }>().type.not.toBeAssignableTo<RouteProps>();
+  // Plain sync objects stay legal on the parse INPUT surface instead.
+  expect<{ params: { id: string } }>().type.toBeAssignableTo<RoutePropsInput>();
+  expect<RouteProps>().type.toBeAssignableTo<RoutePropsInput>();
+  expect<{
+    params: { slug: string[] };
+  }>().type.toBeAssignableTo<ParamsPropsInput>();
 });
 
 test("SafeResult: the status discriminant narrows both arms (RL6, PR12)", () => {

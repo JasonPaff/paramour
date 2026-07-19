@@ -21,7 +21,7 @@
  * `examples/next-compat` owns the other half — that *real* Next still
  * returns something assignable to these shapes — on every supported major.
  */
-import type { useRouter } from "next/router";
+import type { useRouter } from "next/router.js";
 import type { ParamsSource } from "paramour";
 
 type AmbientRouter = ReturnType<typeof useRouter>;

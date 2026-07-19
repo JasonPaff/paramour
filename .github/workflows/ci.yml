@@ -25,10 +25,14 @@ jobs:
   # Only `examples/next-compat` is version-sensitive. packages/next declares
   # `next` as a peer and stubs `next/navigation` in its unit tests, so `test`,
   # `test:types` and `test:types:registry` are Next-agnostic — running them per
-  # leg would cost minutes and prove nothing. The compat package instead
-  # typechecks paramour's hand-written assumptions about Next (the
-  # `next/navigation` ambient, the hardcoded phase strings, RouteProps, the
-  # config-function shape) against a REAL Next. Seconds per leg, no `next build`.
+  # leg would cost minutes and prove nothing. The compat package covers two
+  # layers per leg: `typecheck` pins paramour's hand-written assumptions about
+  # Next (the `next/navigation` ambient, the hardcoded phase strings,
+  # RouteProps, the config-function shape) against a REAL Next, and
+  # `build:gate` runs a REAL `next build` over a minimal app — the layer that
+  # caught what types never can (Node ESM resolution of the externalized
+  # package at "Collecting page data", and Next 15.5's generated `.next/types`
+  # page-props check; see build-app/).
   #
   # `checks` above is the frozen-lockfile gate on the canonical 16.2.10.
   next-compat:
@@ -52,10 +56,14 @@ jobs:
 
       # Swap only this package's Next. Mutates the runner's package.json and
       # lockfile, never the repo; `checks` stays --frozen-lockfile, so genuine
-      # lockfile drift is still caught there.
+      # lockfile drift is still caught there. This install also re-syncs the
+      # injected workspace-package copies with the dist/ built above (see the
+      # sync note in .github/actions/checks).
       - run: pnpm --filter example-next-compat add -D next@${{ matrix.next }}
 
       - run: pnpm --filter example-next-compat run typecheck
+
+      - run: pnpm --filter example-next-compat run build:gate
 
   # Single stable context for branch protection: the ruleset requires "CI OK"
   # and nothing else, so renaming jobs or bumping the compat matrix's Next
