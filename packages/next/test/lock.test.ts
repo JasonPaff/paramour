@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { acquireWatcherLock } from "../src";
+import { acquireWatcherLock } from "../src/lock.js";
 import { makeTempDir } from "./helpers.js";
 
 const releases: (() => void)[] = [];

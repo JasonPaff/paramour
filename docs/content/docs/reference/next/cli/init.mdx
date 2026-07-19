@@ -1,0 +1,76 @@
+---
+title: paramour init
+description: Non-interactive project setup — config scaffold, next.config wrap, package script, first generate.
+---
+
+Sets up paramour in a project, non-interactively: it runs straight through
+with defaults and prints one status line per step. Every step is idempotent
+— rerunning init never clobbers your edits — and individually skippable:
+
+```bash
+npx paramour init
+```
+
+```txt
+paramour init
+  ✔ created paramour.config.ts
+  ✔ wrapped next.config.ts with withTypedRoutes
+  ✔ added "paramour" script to package.json
+  ✔ wrote paramour-env.d.ts (1 route)
+
+setup:
+  ✔ route directories: app/
+  ✔ dependencies declared: paramour, @paramour-js/next
+  ✔ tsconfig.json includes paramour-env.d.ts
+
+Commit the generated artifact — `paramour check` verifies it stays current in CI.
+```
+
+## The four steps
+
+1. **Scaffold `paramour.config.ts`** — every field in the scaffold is a
+   commented-out default, so the file is a no-op until you edit it. An
+   existing config (any of the three filenames) is skipped unless you pass
+   `--force`.
+2. **Wrap `next.config` with `withTypedRoutes`** — a source transform of
+   your existing config file. If the file can't be transformed safely (or
+   read, or doesn't exist), init prints the wrap snippet for you to apply by
+   hand and still exits `0` — a printed instruction is a successful outcome.
+   An already-wrapped config is skipped.
+3. **Add a `"paramour"` script to `package.json`** — shorthand for
+   `paramour generate`. Skipped if a `"paramour"` script already exists.
+4. **Run the first generate** — writes the artifact and reports the route
+   count. A project with no `app/` or `pages/` yet gets a warning and a
+   skip, not an error.
+
+It finishes with a warn-level setup summary (route directories, declared
+dependencies, tsconfig coverage of the artifact) that never affects the
+exit code.
+
+## Flags
+
+| Flag            | Default | Description                                                 |
+| --------------- | ------- | ----------------------------------------------------------- |
+| `--dry-run`     | off     | Report every step without writing anything.                 |
+| `--force`       | off     | Overwrite an existing `paramour.config` with the scaffold.  |
+| `--no-config`   | off     | Skip scaffolding `paramour.config.ts`.                      |
+| `--no-wrap`     | off     | Skip wrapping `next.config`.                                |
+| `--no-script`   | off     | Skip adding the `package.json` script.                      |
+| `--no-generate` | off     | Skip the first generate.                                    |
+| `--help`, `-h`  | —       | Show usage.                                                 |
+
+<Callout title="--force replaces non-TS configs too">
+  The scaffold is always `paramour.config.ts`. If `--force` overwrites a
+  project that had `paramour.config.mjs` or `.json`, the old file is
+  deleted — the discovery order is ts-first, so leaving it behind would
+  shadow nothing but confuse everyone.
+</Callout>
+
+## Exit codes
+
+| Code | When                                                                                                     |
+| ---- | --------------------------------------------------------------------------------------------------------- |
+| `0`  | Success — including skipped steps, dry runs, and manual-fallback wrap instructions.                        |
+| `2`  | Hard errors only: no `package.json` at the current directory (run init at the project root), a broken `package.json`, an invalid existing config file, route collisions during the first generate. |
+
+There is no exit `1`: init verifies nothing, it sets up.

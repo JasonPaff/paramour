@@ -1,0 +1,84 @@
+---
+title: paramour generate
+description: Generate paramour-env.d.ts from the app and pages directories.
+---
+
+Scans the route directories and writes the
+[registry artifact](/docs/concepts/registry) — the `paramour-env.d.ts` file
+that narrows route constructors to paths that actually exist:
+
+```bash
+npx paramour generate
+```
+
+```txt
+paramour: wrote paramour-env.d.ts (3 app routes)
+```
+
+The write is deterministic and idempotent: byte-identical output is a
+skipped write (reported as `unchanged`), so timestamps don't churn and
+watchers don't loop.
+
+## Flags
+
+| Flag                       | Default                             | Description                                                        |
+| -------------------------- | ----------------------------------- | ------------------------------------------------------------------ |
+| `--app-dir <dir>`          | discovered `app/` or `src/app/`     | App directory.                                                     |
+| `--pages-dir <dir>`        | discovered `pages/` or `src/pages/` | Pages directory.                                                   |
+| `--out-file <file>`        | `paramour-env.d.ts`                 | Artifact path, relative to the project root.                       |
+| `--page-extensions <list>` | `tsx,ts,jsx,js`                     | Comma-separated, no leading dots.                                  |
+| `--check`                  | off                                 | Verify the artifact is current; exit `1` on drift, **never writes**. |
+| `--watch`                  | off                                 | Regenerate on route-directory changes.                             |
+| `--help`, `-h`             | —                                   | Show usage.                                                        |
+
+`--check` and `--watch` are mutually exclusive — passing both exits `2`.
+Flag values take precedence over `paramour.config`, which takes precedence
+over discovery; an explicitly given directory must exist or the command
+exits `2`. Discovery only runs for directories you didn't pass, so passing
+both `--app-dir` and `--pages-dir` bypasses it entirely.
+
+## The artifact workflow
+
+`generate` writes the file; committing it is what makes it useful. The
+artifact is generated *and committed* — treat it like a lockfile:
+
+1. Add, move, or delete a route, then run `paramour generate` (the
+   `"paramour"` package script init adds runs exactly this).
+2. Commit the regenerated file — route changes show up in review as a small
+   readable diff.
+3. Let [`paramour check`](/docs/reference/next/cli/check) prove the
+   committed file honest in CI.
+
+During `next dev`, the
+[`withTypedRoutes`](/docs/reference/next/with-typed-routes) wrapper keeps
+the artifact current automatically, so manual runs mostly matter outside
+the dev server.
+
+## `--watch`
+
+Regenerates on route-directory changes, for workflows outside `next dev` —
+an editor companion while you restructure routes, say:
+
+```bash
+npx paramour generate --watch
+```
+
+```txt
+paramour: watching /home/you/my-app/app
+```
+
+A pidfile lock makes watchers single-writer: if another live watcher
+already owns the artifact (usually a running `next dev` with
+`withTypedRoutes`), the command prints the owning pid and exits `0` —
+initial generation has already run, so nothing is stale. A failed initial
+generation warns and keeps watching; a route collision mid-watch (usually a
+file mid-move) logs on every rescan, keeps the last good artifact on disk,
+and keeps running.
+
+## Exit codes
+
+| Code | When                                                                                       |
+| ---- | ------------------------------------------------------------------------------------------ |
+| `0`  | Wrote the artifact, or it was already up to date; `--watch` declined by an existing watcher. |
+| `1`  | `--check` found drift — only that.                                                          |
+| `2`  | Usage/config errors, no route directories, route collisions, I/O failures.                  |

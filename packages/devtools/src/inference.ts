@@ -1,16 +1,13 @@
 import type { AnyCodec, CodecDescription, Issue, SearchConfig } from "paramour";
 
-import {
-  decodeSearch,
-  foreignMessage,
-  parseValue,
-  SearchDecodeError,
-} from "paramour";
+import { decodeSearch, SearchDecodeError } from "paramour";
+import { foreignMessage, parseValue } from "paramour/internal";
 
 /**
  * Pure decode/attribution logic (design-12 DT7/DT8). Everything here goes
- * through core's PUBLIC surface: `parseValue` (the catch-attribution probe
- * core exports for exactly this) and the single-key `decodeSearch` trick —
+ * through core's published surface — `parseValue` and `foreignMessage` via
+ * the `paramour/internal` tooling entry (the catch-attribution probe core
+ * exports for exactly this) and the single-key `decodeSearch` trick —
  * a synthesized one-key config gives full presence/default/catch/duplicate
  * semantics for one value without touching `~`-internals.
  */

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { emitArtifact } from "../src";
+import { emitArtifact } from "../src/emit.js";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /** App-only emission — what this suite's fixtures produce. */

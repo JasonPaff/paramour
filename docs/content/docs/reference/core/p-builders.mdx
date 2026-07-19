@@ -1,0 +1,406 @@
+---
+title: p.* builders
+description: Every built-in codec — wire grammars, accept/reject behavior, and schema slots.
+---
+
+The `p` object is the catalog of codec builders. Each builder returns a
+[codec](./codecs) — a bidirectional wire converter that both parses a URL
+string into a typed value and serializes that value back. Parsing is strict:
+each codec matches an anchored grammar from the wire-format spec, never
+`Number()`-style coercion, so `"4.2"` is not an integer, `" 42"` is not a
+number, and `"0x10"` is not sixteen. Malformed input fails with a structured
+`ParseError`; an unserializable value fails with a `SerializeError` at
+link-build time.
+
+The tables below show **value-layer** strings — what the codec sees after
+percent-decoding. Byte-layer encoding (spaces as `%20`, commas as `%2C`) is
+applied by the [search and path layers](/docs/concepts/serialization), not by
+the codec.
+
+Four builders take an optional [Standard
+Schema](/docs/concepts/standard-schema) for domain refinement (`p.string`,
+`p.integer`, `p.number`, `p.index`); `p.json` requires one. A schema
+validates in *both* directions: schema-invalid wire input is a `ParseError`,
+and a schema-invalid in-memory value is a `SerializeError` when you build the
+link — never a URL that can't round-trip.
+
+## p.string
+
+The identity codec: the decoded param text, unchanged, in both directions.
+
+`p.string()` produces `Codec<string>`. With a schema
+(`StandardSchemaV1<string, string>`) the codec's output type becomes the
+schema's output type, so branded or refined string types flow through:
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+import { z } from "zod";
+
+const config = { q: p.string(z.string().min(1)) };
+
+const search = decodeSearch(config, new URLSearchParams("?q=socks"));
+//    ^?
+```
+
+The schema's *returned* value is what goes on the wire, so a normalizing
+schema (trim, lowercase) emits canonical form on serialize. Transforming
+schemas — where input and output types differ — are parse-only by design:
+their output fails input validation on the serialize side. Use `p.custom`
+for bidirectional transforms.
+
+## p.integer
+
+Base-10 integers, matched by the anchored grammar `-?\d+` plus a
+safe-integer bound check.
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const search = decodeSearch(
+  { page: p.integer() },
+  new URLSearchParams("?page=42"),
+);
+
+search.page;
+//      ^?
+```
+
+| Wire value          | Result                                        |
+| ------------------- | --------------------------------------------- |
+| `42`                | `42`                                          |
+| `-7`                | `-7`                                          |
+| `007`               | `7` (non-canonical; re-serializes as `7`)     |
+| `4.2`               | `ParseError` — not an integer                 |
+| `1e3`               | `ParseError` — no scientific notation         |
+| `+5`, ` 42`, `0x10` | `ParseError` — anchored grammar               |
+| `9007199254740993`  | `ParseError` — outside the safe integer range |
+
+Serialization requires a finite safe integer — anything else (a float,
+`NaN`, a number beyond `Number.MAX_SAFE_INTEGER`) throws `SerializeError`.
+The optional schema (`StandardSchemaV1<number, number>`) refines the parsed
+integer and re-validates on serialize.
+
+## p.number
+
+Finite base-10 numbers: an integer part, an optional decimal part, and an
+optional exponent (`-?\d+(\.\d+)?([eE][+-]?\d+)?`).
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const search = decodeSearch(
+  { ratio: p.number() },
+  new URLSearchParams("?ratio=2.5e-1"),
+);
+
+search.ratio;
+//      ^?
+```
+
+| Wire value          | Result                             |
+| ------------------- | ---------------------------------- |
+| `3.14`              | `3.14`                             |
+| `-0.5`              | `-0.5`                             |
+| `1e3`               | `1000`                             |
+| `.5`                | `ParseError` — leading digit required |
+| `5.`                | `ParseError` — trailing dot        |
+| `NaN`, `Infinity`   | `ParseError` — grammar, then finiteness |
+| ` 42`, `0x2A`       | `ParseError` — anchored grammar    |
+
+Serialization is `String(value)` for a finite number; `NaN` and the
+infinities throw `SerializeError`. The optional schema is
+`StandardSchemaV1<number, number>`, applied on both sides.
+
+## p.boolean
+
+Exactly `"true"` or `"false"` on the wire — nothing else.
+
+```ts twoslash
+import { p, searchToString } from "paramour";
+
+const qs = searchToString({ debug: p.boolean() }, { debug: true });
+// => "?debug=true"
+```
+
+| Wire value | Result                             |
+| ---------- | ---------------------------------- |
+| `true`     | `true`                             |
+| `false`    | `false`                            |
+| `1`, `TRUE`, empty string | `ParseError` — not `"true"` or `"false"` |
+
+## p.enum
+
+A closed set of string members. The `const` type parameter keeps the literal
+union, so the output narrows to exactly the members you listed:
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const search = decodeSearch(
+  { sort: p.enum(["price", "rating"]) },
+  new URLSearchParams("?sort=price"),
+);
+
+search.sort;
+//      ^?
+```
+
+Parsing rejects any value outside the set with a `ParseError` naming the
+members; serializing a non-member (possible from plain JavaScript, or via a
+cast) throws `SerializeError`. The member list must be a non-empty tuple of
+strings, and it is exposed to reflection as
+[`enumMembers`](./describe#describecodec).
+
+## p.isoDate
+
+Calendar dates as `YYYY-MM-DD`, decoded to a UTC-midnight `Date`.
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const search = decodeSearch(
+  { since: p.isoDate() },
+  new URLSearchParams("?since=2026-07-18"),
+);
+
+search.since;
+//      ^?
+```
+
+| Wire value             | Result                                    |
+| ---------------------- | ----------------------------------------- |
+| `2026-07-18`           | `Date` at `2026-07-18T00:00:00.000Z`      |
+| `2026-02-30`           | `ParseError` — not a real calendar date   |
+| `2026-7-4`             | `ParseError` — two-digit fields required  |
+| `2026-07-18T00:00:00Z` | `ParseError` — use `p.timestamp` for instants |
+
+Dates the engine would silently normalize are rejected: `2026-02-30` fails
+rather than becoming March 2nd. Serialization emits the date part of
+`toISOString()`; an invalid `Date` throws `SerializeError`, as does a year
+outside 0000–9999 (where `toISOString` switches to an expanded-year form the
+wire grammar cannot represent — better a loud error than a URL that can
+never round-trip).
+
+## p.timestamp
+
+Full ISO-8601 UTC instants, decoded to a `Date`. Canonical output is
+`Date#toISOString()` — milliseconds always present — while parsing tolerates
+absent or 1–3-digit milliseconds. UTC (`Z`) only: offsets are rejected.
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const search = decodeSearch(
+  { at: p.timestamp() },
+  new URLSearchParams("?at=2026-07-18T12:30:00Z"),
+);
+
+search.at;
+//      ^?
+```
+
+| Wire value                  | Result                               |
+| --------------------------- | ------------------------------------ |
+| `2026-07-18T12:30:00.000Z`  | `Date` (canonical form)              |
+| `2026-07-18T12:30:00Z`      | `Date` (milliseconds optional on parse) |
+| `2026-07-18T12:30:00+02:00` | `ParseError` — UTC `Z` only          |
+| `2026-02-30T00:00:00Z`      | `ParseError` — not a real instant    |
+| `2026-07-18`                | `ParseError` — use `p.isoDate` for dates |
+
+Like `p.isoDate`, impossible instants the engine would normalize (`Feb 30`,
+hour `24`) are rejected via an exact round-trip check, and serialization
+applies the same valid-`Date`, year-0000–9999 guards.
+
+## p.json
+
+Any JSON value packed into a single param, validated by a required Standard
+Schema — unvalidated `JSON.parse` output would poison the types, so there is
+no schemaless form:
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+import { z } from "zod";
+
+const config = { filters: p.json(z.object({ maxPrice: z.number() })) };
+
+const search = decodeSearch(
+  config,
+  new URLSearchParams('?filters={"maxPrice":250}'),
+);
+
+search.filters;
+//      ^?
+```
+
+Parsing is `JSON.parse` (a syntax failure is a `ParseError`) followed by
+schema validation. Serializing validates first, then `JSON.stringify` —
+values JSON cannot represent (`undefined`, functions, symbols, circular
+references, `BigInt`) throw `SerializeError` rather than leaking a raw
+`TypeError`. On the wire the JSON text is percent-encoded by the byte layer
+(`?filters=%7B%22maxPrice%22%3A250%7D`).
+
+## p.csv
+
+A comma-separated list packed into **one** wire value (`?tags=a,b`), arity
+`"single"`. Elements are strings unless you pass an element codec:
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const search = decodeSearch(
+  { ids: p.csv(p.integer()) },
+  new URLSearchParams("?ids=1,2,3"),
+);
+
+search.ids;
+//      ^?
+```
+
+| Wire value  | Result                                     |
+| ----------- | ------------------------------------------ |
+| `a,b`       | `["a", "b"]`                               |
+| empty string | `[]`                                      |
+| `a,,b`      | `ParseError` — empty list element          |
+| `a,` or `,` | `ParseError` — strict grammar              |
+
+The grammar is deliberately strict: the empty wire string means `[]`, and
+every segment must be non-empty and parse under the element codec — the
+first element failure aborts the list parse. Recovery, if you want it,
+belongs on the *list* via `.catch()`.
+
+Serialization guards the round trip: an element that serializes to the empty
+string, or whose serialization contains a comma, throws `SerializeError`
+(it would mis-split on re-parse). A consequence: `[""]` is unrepresentable —
+the empty wire string already means `[]`.
+
+Because the arity is `"single"`, the full modifier set applies —
+`p.csv().default([])`, `.optional()`, `.catch()` all work. Element codecs,
+however, must be plain scalars: modifiers and array codecs are rejected at
+compile time.
+
+```ts twoslash
+// @errors: 2345
+import { p } from "paramour";
+
+p.csv(p.integer().catch(0));
+```
+
+A *nested* csv (`p.csv(p.csv())`) is structurally indistinguishable at the
+type level and is instead rejected at runtime with a `ParamourError`.
+
+## p.array
+
+A repeated-key list (`?tags=a&tags=b`), arity `"many"`. Like `p.csv`,
+elements default to strings and an element codec changes the element type:
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const search = decodeSearch(
+  { tags: p.array() },
+  new URLSearchParams("?tags=sale&tags=new"),
+);
+
+search.tags;
+//      ^?
+```
+
+| Wire value        | Result             |
+| ----------------- | ------------------ |
+| `?tags=a&tags=b`  | `["a", "b"]`       |
+| key absent        | `[]`               |
+| `?tags=a`         | `["a"]`            |
+
+Absence and `[]` are the same wire state, so **presence modifiers do not
+exist** on array codecs — a `.default()` could never be observed, and
+`.optional()` would promise a distinction the URL can't make. The methods
+are typed `never`:
+
+```ts twoslash
+// @errors: 2349
+import { p } from "paramour";
+
+p.array().default(["a"]);
+
+p.array().optional();
+```
+
+`.catch()` stays legal and preserves the `"many"` arity. Element
+restrictions mirror `p.csv` — no modifiers, no arity-`"many"` elements:
+
+```ts twoslash
+// @errors: 2345
+import { p } from "paramour";
+
+p.array(p.integer().optional());
+```
+
+Unlike csv, a **csv element is legal** here: `p.array(p.csv(p.integer()))`
+means one whole comma-packed list per repeated key
+(`?m=1,2&m=3,4` decodes to `[[1, 2], [3, 4]]`).
+
+## p.index
+
+A pagination-friendly integer that is **1-based on the wire and 0-based in
+memory**: `?page=1` decodes to index `0`.
+
+```ts twoslash
+import { p, searchToString } from "paramour";
+
+const qs = searchToString({ page: p.index() }, { page: 0 });
+// => "?page=1"
+```
+
+| Wire value | Result                                       |
+| ---------- | -------------------------------------------- |
+| `1`        | `0`                                          |
+| `10`       | `9`                                          |
+| `0`        | `ParseError` — below the 1-based wire floor  |
+| `-1`       | `ParseError` — below the 1-based wire floor  |
+| `1.5`      | `ParseError` — integer grammar               |
+
+Wire values below `1` are a `ParseError` (recoverable via `.catch()`, like
+any malformed input). A negative in-memory index cannot round-trip through
+the 1-based wire floor, so serializing one is a `SerializeError` at
+link-build time. The optional schema (`StandardSchemaV1<number, number>`)
+validates the **in-memory, 0-based** value on both sides.
+
+## p.custom
+
+The escape hatch: wrap any bidirectional parse/serialize pair. `Out` is
+inferred from the pair:
+
+```ts twoslash
+import { p } from "paramour";
+
+const bigintCodec = p.custom({
+  label: "bigint",
+  parse: (raw) => BigInt(raw),
+  serialize: (value: bigint) => value.toString(),
+});
+
+bigintCodec;
+// ^?
+```
+
+- **`parse: (raw: string) => Out`** — throw for malformed input. Foreign
+  throws (like `BigInt`'s `SyntaxError` above) are rebranded to `ParseError`,
+  so they are recoverable via `.catch()` and aggregate per-key like any
+  other parse failure.
+- **`serialize: (value: Out) => string`** — foreign throws are rebranded to
+  `SerializeError`.
+- **`label`** (optional) — the reflection name shown by
+  [`describeCodec`](./describe#describecodec) and `paramour list`; defaults
+  to `"custom"`.
+
+<Callout title="Paramour errors pass through loud">
+  Any `ParamourError` thrown inside your `parse`/`serialize` — including
+  errors from reused paramour helpers — is never downgraded: it bypasses
+  `.catch()` recovery and per-key aggregation. `.catch()` recovers foreign
+  parse failures only.
+</Callout>
+
+All three modifiers work on the result, and `p.custom` codecs are legal
+`p.csv`/`p.array` elements as long as the usual element rules hold (an
+element serialization containing a comma is caught by csv's serialize
+guard).

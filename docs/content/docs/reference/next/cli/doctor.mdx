@@ -1,0 +1,68 @@
+---
+title: paramour doctor
+description: Diagnose the project's paramour setup — seven checks, one report.
+---
+
+Diagnoses the whole setup in one pass. When something about a project feels
+off, run doctor before debugging by hand — it checks the boring causes
+first:
+
+```bash
+npx paramour doctor
+```
+
+```txt
+  ✔ config: no paramour.config file — defaults in effect
+  ✔ route directories: app/
+  ✔ artifact: paramour-env.d.ts is up to date
+  ✔ next.config: next.config.ts wraps withTypedRoutes
+  ⚠ versions: paramour 0.4.0 != @paramour-js/next 0.2.1
+      align the two versions — they release in lockstep
+  ✔ tsconfig: tsconfig.json includes paramour-env.d.ts
+  ✔ route definitions: 3 found in 3 modules
+      3 of 3 filesystem routes have definitions
+
+doctor: 7 checks — 0 failed, 1 warning
+```
+
+Each check degrades independently — doctor exists to diagnose broken
+setups, so a probe that itself throws becomes a finding, never a crash.
+
+## The checks
+
+Seven, in report order. `fail` means a verification you care about is
+untrue; `warn` is advisory and never affects the exit code.
+
+| Check                 | Verifies                                                                                             | Can fail? |
+| --------------------- | ----------------------------------------------------------------------------------------------------- | --------- |
+| `config`              | `paramour.config.{ts,mjs,json}` parses and validates (no config at all is a pass — defaults in effect). | fail      |
+| `route directories`   | An app and/or pages directory resolves, config dirs honored.                                          | fail      |
+| `artifact`            | The artifact exists and is byte-current — the [`check`](/docs/reference/next/cli/check) engine; drift details name the routes. | fail      |
+| `next.config`         | The config file wraps `withTypedRoutes`. Warn-level only: CLI-only workflows (generate in a script, check in CI) are legitimate. | warn only |
+| `versions`            | `paramour` and `@paramour-js/next` resolve in `node_modules` (fail if not) and match versions — they release in lockstep (warn on mismatch). | fail      |
+| `tsconfig`            | The tsconfig covers the artifact file, so the registry augmentation is actually in your program.       | warn only |
+| `route definitions`   | Route-definition discovery is healthy — how many definitions found, how many filesystem routes they cover, plus load failures and duplicates. Evaluates matched modules, like [`list`](/docs/reference/next/cli/list). | warn only |
+
+## Flags
+
+| Flag           | Default | Description              |
+| -------------- | ------- | ------------------------ |
+| `--json`       | off     | Machine-readable output. |
+| `--help`, `-h` | —       | Show usage.              |
+
+`--json` emits `{ checks, status }`, where each check carries `label`,
+`status` (`"pass"` / `"warn"` / `"fail"`), and optional `detail` lines, and
+the top-level `status` is the worst of them.
+
+## Exit codes
+
+Doctor is a verification, so its exit codes follow `check`'s class:
+
+| Code | When                                                             |
+| ---- | ----------------------------------------------------------------- |
+| `0`  | Every check passed — warnings allowed.                            |
+| `1`  | Any check failed.                                                 |
+| `2`  | Doctor itself could not run (usage errors, an unexpected crash).  |
+
+Because warnings exit `0`, doctor can run in CI as a broader gate than
+`check` without failing builds over advisory findings.

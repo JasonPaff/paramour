@@ -2,7 +2,8 @@ import { symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { RouteCollisionError, scanAppRoutes } from "../src";
+import { RouteCollisionError } from "../src";
+import { scanAppRoutes } from "../src/scan-app.js";
 import { makeTempDir, makeTree, trySymlink } from "./helpers.js";
 
 /** Build a tree in a temp dir and scan it in one step. */

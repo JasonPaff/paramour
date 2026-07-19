@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { emitArtifact } from "../src";
+import { emitArtifact } from "../src/emit.js";
 import { runCli } from "../src/run-cli.js";
 import { makeTempDir, makeTree } from "./helpers.js";
 

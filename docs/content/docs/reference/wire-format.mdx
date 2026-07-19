@@ -7,3 +7,13 @@ description: The normative, numbered rules for paramour's URL serialization.
   The published spec and the interactive wire-format explorer land in a
   later milestone.
 </Callout>
+
+Until the numbered rules are published here, the wire behavior is
+documented in two places:
+
+- [Serialization & the Wire Format](/docs/concepts/serialization) — the
+  narrative tour of the rules: per-codec wire grammars, default elision,
+  repeated keys vs. CSV, and the byte-layer encoding choices.
+- [Search helpers](/docs/reference/core/search) — the core functions that
+  implement those rules (`encodeSearch`, `decodeSearch`,
+  `buildSearchString`) and their exact contracts.

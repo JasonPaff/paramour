@@ -1,0 +1,72 @@
+---
+title: paramour check
+description: Verify the committed artifact is current — exit 1 on drift, never writes.
+---
+
+The CI gate. `check` is exactly
+[`generate --check`](/docs/reference/next/cli/generate): re-scan the route
+directories, byte-compare the result against the committed artifact, exit
+`1` on drift, **never write**:
+
+```bash
+npx paramour check
+```
+
+```txt
+paramour: paramour-env.d.ts is up to date
+```
+
+On drift, the report names what appeared and disappeared, so the fix is
+obvious — rerun `generate` and commit:
+
+```txt
+paramour: paramour-env.d.ts is out of date.
+  + /product/[id] (app)
+  - /products/[id] (app)
+Run `paramour generate` and commit the result.
+```
+
+A **missing artifact counts as drift** — CI can't silently degrade to
+unchecked paths. So does byte drift with an identical route set (a
+hand-edited artifact), reported as `content differs from generator output`.
+
+## Flags
+
+`check` accepts the shared route-resolution flags and nothing else — in
+particular it rejects `--check` and `--watch` as unknown options (it *is*
+the check; there is nothing to watch):
+
+| Flag                       | Default                             | Description                                  |
+| -------------------------- | ----------------------------------- | -------------------------------------------- |
+| `--app-dir <dir>`          | discovered `app/` or `src/app/`     | App directory.                               |
+| `--pages-dir <dir>`        | discovered `pages/` or `src/pages/` | Pages directory.                             |
+| `--out-file <file>`        | `paramour-env.d.ts`                 | Artifact path, relative to the project root. |
+| `--page-extensions <list>` | `tsx,ts,jsx,js`                     | Comma-separated, no leading dots.            |
+| `--help`, `-h`             | —                                   | Show usage.                                  |
+
+## CI usage
+
+Put it in front of the build so a stale registry is a failed build with a
+clear message, not a type-error cascade later in the log:
+
+```json title="package.json"
+{
+  "scripts": {
+    "build": "paramour check && next build"
+  }
+}
+```
+
+The complementary wiring is
+[`withTypedRoutes(config, { strict: true })`](/docs/reference/next/with-typed-routes#withtypedroutesoptions),
+which upgrades build-phase drift into a `next build` failure — this docs
+site does both. Prefer `check` as the first line of defense: it fails
+explicitly and first, rather than mid-`next build`.
+
+## Exit codes
+
+| Code | When                                                                       |
+| ---- | -------------------------------------------------------------------------- |
+| `0`  | The artifact matches the filesystem byte-for-byte.                          |
+| `1`  | Drift — including a missing or hand-edited artifact.                        |
+| `2`  | Usage/config errors, no route directories, route collisions, I/O failures.  |

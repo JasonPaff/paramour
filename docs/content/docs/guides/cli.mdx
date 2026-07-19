@@ -7,7 +7,9 @@ description: generate, check, init, list, and doctor.
 contract holds across all of them — exit `0` means success, `1` means "the
 thing you asked me to verify is not true" (drift, failed checks), `2` means
 usage or configuration errors — so CI scripting never has to guess. Every
-command takes `--help`.
+command takes `--help`. This guide covers workflows; the
+[CLI reference](/docs/reference/next/cli) documents every flag and default,
+one page per command.
 
 Configuration comes from `paramour.config.ts` (or `.mjs`/`.json`) at the
 project root; every field is optional, flags take precedence, and with no
@@ -37,6 +39,8 @@ skipped write, so timestamps don't churn). Flags: `--app-dir`,
   fighting.)
 - `--check` — see below.
 
+Flag-by-flag details: [generate reference](/docs/reference/next/cli/generate).
+
 ## check
 
 `check` is exactly `generate --check`: re-scan, byte-compare against the
@@ -61,7 +65,8 @@ This is the CI gate. The two standard wirings:
 ```
 
 or `withTypedRoutes(config, { strict: true })`, which upgrades build-phase
-drift into a `next build` failure — this docs site does both.
+drift into a `next build` failure — this docs site does both. Details:
+[check reference](/docs/reference/next/cli/check).
 
 ## init
 
@@ -81,7 +86,8 @@ transformed safely, init prints the wrap snippet for you to apply by hand
 and still exits `0` — a printed instruction is a successful outcome.
 
 The [Getting Started tutorial](/docs/getting-started#initialize) shows a
-full init run and explains each change.
+full init run and explains each change; the
+[init reference](/docs/reference/next/cli/init) documents every flag.
 
 ## list
 
@@ -112,7 +118,8 @@ scanned.
 
 A filesystem route with no definition (or a definition whose path matches no
 file) is reported as a warning, not an error — the output doubles as a
-coverage report. `--json` emits the same data machine-readably.
+coverage report. `--json` emits the same data machine-readably. Details:
+[list reference](/docs/reference/next/cli/list).
 
 ## doctor
 
@@ -142,7 +149,8 @@ doctor: 7 checks — 0 failed, 1 warning
 Warnings exit `0`; any failed check exits `1` (so doctor can run in CI too,
 if you want a broader gate than `check`). `--json` for tooling. When
 something about a setup feels off, run doctor before debugging by hand —
-it checks the boring causes first.
+it checks the boring causes first. Details:
+[doctor reference](/docs/reference/next/cli/doctor).
 
 ## A CI recipe
 

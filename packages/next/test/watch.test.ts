@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { type RouteDirsWatcher, watchRouteDirs } from "../src";
+import { type RouteDirsWatcher, watchRouteDirs } from "../src/watch.js";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /**

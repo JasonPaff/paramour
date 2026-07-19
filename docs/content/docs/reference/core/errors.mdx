@@ -1,0 +1,150 @@
+---
+title: Errors
+description: The ParamourError hierarchy, brand-based instanceof, and the Issue shape shared by every failed decode.
+---
+
+Every error paramour throws is a `ParamourError`. Foreign throws — a
+Standard Schema validator that throws instead of returning issues, a
+`.default()` factory that fails, a props promise that rejects — are caught
+at chokepoints and rebranded into the hierarchy, with the original attached
+as `cause`. So one `instanceof ParamourError` check in an error boundary
+catches everything the library can produce.
+
+```txt
+ParamourError
+├─ ParseError          one wire value failed its codec grammar or schema
+├─ SerializeError      a value could not be serialized to the wire
+├─ ParamsDecodeError   aggregate params-decode failure — carries issues
+├─ SearchDecodeError   aggregate search-decode failure — carries issues
+└─ SearchSourceError   a source violated the wire-shape contract — carries key
+```
+
+`instanceof` is hardened with cross-copy identity brands: each class brands
+its prototype with a `Symbol.for()` symbol, which resolves in the
+realm-global symbol registry — so a second physical copy of the module
+(dual-package hazard, bundler duplication) mints the *same* symbols, and
+`instanceof` recognizes instances across copies. A structurally identical
+foreign class lacks the brands entirely and never passes. Each class checks
+its own brand (a `ParseError` check never matches a plain `ParamourError`),
+and the checks are typed as predicates, so TypeScript narrows through them.
+
+## ParamourError
+
+The base class — and the type thrown directly for *contract violations*:
+an invalid path literal at define time, a hand-built route missing a codec,
+a config or source that isn't even an object, a rebranded foreign throw.
+These are programming errors, so they deliberately stay loud — the `safe*`
+APIs never soften them into the `error` arm.
+
+## ParseError
+
+A single wire value failed its codec grammar or schema validation —
+`"abc"` is not an integer, `"2026-13-40"` is not a date. This is the
+element-level error, and it is exactly what `.catch()` recovers: inside the
+high-level decoders every `ParseError` is either caught into the codec's
+fallback or folded into the aggregate's `issues[]`, so you normally meet it
+as an issue `message` rather than a raw throw. It surfaces directly only on
+low-level paths (custom codec internals, tooling using
+`paramour/internal`).
+
+## SerializeError
+
+A value could not be serialized to the wire: the wrong runtime type, a
+value failing its codec or schema on serialize, a required param or search
+key missing at encode time, a required catch-all given `[]`, a segment
+serializing to `""`, a custom serializer returning a non-string, or
+unencodable text (lone surrogates). Thrown by the whole encode surface —
+`href`, `buildPath`, `encodeParams`, `encodeStaticParams`, `encodeSearch`,
+`searchToString`, `buildSearchString`, `serializeValue` — at link-build
+time, in the component that introduced the bad value.
+
+## ParamsDecodeError
+
+The aggregate failure for a whole params decode. Carries `issues`, one
+entry per failed key — a decode never stops at the first problem:
+
+```ts twoslash
+import {
+  decodeParams,
+  defineAppRoute,
+  p,
+  ParamourError,
+  ParamsDecodeError,
+} from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+
+try {
+  decodeParams(productRoute, { id: "abc" });
+} catch (error) {
+  if (error instanceof ParamsDecodeError) {
+    error.issues;
+    //    ^?
+  } else if (error instanceof ParamourError) {
+    // contract violation — a bug in the caller, not a bad URL
+    throw error;
+  }
+}
+```
+
+Thrown by `decodeParams`, `route.parseParams`, and the params half of
+`route.parse` / `route.parseContext`; returned in the `error` arm by their
+`safe*` twins.
+
+## SearchDecodeError
+
+The aggregate failure for a whole search decode — same shape, same
+`issues` property, so error rendering written for one surface works for
+both. Thrown by `decodeSearch`, `route.parseSearch`, the search half of
+`route.parse` / `route.parseContext`, and a failed `rawSearch` schema
+(whose root-level issues appear under the key `"<search>"`);
+`standardSearchSchema` converts it to spec-shaped issues instead of
+throwing.
+
+## SearchSourceError
+
+A search source violated its wire-shape contract: the source isn't an
+object, or a *declared* key's value isn't a `string` / `string[]`. Carries
+`key` — the offending source key, or `null` when the source itself is
+malformed. This is distinct from a decode failure on purpose: a malformed
+source is the caller's bug, so it stays loud everywhere — including through
+`safeDecodeSearch` — with one exception: `standardSearchSchema`'s
+`validate()` receives genuinely untrusted input, so exactly these errors
+soften to spec issues at that one boundary.
+
+## Which API throws what
+
+| API                                                                                                             | Failure                                                                          |
+| --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `decodeParams`, `route.parseParams`                                                                              | `ParamsDecodeError`                                                              |
+| `decodeSearch`, `route.parseSearch`                                                                              | `SearchDecodeError`; `SearchSourceError` for a contract-violating source         |
+| `route.parse`, `route.parseContext`                                                                              | `ParamsDecodeError` or `SearchDecodeError` — params decode first                 |
+| `href`, `buildPath`, `encodeParams`, `encodeStaticParams`, `encodeSearch`, `searchToString`, `buildSearchString` | `SerializeError`                                                                 |
+| `defineAppRoute`, `definePagesRoute`                                                                             | `ParamourError` on an invalid path literal                                       |
+| any API given a config or source that breaks its documented shape (plain-JS callers)                             | base `ParamourError`                                                             |
+
+The `safe*` and `safeDecode*` variants return the two aggregate decode
+errors in their `error` arm instead of throwing; everything else in this
+table still throws through them.
+
+## Related types
+
+**`RouteDecodeError`** is the union of the two aggregate errors — the type
+of [`SafeResult`](/docs/reference/core/routes#saferesult)'s `error` arm:
+
+```ts
+type RouteDecodeError = ParamsDecodeError | SearchDecodeError;
+```
+
+**`Issue`** is one failed key in an aggregate error — the same shape on
+both surfaces (and in the hooks and devtools), so issue rendering is
+written once:
+
+```ts
+interface Issue {
+  readonly key: string;
+  readonly message: string;
+}
+```

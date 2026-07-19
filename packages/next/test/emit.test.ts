@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 
-import { emitArtifact, writeIfChanged } from "../src";
+import { emitArtifact, writeIfChanged } from "../src/emit.js";
 import { makeTempDir } from "./helpers.js";
 
 /** App-only emission — the shape most existing suites exercise. */

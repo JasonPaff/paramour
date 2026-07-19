@@ -3,6 +3,255 @@ title: "@paramour-js/devtools"
 description: Devtools panel API and the observation-seam contract.
 ---
 
-<Callout title="Under construction">
-  This page is a stub — the devtools reference lands in a later milestone.
-</Callout>
+`@paramour-js/devtools` is a [TanStack Devtools](https://tanstack.com/devtools)
+panel that observes the hooks in `@paramour-js/next` as they decode routes
+(design-12). The public surface is deliberately tiny — the plugin-entry
+helper and the panel component — because the panel never re-implements
+decoding: it subscribes to an observation seam the hooks emit through, so
+what it renders is what your components actually got.
+
+For setup and a tour of what the panel shows, see the
+[devtools guide](/docs/guides/devtools). This page is the API reference,
+plus the contract of the observation seam for anyone building other
+observers.
+
+## paramourDevtoolsPlugin
+
+Builds the plugin entry you hand to the TanStack Devtools shell.
+
+```ts
+function paramourDevtoolsPlugin(
+  options?: ParamourDevtoolsPluginOptions,
+): ParamourDevtoolsPluginEntry;
+
+interface ParamourDevtoolsPluginOptions {
+  readonly defaultOpen?: boolean;
+}
+```
+
+You own the shell — install `@tanstack/react-devtools`, mount it once,
+dev-conditionally, and pass paramour as a plugin:
+
+```tsx twoslash title="app/devtools.tsx"
+"use client";
+
+import { paramourDevtoolsPlugin } from "@paramour-js/devtools";
+import { TanStackDevtools } from "@tanstack/react-devtools";
+
+export function Devtools() {
+  if (process.env.NODE_ENV === "production") return null;
+  return <TanStackDevtools plugins={[paramourDevtoolsPlugin()]} />;
+}
+```
+
+`defaultOpen: true` opens the panel on load — useful when you want it in
+your face during a debugging session. That's the only option; the helper
+just builds `{ id, name, render }` with the panel component as `render`,
+plus the flag.
+
+Gotchas:
+
+- **Guard the shell yourself.** The instrumentation in the hooks is erased
+  from production bundles automatically (the emit sites sit behind
+  `process.env.NODE_ENV !== "production"` checks that bundlers
+  constant-fold), but the shell component is yours — the `NODE_ENV` early
+  return above is what keeps the panel out of production.
+- Nothing is registered per route: any component using `useRouteParams` /
+  `useSearch` (App or Pages router) starts reporting the moment it renders.
+
+## ParamourDevtoolsPanel
+
+The panel component itself, exported for custom devtools shells.
+
+```ts
+interface ParamourDevtoolsPanelProps {
+  readonly theme?: "dark" | "light";
+}
+```
+
+Session sidebar on the left; the main pane auto-follows the route(s) whose
+observations match the current URL (a layout and a page may both report —
+both render, stacked), or shows a pinned session's last-known snapshot
+read-only with a stale marker.
+
+```tsx twoslash
+"use client";
+
+import { ParamourDevtoolsPanel } from "@paramour-js/devtools";
+
+export function CustomShellPanel({ theme }: { theme: "dark" | "light" }) {
+  return <ParamourDevtoolsPanel theme={theme} />;
+}
+```
+
+`theme` selects the panel's token set via a `data-theme` attribute (no
+theme context, no remount) and defaults to `"light"`. When the panel is
+mounted through [`paramourDevtoolsPlugin`](#paramourdevtoolsplugin) you
+never pass it — the TanStack shell clones the rendered element and injects
+`theme` itself; the prop exists for shells that don't.
+
+## ParamourDevtoolsPluginEntry
+
+The type [`paramourDevtoolsPlugin`](#paramourdevtoolsplugin) returns.
+
+```ts
+interface ParamourDevtoolsPluginEntry {
+  readonly defaultOpen?: boolean;
+  readonly id: string;
+  readonly name: string;
+  readonly render: ReactElement;
+}
+```
+
+Declared *structurally* — the shell's contract is just
+`name`/`render`/`id`/`defaultOpen` — so this package never imports
+`@tanstack/react-devtools` at runtime; assignability to the real plugin
+type is certified by the package's type tests.
+
+```ts twoslash
+import { paramourDevtoolsPlugin } from "@paramour-js/devtools";
+
+const entry = paramourDevtoolsPlugin({ defaultOpen: true });
+//    ^?
+```
+
+## The observation seam
+
+The hooks in `@paramour-js/next` and the panel never import each other at
+runtime. They meet at a dependency-free global slot: the hooks push decode
+observations into it, the panel subscribes and reads them out.
+
+- **Slot key**: `Symbol.for("paramour.devtools.seam")` — the realm-global
+  symbol registry, so a second physical copy of the module (dual-package
+  hazard, bundler duplication) mints the *same* symbol and lands on the
+  same slot. Either side may create the slot; both are create-if-absent.
+- **Types-only subpath, by design**: the contract is published as
+  `@paramour-js/next/devtools-seam`, whose exports entry ships *types
+  only* — a runtime import fails module resolution. Panel and hooks share
+  the global slot, not runtime imports. The contract of record is
+  `packages/next/src/devtools-seam.ts` in the paramour repo.
+- **Data-only slot**: the slot has no function fields. A function property
+  would close over whichever module copy created the slot first, letting a
+  duplicated or version-skewed copy pin stale behavior; with plain data,
+  every copy of the emit/attach code operates on shared state and
+  `version` is the only skew guard needed.
+- **Protocol**: subscribe = `listeners.add(fn)`; unsubscribe =
+  `listeners.delete(fn)`; replay = synchronously read `buffer`, then `add`
+  (same JS thread, so nothing can be emitted between the read and the
+  add). Emitters push to `buffer` — a FIFO capped at 128 entries, oldest
+  dropped — then invoke every listener.
+- **Production**: every emit site sits behind
+  `process.env.NODE_ENV !== "production"`; Next's compilers constant-fold
+  the check and, with the package's `sideEffects: false`, drop the
+  then-dead import entirely. The seam module's emitted JS imports nothing,
+  which is load-bearing for that erasure.
+
+### ParamourDevtoolsSeam
+
+The slot shape.
+
+```ts
+interface ParamourDevtoolsSeam {
+  readonly buffer: ParamourObservation[]; // capped FIFO; replay = read it
+  readonly listeners: Set<(observation: ParamourObservation) => void>;
+  readonly version: 1;
+}
+```
+
+`version` is bumped only when an *existing* field's semantics change;
+additive fields never bump it.
+
+### ParamourObservation
+
+One hook decode.
+
+```ts
+type ParamourObservation =
+  | ParamourParamsObservation
+  | ParamourSearchObservation;
+```
+
+Both arms extend a common base:
+
+```ts
+interface ParamourObservationBase {
+  readonly hook: ParamourHookId;
+  readonly navigate: ParamourNavigate;
+  readonly pathname: string;
+  readonly result: ParamourObservationResult;
+  readonly route: AnyRoute; // the LIVE route object — same JS context
+  readonly routerKind: RouterKind;
+}
+```
+
+- `ParamourParamsObservation` — `kind: "params"`; its `wire` is a
+  decode-time shallow copy of the source params record.
+- `ParamourSearchObservation` — `kind: "search"`; its `wire` is a
+  [`ParamourSearchWire`](#paramoursearchwire) pair list.
+- `pathname` is the *emitting hook's own* resolution base at decode time —
+  `usePathname()` (App) or `asPath`'s path part (Pages), both
+  basePath-/locale-relative — so an observer never has to reverse-engineer
+  a configured basePath.
+- `route` is the live route object, not a serialized snapshot: an observer
+  can call `describeRoute`, the route's own codecs, and `buildSearchString`
+  on it directly.
+
+Observations are emitted on decode *change*, and re-emitted when the
+hook's resolution base moves under an unchanged decode (a layout surviving
+`/product/1?q=a` → `/product/2?q=a`), so the captured `navigate` and
+`pathname` never go stale while the hook is mounted.
+
+### ParamourObservationResult
+
+The decode result, pre-`select`.
+
+```ts
+type ParamourObservationResult =
+  | SafeResult<unknown>
+  | { readonly status: "pending" };
+```
+
+Always the hook's full `SafeResult` — the error arm carries the live
+`ParamsDecodeError`/`SearchDecodeError` with its `issues` — never the
+user's `select` projection. `pending` is the Pages-router-only third state
+(the router before hydration). Generic-erased on purpose: observers treat
+`data` structurally.
+
+### ParamourHookId
+
+Discriminant naming which hook reported.
+
+```ts
+type ParamourHookId =
+  | "app.useRouteParams"
+  | "app.useRouteParamsOrThrow"
+  | "app.useSearch"
+  | "app.useSearchOrThrow"
+  | "pages.useRouteParams"
+  | "pages.useSearch";
+```
+
+### ParamourNavigate
+
+```ts
+type ParamourNavigate = (search: string) => void;
+```
+
+Navigation capability captured from the *emitting hook's* router — an
+observer commits URL edits through it, so it never guesses which router is
+live and never imports Next. Pass only the serialized search string (`""`
+or `"?…"`); the hook resolves it against its own current pathname, which
+is what Next's `replace()` expects back. (Reading
+`window.location.pathname` on the observer side instead would double a
+configured basePath.) It uses `replace` semantics: commit-per-edit
+experimenting shouldn't turn the back button into a slog.
+
+### ParamourSearchWire
+
+```ts
+type ParamourSearchWire = readonly (readonly [string, string])[];
+```
+
+Decode-time `[key, value]` pairs in wire order. The pair form is
+deliberate: order is load-bearing for repeated keys, and pairs round-trip
+losslessly — a plain record could not represent `?tags=a&tags=b`.

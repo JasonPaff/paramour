@@ -1,0 +1,222 @@
+---
+title: Codec & modifiers
+description: The Codec interface, createCodec, the three modifiers, and the type-state rules.
+---
+
+Every value paramour moves across the URL boundary is described by a codec.
+This page documents the `Codec` interface itself, the low-level `createCodec`
+factory, the three chainable modifiers, and the type-state rules that make
+illegal modifier chains fail to compile. For the catalog of built-in
+builders, see [`p.*` builders](./p-builders); for the conceptual tour, see
+[Codecs & the type-state API](/docs/concepts/codecs).
+
+## Codec
+
+The interface behind every builder: `Codec<Out, P, C, A, E>`, a
+bidirectional wire codec whose modifier history is tracked in its type
+parameters.
+
+- **`Out`** — the decoded in-memory type (`number` for `p.integer()`,
+  `Date` for `p.isoDate()`).
+- **`P` (presence)** — `"required"`, `"optional"`, or `"defaulted"`.
+  Presence governs absence semantics on both sides: whether the key may be
+  omitted when building a URL, and whether the decoded property can be
+  `undefined`.
+- **`C` (caught)** — `true` once `.catch()` has been applied.
+- **`A` (arity)** — `"single"` (one wire value per key) or `"many"`
+  (repeated keys; only `p.array` produces this).
+- **`E` (default-elides)** — `true` after a value-form `.default()`,
+  `false` after a factory-form one, unresolved `boolean` before either.
+  Derived surfaces (the nuqs adapter) read this literal to decide whether a
+  defaulted key can be given a non-nullable read.
+
+The type parameters are **type-state**: modifier methods are conditionally
+`never`, so an illegal chain makes the method itself uncallable. Hover the
+chain to watch the state accumulate:
+
+```ts twoslash
+import { p } from "paramour";
+
+const page = p.integer().default(1).catch(0);
+//    ^?
+```
+
+Properties prefixed `~` (`~kind`, `~presence`, `~parseElement`, …) are
+internal machinery, not public API — user code reads codecs through
+[`describeCodec`](./describe#describecodec) and the utility types below.
+`~out` in particular is a phantom property: it carries `Out` for inference
+and is never set at runtime.
+
+## createCodec
+
+The low-level factory the `p.*` builders themselves use. It exists mainly
+for advanced and internal use — **`p.custom` is the app-author path**.
+
+`createCodec<Out>({ kind?, parseElement, serializeElement, … })` returns a
+fresh `Codec<Out, "required", false>`. The practical difference from
+`p.custom`: `createCodec` does *not* rebrand foreign exceptions, so your
+`parseElement`/`serializeElement` must throw paramour's own `ParseError`/
+`SerializeError` to participate in `.catch()` recovery and per-key error
+aggregation. `p.custom` wraps that bookkeeping for you.
+
+## .optional()
+
+Marks the key as allowed to be absent.
+
+The decoded type gains `| undefined`, the key becomes omittable on the
+`href`/encode side, and serializing `undefined` omits the key entirely.
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const config = { q: p.string().optional() };
+
+const search = decodeSearch(config, new URLSearchParams(""));
+//    ^?
+```
+
+Available only on `"required"`-presence, `"single"`-arity codecs — see
+[type-state rules](#type-state-rules).
+
+## .default(value | factory)
+
+Substitutes a value when the key is absent — and, in the value form, elides
+the key when serializing a value equal to the default.
+
+The two forms differ deliberately (they are distinguished in type-state via
+the `E` parameter):
+
+```ts twoslash
+import { p } from "paramour";
+
+const page = p.integer().default(1);
+//    ^?
+
+const since = p.timestamp().default(() => new Date());
+//    ^?
+```
+
+- **Value form** (`.default(1)`) — absent decodes as `1`, and serializing
+  `1` **elides** the key, so every state has exactly one canonical URL (no
+  `?page=1` and `?` aliases). The comparison is by wire form, and the live
+  default is re-serialized per encode — never a stale snapshot — so
+  mutating a reference-typed default cannot desync encode from decode. The
+  default is also serialized once at definition time, so a default the
+  codec cannot serialize (or that fails its schema) throws a
+  `ParamourError` when the config is *defined*, not on some later encode.
+- **Factory form** (`.default(() => new Date())`) — the factory runs per
+  decode, so reference-typed defaults are isolated per call. Factory
+  defaults **never elide**: a time-varying default could swallow an
+  explicitly-passed value that later decodes as a different one.
+
+Array values passed to `.default()` are handed out as fresh shallow copies
+per call, so mutating a decoded fallback can't pollute later decodes; other
+reference values are returned by reference — use a factory to isolate
+those.
+
+## .catch(fallback | factory)
+
+Recovers a *failed parse* to a fallback value instead of failing the
+decode.
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const config = { view: p.enum(["grid", "list"]).catch("grid") };
+
+const search = decodeSearch(config, new URLSearchParams("?view=nonsense"));
+// => { view: "grid" }
+```
+
+`.catch()` is orthogonal to presence: it recovers parse **failures**, never
+absence — an absent optional key is still `undefined`, an absent required
+key is still an error. It also only recovers data-level `ParseError`s:
+misconfiguration (`ParamourError`) and serialization bugs
+(`SerializeError`) stay loud. Like `.default()`, it accepts a value or a
+zero-arg factory (array values are shallow-copied per call), and its
+argument is typed to the codec's output:
+
+```ts twoslash
+// @errors: 2345
+import { p } from "paramour";
+
+p.enum(["asc", "desc"]).catch("descending");
+```
+
+## Type-state rules
+
+Contradictory chains fail to compile: applying a modifier removes it (and
+any modifier it excludes) from the resulting type, collapsing the method to
+`never`. Calling a `never`-typed method is TS error 2349:
+
+```ts twoslash
+// @errors: 2349
+import { p } from "paramour";
+
+p.string().optional().optional();
+
+p.string().optional().default("a");
+
+p.string().default("a").optional();
+
+p.integer().default(1).default(2);
+
+p.integer().catch(0).catch(1);
+```
+
+The rules, spelled out:
+
+- Each modifier may be applied **once**.
+- `.optional()` and `.default()` are mutually exclusive in either order —
+  what would `.optional().default(1)` mean when the key is absent?
+- `.catch()` combines freely with either presence modifier, in any order:
+  `p.integer().catch(0).default(1)` and `p.integer().default(1).catch(0)`
+  are both legal.
+- Arity-`"many"` codecs (`p.array`) have no presence modifiers at all —
+  absent and `[]` are the same wire state (see
+  [`p.array`](./p-builders#parray)).
+
+Mismatched modifier arguments fail like ordinary typed calls — for
+`.default()`, whose value/factory split is expressed as overloads, a
+wrong-typed argument reports error 2769:
+
+```ts twoslash
+// @errors: 2769
+import { p } from "paramour";
+
+p.integer().default("x");
+```
+
+One subtlety of the overloads: an `Out` whose static type includes a
+function member can only be defaulted through the factory form — the
+runtime treats any function argument as a factory, so the value branch is
+withheld whenever the two could disagree.
+
+These rules are not types-only theater: the same illegal chains throw
+`ParamourError` at runtime for plain-JavaScript consumers. The type-state
+is a compile-time mirror of real constraints.
+
+## Related types
+
+- **`AnyCodec`** — the wildcard codec type (`Codec<any, …>` across all
+  states); the constraint to use when writing generic code over codecs.
+- **`OutputOf<C>`** — the decoded type of a codec:
+  `OutputOf<ReturnType<typeof p.integer>>` is `number`.
+- **`ParamCodec`** — the codecs legal in a route's `params:` config: no
+  presence modifiers (a path segment can't be absent), `.catch()` allowed.
+- **`Presence`** — `"defaulted" | "optional" | "required"`.
+- **`PresenceOf<C>`** — a codec's presence state as a literal type.
+- **`Arity`** — `"many" | "single"`.
+
+```ts twoslash
+import { p } from "paramour";
+import type { OutputOf, PresenceOf } from "paramour";
+
+const page = p.integer().default(1);
+
+type Page = OutputOf<typeof page>;
+//   ^?
+
+type PagePresence = PresenceOf<typeof page>;
+//   ^?
+```

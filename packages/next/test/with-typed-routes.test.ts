@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { emitArtifact, withTypedRoutes } from "../src";
+import { withTypedRoutes } from "../src";
+import { emitArtifact } from "../src/emit.js";
 import {
   devWatcherCountForTests,
   resetDevWatchersForTests,

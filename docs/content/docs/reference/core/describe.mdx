@@ -1,0 +1,139 @@
+---
+title: describeCodec & describeRoute
+description: The reflection API — codecs and routes as plain, serializable data.
+---
+
+Codecs and routes carry their configuration in `~`-prefixed runtime
+properties that are not public API. The describe functions are the public
+face of that metadata: they reflect a codec or a route into plain data that
+tooling can render without ever executing `parse`/`serialize`. This surface
+powers `paramour list` and `paramour doctor`, and it is what the devtools
+panel and other derived tooling build on.
+
+## describeCodec
+
+Reflects a codec into a `CodecDescription` — kind, arity, presence, enum
+members, default and catch state — as plain data.
+
+```ts twoslash
+import { describeCodec, p } from "paramour";
+
+const description = describeCodec(p.enum(["asc", "desc"]).default("asc"));
+//    ^?
+// => {
+//      arity: "single",
+//      caught: false,
+//      defaultValue: { kind: "value", wire: "asc" },
+//      enumMembers: ["asc", "desc"],
+//      kind: "enum",
+//      presence: "defaulted",
+//    }
+```
+
+Details worth knowing:
+
+- **Optional members are absent, not `undefined`** — `enumMembers` only
+  exists on enum descriptions, `defaultValue` only on defaulted ones — so
+  consumers compiled under `exactOptionalPropertyTypes` can spread
+  descriptions safely.
+- **Defaults reflect per their form.** A value-form `.default()` carries its
+  wire serialization (`{ kind: "value", wire: "asc" }` — the same text
+  elision compares against), re-serialized from the live value at describe
+  time. A factory default reflects as `{ kind: "factory" }`: invoking the
+  factory per description would leak time-varying values into what should
+  be static metadata. If a value default has been mutated into something
+  the codec can no longer serialize, the description degrades to the
+  factory arm rather than throwing from a read-only reflection call.
+- **Composites nest.** `p.csv` and `p.array` descriptions carry an
+  `element` — a nested `CodecDescription` of the per-segment/per-key
+  scalar. The recursion is bounded by construction: the deepest legal chain
+  is `array<csv<scalar>>`.
+- **`kind` is reflection-only.** It names the builder (`"integer"`,
+  `"enum"`, …; `p.custom` uses its `label` or `"custom"`) and is never
+  consulted by parse/serialize.
+
+## describeRoute
+
+Reflects a defined route into a `RouteDescription`: its path, router kind,
+params in path order, and search config.
+
+```ts twoslash
+import { defineAppRoute, describeRoute, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: { page: p.index().default(0) },
+});
+
+const description = describeRoute(productRoute);
+//    ^?
+```
+
+Both router brands are accepted (`defineAppRoute` and `definePagesRoute`
+results) — reflection only needs the data core. The pieces:
+
+- **`params`** — one `ParamDescription` per dynamic segment, in path order.
+  Each is a `CodecDescription` plus a `segmentKind`: `"single"` for
+  `[id]`, `"catchall"` for `[...slug]`, `"optional-catchall"` for
+  `[[...slug]]`.
+- **`search`** — a `SearchDescription` with three shapes: `{ kind: "none" }`
+  when the route declares no search config, `{ kind: "codecs", keys }` with
+  a `CodecDescription` per key for the ordinary codec-map form, and
+  `{ kind: "raw" }` for the `rawSearch` escape hatch — a Standard Schema is
+  a black box with no introspectable structure, so `raw` is all there is to
+  say.
+
+## formatCodecDescription
+
+Renders a `CodecDescription` as a one-line label, in one of two styles.
+This is *the* shared walk over a description's fields — `paramour list`'s
+annotations and the devtools panel's shape column both call it, so every
+consumer renders the same structure.
+
+```ts twoslash
+import { describeCodec, formatCodecDescription, p } from "paramour";
+
+const sort = describeCodec(p.enum(["asc", "desc"]).default("asc").catch("asc"));
+
+formatCodecDescription(sort, "compact");
+// => "enum(asc|desc) =asc catch"
+
+formatCodecDescription(sort, "verbose");
+// => "enum(asc, desc) (default: asc) (catch)"
+```
+
+- **`"compact"`** — terse annotations: `?` marks optional presence, `=` plus
+  the default's wire form (or `=ƒ()` for a factory default), a bare
+  `catch`. Examples:
+
+  ```txt
+  string
+  integer?
+  enum(asc|desc) =asc catch
+  csv<integer>
+  string[]
+  ```
+
+- **`"verbose"`** — parenthesized annotations in fixed order (presence,
+  default, catch): `enum(asc, desc) (optional) (default: asc) (catch)`.
+
+Composite labels wrap or pluralize: a one-key list wraps its element
+(`csv<integer>`), while a repeated-key list *is* its element, pluralized
+(`integer[]`) — the `"array"` kind never appears in a label, the `[]`
+carries it, so `array<csv<E>>` renders as `csv<E>[]`.
+
+## Related types
+
+- **`CodecDescription`** — the reflected codec: `kind`, `arity`,
+  `presence`, `caught`, optional `defaultValue`, `element`, and
+  `enumMembers`.
+- **`CodecDefaultDescription`** — the `defaultValue` union:
+  `{ kind: "value"; wire: string }` or `{ kind: "factory" }`.
+- **`CodecFormatStyle`** — `"compact" | "verbose"`, the styles accepted by
+  `formatCodecDescription`.
+- **`ParamDescription`** — a `CodecDescription` plus the `segmentKind` of
+  the dynamic segment hosting it.
+- **`RouteDescription`** — the reflected route: `path`, `router`, `params`,
+  `search`.
+- **`SearchDescription`** — the search slot's three shapes: `"codecs"`,
+  `"none"`, or `"raw"`.

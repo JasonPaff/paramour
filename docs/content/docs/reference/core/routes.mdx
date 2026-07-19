@@ -1,0 +1,328 @@
+---
+title: defineAppRoute & definePagesRoute
+description: The route constructors, their parse surfaces, and the route and registry types.
+---
+
+The route constructors take a URL-shaped path literal plus codec configs and
+return a plain [route object](/docs/concepts/route-objects) — the value you
+import everywhere you parse a URL or build one. There is one constructor per
+router because the routers hand you data differently: the App Router's parse
+surface is async and props-based, the Pages Router's is sync and
+context-based. The router is a declaration, not an inference — the
+constructor you call brands the route, and everything downstream (parse
+methods, hooks) is gated on that brand.
+
+## defineAppRoute
+
+Defines an App Router route from a path literal and a config: `params`
+(required exactly when the path has dynamic segments, forbidden otherwise)
+and `search` (always optional — a codec map, or a
+[`rawSearch`](/docs/reference/core/search#rawsearch) schema).
+
+```ts twoslash
+import { defineAppRoute, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+  },
+});
+
+declare const props: import("paramour").RouteProps;
+const { params, search } = await productRoute.parse(props);
+//      ^?
+
+search.page;
+//     ^?
+```
+
+The parse surface is three surfaces × throwing/safe, all async:
+
+| Method                  | Accepts       | Resolves to                       |
+| ----------------------- | ------------- | --------------------------------- |
+| `parse(props)`          | `RouteProps`  | `{ params, search }`              |
+| `parseParams(props)`    | `ParamsProps` | the decoded params only           |
+| `parseSearch(props)`    | `SearchProps` | the decoded search only           |
+| `safeParse(props)`      | `RouteProps`  | `SafeResult` of both halves       |
+| `safeParseParams(props)`| `ParamsProps` | `SafeResult` of the params        |
+| `safeParseSearch(props)`| `SearchProps` | `SafeResult` of the search        |
+
+Behavior notes:
+
+- Props may be plain objects or promises (Next 15/16). Both members are
+  awaited up front, before any decode runs — a rejecting `searchParams`
+  promise can never become an unhandled rejection.
+- **Params decode first.** A params grammar failure means the URL doesn't
+  denote this route at all (morally a 404), so `parse` throws before search
+  is decoded.
+- The throwing methods throw
+  [`ParamsDecodeError` / `SearchDecodeError`](/docs/reference/core/errors);
+  the `safe*` twins return the same errors in a [`SafeResult`](#saferesult)
+  instead.
+- The half contracts are structural: layout props are assignable to
+  `ParamsProps`, and a missing props member decodes like an empty source —
+  required-missing issues, never a crash.
+
+<Callout title="Next control-flow errors pass through">
+  A rejecting props promise is rebranded to a `ParamourError` — with one
+  deliberate exception: errors carrying Next's string `digest`
+  (`NEXT_REDIRECT`, the dynamic-usage sentinel) propagate unwrapped. Next
+  rejects the `searchParams` promise itself during a `generateStaticParams`
+  prerender; wrapping it would turn a graceful bail-to-dynamic into a failed
+  build.
+</Callout>
+
+### Path-literal validation
+
+The literal is validated eagerly, at define time — an invalid path throws a
+`ParamourError` when the module first evaluates, not when the first link is
+built. Rejected: a path not starting with `/` (or ending with one), `?` or
+`#` anywhere in it (search belongs in the `search` config, fragments in
+`href`'s `hash` option), empty or malformed bracket segments, route-group
+`(folder)` and parallel-slot `@name` spellings (route paths are URL-shaped,
+not filesystem-shaped), duplicate param names, and a catch-all that isn't
+the final segment.
+
+The `params` config is checked against the literal too: every dynamic
+segment needs exactly one codec, keyed by segment name — a missing or
+misspelled key is a compile error on its own property line. A param codec
+describes **one segment element** (the array-ness of a catch-all comes from
+the segment kind), so presence modifiers are compile errors in param
+position. See [defining routes](/docs/guides/defining-routes) for catch-all
+recipes.
+
+## definePagesRoute
+
+Defines a Pages Router route with the same config shape. The parse surface
+is the sync context pair — `getServerSideProps` and `getInitialProps` hand
+params and query synchronously, so there is no promised-props machinery:
+
+| Method                  | Accepts       | Returns                     |
+| ----------------------- | ------------- | --------------------------- |
+| `parseContext(ctx)`     | `PagesContext`| `{ params, search }`        |
+| `safeParseContext(ctx)` | `PagesContext`| `SafeResult` of both halves |
+
+```ts twoslash
+// @filename: lib/routes.ts
+import { definePagesRoute, p } from "paramour";
+
+export const legacyRoute = definePagesRoute("/legacy/[id]", {
+  params: { id: p.integer() },
+  search: { ref: p.string().optional() },
+});
+
+// @filename: pages/legacy/[id].tsx
+import type { GetServerSideProps } from "next";
+
+import { legacyRoute } from "../../lib/routes";
+
+export const getServerSideProps = (async (ctx) => {
+  const { params, search } = legacyRoute.parseContext(ctx);
+  //      ^?
+  return { props: { id: params.id, ref: search.ref ?? null } };
+}) satisfies GetServerSideProps;
+```
+
+How the context splits:
+
+- `ctx.params` is authoritative for path params when present. When it's
+  absent (`getInitialProps` — `NextPageContext` has no `params`), path
+  params are extracted from `query` by segment name, which is sound because
+  Next's own merge gives route params precedence in `query`.
+- Search is always `query` minus the path-param names.
+- No percent-decoding is applied: pages sources were already decoded by
+  Node's querystring layer, so decoding again would corrupt values like
+  `a%20b`. (The App surface is the opposite — see
+  [`decodeParams`](/docs/reference/core/href#decodeparams).)
+- Params decode first — the same morally-a-404 rule as the App surface.
+
+Two contract edges worth knowing:
+
+- **`getStaticProps` is out of scope by design.** Its context carries no
+  query string, so `parseContext` rejects it loudly rather than pretending
+  typed search exists at build time. The static-generation story is
+  [`decodeParams` / `safeDecodeParams`](/docs/reference/core/href#decodeparams)
+  against `ctx.params`.
+- **A search key can't shadow a path param.** `router.query` merges the two
+  halves with route params winning, so a shadowed search key could never
+  receive a value — it fails to compile instead. (App routes have no such
+  constraint: their two sources are separate, so `?id=` on `/product/[id]`
+  is well-defined there.)
+
+## SafeResult
+
+The status-discriminated result shape shared by the `safe*` route methods
+and the standalone `safeDecodeParams` / `safeDecodeSearch` helpers:
+
+```ts
+type SafeResult<T> =
+  | { data: T; status: "success" }
+  | { error: RouteDecodeError; status: "error" };
+```
+
+One `status` check narrows both arms:
+
+```ts twoslash
+import { defineAppRoute, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+declare const props: import("paramour").RouteProps;
+// ---cut---
+const result = await productRoute.safeParse(props);
+
+if (result.status === "error") {
+  result.error.issues;
+  //           ^?
+} else {
+  result.data.params;
+  //          ^?
+}
+```
+
+Only *decode* failures reach the `error` arm — its type is
+[`RouteDecodeError`](/docs/reference/core/errors#related-types), the union
+of the two aggregate decode errors. Contract violations (a malformed source
+handed in from plain JS, a hand-built route missing a codec, a foreign
+throw out of user code) still throw: a bug should stay loud, not render as
+a 404.
+
+## RouterKind
+
+```ts
+type RouterKind = "app" | "pages";
+```
+
+Which router a route belongs to — the value of the route's internal router
+brand, set by which constructor you called. The brand is what makes the
+wrong parse surface *absent*, not merely ill-typed:
+
+```ts twoslash
+// @errors: 2339
+import { defineAppRoute, definePagesRoute, p } from "paramour";
+
+const appRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+const pagesRoute = definePagesRoute("/legacy/[id]", {
+  params: { id: p.integer() },
+});
+
+pagesRoute.parse;
+
+appRoute.parseContext;
+```
+
+The same gate runs through the hooks: `@paramour-js/next/app` hooks accept
+only App routes, `@paramour-js/next/pages` hooks only Pages routes.
+
+## Route object types
+
+The interfaces and helpers behind the values the constructors return. The
+`~`-prefixed members you may notice on a route object are runtime-internal
+— not public API; `path` is the one public data member.
+
+| Type                             | What it is                                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `Route<Path, PC, SC>`            | The router-agnostic core every route extends: the `path` literal plus the codec configs.                           |
+| `AppRoute<Path, PC, SC>`         | `Route` plus the async props-based parse surface.                                                                  |
+| `PagesRoute<Path, PC, SC>`       | `Route` plus the sync context-based parse surface.                                                                 |
+| `AnyRoute`                       | The bound for helpers that take any route (`R extends AnyRoute`) — what `href` and the standalone decoders accept. |
+| `AnyAppRoute` / `AnyPagesRoute`  | The router-specific bounds — what the App and Pages hook modules accept, respectively.                             |
+| `InferRouteParams<R>`            | The decoded params object type of a route (see below).                                                             |
+
+`InferRouteParams` follows the segment kinds: `[id]` contributes `Out`,
+`[...slug]` and `[[...slug]]` contribute `Out[]` — and every key is present
+on the output (an absent optional catch-all decodes to `[]`):
+
+```ts twoslash
+import { defineAppRoute, p, type InferRouteParams } from "paramour";
+
+const docsRoute = defineAppRoute("/docs/[[...slug]]", {
+  params: { slug: p.string() },
+});
+
+type DocsParams = InferRouteParams<typeof docsRoute>;
+//   ^?
+```
+
+The input-contract types describe what the parse methods accept — all
+structural, with no `next/*` import, so Next's own props and contexts are
+assignable while core stays framework-agnostic:
+
+| Type                | Shape                                                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------- |
+| `ParamsConfig<Path>`| The `params:` config shape — one param codec per dynamic segment name in `Path`.                         |
+| `ParamsProps`       | `{ params? }` — plain or promised; the contract of `parseParams`. Layout props are assignable.           |
+| `SearchProps`       | `{ searchParams? }` — plain or promised; the contract of `parseSearch`.                                  |
+| `RouteProps`        | Both members — the contract of `parse` / `safeParse`; Next's generated page props are assignable.        |
+| `PagesContext`      | `{ params?, query }` — the contract of `parseContext`. `query` is required (`getStaticProps` contexts, which have none, fail to compose by design). |
+
+## Registry types
+
+These types connect route paths to filesystem truth. They are populated by
+a `declare module "paramour"` augmentation that `paramour generate` writes
+(and `withTypedRoutes` keeps current during `next dev`) — **you never write
+them by hand**. Before the first generate, each union falls back to
+`string` and any well-formed path is accepted. The full story is
+[the generated registry](/docs/concepts/registry).
+
+The generated artifact is a pure types-only augmentation — no runtime
+import, nothing in your bundle:
+
+```ts twoslash title="paramour-env.d.ts"
+// Generated by @paramour-js/next. Do not edit — regenerate with `paramour generate`.
+import "paramour";
+
+declare module "paramour" {
+  interface ParamourRegister {
+    appRoutes: "/" | "/about" | "/product/[id]";
+    pagesRoutes: "/legacy/[id]";
+  }
+}
+```
+
+| Type                               | Resolves to                                                                                          |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `ParamourRegister`                 | The augmentation target itself — an empty interface codegen merges the per-router path unions into.  |
+| `RegisteredAppRoutePaths`          | The union of registered App Router paths; `string` before generation.                                |
+| `RegisteredPagesRoutePaths`        | The Pages twin.                                                                                      |
+| `RegisteredStaticAppRoutePaths`    | The static-only subset of the App union — any `[` marks a path dynamic.                              |
+| `RegisteredStaticPagesRoutePaths`  | The Pages twin.                                                                                      |
+| `RegisteredStaticRoutePaths`       | Every registered static path across both routers — the type of `href`'s string-form argument.        |
+
+The static subsets are derived by syntactic filter, not emitted separately
+— and the filter passes `string` through, so the pre-generation fallback
+survives:
+
+```ts twoslash
+// @filename: paramour-env.d.ts
+import "paramour";
+
+declare module "paramour" {
+  interface ParamourRegister {
+    appRoutes: "/" | "/about" | "/product/[id]";
+  }
+}
+
+// @filename: demo.ts
+import type { RegisteredStaticRoutePaths } from "paramour";
+
+type StaticPaths = RegisteredStaticRoutePaths;
+//   ^?
+```
+
+Two subtleties:
+
+- **Per-router independence.** Each per-router union falls back to `string`
+  independently — an empty scan for one router never erases verification
+  for the other. For that same reason, `RegisteredStaticRoutePaths` is
+  deliberately *not* the union of the two per-router static types (an
+  absent side's `string` would swallow the union); it degrades to `string`
+  only when *neither* router has generated routes.
+- **Reachability is not staticness.** `/docs/[[...slug]]` serves `/docs`,
+  but it carries a codec and decode expectations, so it is excluded from
+  the static unions.

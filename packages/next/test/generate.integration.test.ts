@@ -4,12 +4,8 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  emitArtifact,
-  resolveRouteDirs,
-  scanRoutes,
-  writeIfChanged,
-} from "../src";
+import { emitArtifact, writeIfChanged } from "../src/emit.js";
+import { resolveRouteDirs, scanRoutes } from "../src/scan.js";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /**

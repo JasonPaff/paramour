@@ -1,0 +1,41 @@
+---
+title: paramour (core)
+description: API reference for the core package — codecs, routes, href, serialization helpers, reflection, and errors.
+---
+
+`paramour` is the framework-agnostic core: the `p.*` codec builders, the
+route-object constructors and their parse methods, `href` for typed URL
+building, the standalone search/path helpers, the reflection API, and the
+`ParamourError` hierarchy. Everything documented in this section is imported
+from the package barrel (`import { … } from "paramour"`), and every code
+block is compiled against the real package on each docs build — hover
+anything to see what the compiler sees.
+
+## Pages
+
+- [`p.*` builders](./p-builders) — every built-in codec: wire grammars,
+  accept/reject tables, schema slots, and list arities.
+- [Codec & modifiers](./codecs) — the `Codec` interface, `createCodec`,
+  `.optional()`/`.default()`/`.catch()`, and the type-state rules that make
+  illegal chains fail to compile.
+- [Routes](./routes) — `defineAppRoute`, `definePagesRoute`, the parse
+  methods, and the registry types.
+- [href & path building](./href) — building typed, serialized URLs from
+  route objects, plus the path-side helpers: `buildPath`, `encodeParams`,
+  `encodeStaticParams`, and `decodeParams`.
+- [Search helpers](./search) — the standalone search encode/decode surface:
+  `decodeSearch`, `encodeSearch`, `buildSearchString`, `rawSearch`, and
+  `standardSearchSchema`.
+- [describeCodec & describeRoute](./describe) — the reflection API that
+  powers `paramour list` and `paramour doctor`.
+- [Errors](./errors) — the `ParamourError` hierarchy and the `Issue` shape
+  shared by every failed decode.
+
+## The paramour/internal entry
+
+The package also ships a `paramour/internal` subpath exposing `parseValue`
+and `foreignMessage`. It exists for derived tooling — the devtools panel,
+adapters — so reflection-driven consumers can share core's implementation
+instead of re-deriving it. It is not for app authors, it is deliberately
+undocumented beyond this paragraph, and it carries no stability guarantees:
+its exports may change or disappear in any release.

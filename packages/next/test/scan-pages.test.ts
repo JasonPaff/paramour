@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { RouteCollisionError, scanPagesRoutes } from "../src";
+import { RouteCollisionError } from "../src";
+import { scanPagesRoutes } from "../src/scan-pages.js";
 import { makeTempDir, makeTree, trySymlink } from "./helpers.js";
 
 /**
