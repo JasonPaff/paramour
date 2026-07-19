@@ -32,13 +32,22 @@
   },
   "description": "nuqs integration for paramour: derive nuqs parsers from a route's search codecs — presence, defaults, catch recovery, and equality read off the codec once, mechanically.",
   "author": "Jason Paff <jasonpaff@gmail.com>",
+  "keywords": [
+    "nextjs",
+    "nuqs",
+    "typescript",
+    "search-params",
+    "query-string",
+    "url-state",
+    "type-safe"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/JasonPaff/paramour.git",
     "directory": "packages/nuqs"
   },
-  "homepage": "https://github.com/JasonPaff/paramour#readme",
+  "homepage": "https://paramour.dev/docs/reference/nuqs",
   "bugs": {
     "url": "https://github.com/JasonPaff/paramour/issues"
   },

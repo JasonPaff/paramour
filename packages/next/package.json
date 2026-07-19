@@ -55,13 +55,23 @@
   },
   "description": "Next.js integration for paramour: withTypedRoutes, App and Pages Router hooks, PageProps glue, and the codegen CLI.",
   "author": "Jason Paff <jasonpaff@gmail.com>",
+  "keywords": [
+    "nextjs",
+    "app-router",
+    "typescript",
+    "routing",
+    "type-safe",
+    "typed-routes",
+    "cli",
+    "codegen"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/JasonPaff/paramour.git",
     "directory": "packages/next"
   },
-  "homepage": "https://github.com/JasonPaff/paramour#readme",
+  "homepage": "https://paramour.dev/docs/reference/next",
   "bugs": {
     "url": "https://github.com/JasonPaff/paramour/issues"
   },
