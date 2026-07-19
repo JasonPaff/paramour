@@ -1,9 +1,10 @@
 name: Link check
 
 # Deliberately not part of ci.yml: external-host flakes must never block the
-# required "CI OK" context. The PR run guards links touched in review; the
-# weekly run is the live-site guard (catches pages that moved or rotted
-# after deploy).
+# required "CI OK" context. Two guards: the sources job checks absolute URLs
+# in markdown/MDX on PRs, and the live-site job walks the deployed site's
+# sitemap weekly so rendered internal links (including Fumadocs-resolved
+# relative MDX links) are validated where they actually exist.
 on:
   pull_request:
     paths:
@@ -20,8 +21,9 @@ permissions:
   contents: read
 
 jobs:
-  lychee:
-    name: lychee
+  sources:
+    name: sources
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -33,7 +35,7 @@ jobs:
         with:
           args: >-
             --config lychee.toml
-            --base-url https://paramour.dev
+            --root-dir "$GITHUB_WORKSPACE/docs/content"
             --no-progress
             README.md
             docs/README.md
@@ -42,4 +44,30 @@ jobs:
           fail: true
         env:
           # Authenticated requests avoid github.com rate-limit flakes.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  live-site:
+    name: live site
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Collect deployed pages from the sitemap
+        run: |
+          curl --fail --silent https://paramour.dev/sitemap.xml |
+            grep --only-matching --perl-regexp '(?<=<loc>)[^<]+' > live-urls.txt
+          wc -l live-urls.txt
+
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --config lychee.toml
+            --no-progress
+            live-urls.txt
+          fail: true
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
