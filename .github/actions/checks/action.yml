@@ -13,6 +13,17 @@ runs:
     - run: pnpm build
       shell: bash
 
+    # publint + attw (CI-P1): statically verify published-package correctness
+    # (exports map, files list, ESM/types resolution) on the packed tarball —
+    # the same bug class the next-compat matrix catches dynamically, but for
+    # every consumer. attw runs the esm-only profile because the packages are
+    # deliberately ESM-only: node10 resolution and require()-from-CJS are
+    # out of scope by design. Needs dist/, hence after build. Runs only in
+    # packages that define the script (the private codemod placeholder
+    # doesn't).
+    - run: pnpm check:publish
+      shell: bash
+
     - run: pnpm lint
       shell: bash
 
