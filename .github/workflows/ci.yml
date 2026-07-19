@@ -35,6 +35,49 @@ jobs:
     needs: checks
     uses: ./.github/workflows/next-compat.yml
 
+  # CI-B5: the published packages declare `engines: node >=22.12.0`; this leg
+  # actually executes that floor instead of leaving it an untested claim.
+  # Runtime (vitest) tests only: type tests are Node-version-independent, and
+  # the full gate's tooling (tstyche needs Node >=22, ESLint >=22.13) belongs
+  # on the canonical Node 24 `checks` job. `needs: checks` for the same
+  # reason as next-compat — don't burn minutes on code that fails the gate.
+  node-floor:
+    name: Node 22.12.0 floor
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: checks
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          # The exact engines floor from the published manifests. Bump the
+          # two together, deliberately — no Renovate annotation on purpose.
+          node-version: "22.12.0"
+          cache: pnpm
+
+      # The root manifest's devEngines (Node >=24.18, onFail: download) would
+      # make pnpm silently fetch Node 24 and run scripts on it, defeating
+      # this leg; the root engines field would add unsupported-engine noise.
+      # Strip both — runner-only mutation, like the compat matrix's Next
+      # swap. The published packages' own engines fields are untouched.
+      - run: npm pkg delete devEngines engines
+
+      - run: pnpm install --frozen-lockfile
+
+      # Prove scripts actually see the floor runtime, not a managed newer one.
+      - run: |
+          version="$(pnpm exec node --version)"
+          echo "scripts run on Node $version"
+          test "$version" = "v22.12.0"
+
+      # test/cli-dist.test.ts exercises the built CLI, so build first.
+      - run: pnpm build:packages
+
+      - run: pnpm test
+
   # Single stable context for branch protection: the ruleset requires "CI OK"
   # and nothing else, so renaming jobs or bumping the compat matrix's Next
   # versions never silently detaches a required check.
@@ -42,7 +85,7 @@ jobs:
     name: CI OK
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [checks, next-compat]
+    needs: [checks, next-compat, node-floor]
     if: always()
     steps:
       - name: All jobs succeeded
@@ -51,5 +94,6 @@ jobs:
             echo "One or more required jobs did not succeed:"
             echo "  checks: ${{ needs.checks.result }}"
             echo "  next-compat: ${{ needs.next-compat.result }}"
+            echo "  node-floor: ${{ needs.node-floor.result }}"
             exit 1
           fi
