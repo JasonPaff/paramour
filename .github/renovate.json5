@@ -64,16 +64,17 @@
       ],
       versioningTemplate: "npm",
     },
-    // Same-line annotated pins, e.g. release.yml's global npm (once CI-U2
-    // exact-pins it):
+    // Same-line annotated pins:
     //   npm install -g npm@11.5.2 # renovate: datasource=npm depName=npm
+    //   version: "1.27.0" # renovate: datasource=pypi depName=zizmor versioning=pep440
     {
       customType: "regex",
       managerFilePatterns: ["/\\.github/workflows/[^/]+\\.ya?ml$/"],
       matchStrings: [
         "npm@(?<currentValue>[0-9][\\w.-]*) # renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)",
+        'version: "(?<currentValue>[0-9][\\w.-]*)" # renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)( versioning=(?<versioning>\\S+))?',
       ],
-      versioningTemplate: "npm",
+      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}npm{{/if}}",
     },
   ],
 }

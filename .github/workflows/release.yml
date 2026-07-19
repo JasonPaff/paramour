@@ -9,17 +9,16 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-permissions:
-  contents: write # push the version branch, create tags and GitHub Releases
-  pull-requests: write # open/update the "Version Packages" PR
-  id-token: write # npm trusted publishing (OIDC)
+# No workflow-level permissions: each job declares exactly what it needs
+# (zizmor: excessive-permissions), so the compat legs never see the release
+# job's write/OIDC grants.
+permissions: {}
 
 jobs:
   # The compat matrix must also gate publishing (CI-B3): ci.yml never runs on
   # the Version Packages PR (PRs created with GITHUB_TOKEN don't trigger other
   # workflows), so this call is the only Next 15/16 compat check on the tree
-  # that reaches npm. Job-level permissions drop this workflow's write/OIDC
-  # grants — the compat legs only need to read the repo.
+  # that reaches npm. The compat legs only need to read the repo.
   next-compat:
     permissions:
       contents: read
@@ -30,6 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: next-compat
+    permissions:
+      contents: write # push the version branch, create tags and GitHub Releases
+      pull-requests: write # open/update the "Version Packages" PR
+      id-token: write # npm trusted publishing (OIDC)
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
