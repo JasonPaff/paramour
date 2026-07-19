@@ -23,6 +23,8 @@ import {
 } from "paramour";
 import { z } from "zod";
 
+import { show, showValue } from "@/lib/show-value";
+
 type ErrorName = keyof typeof ERROR_CLASSES;
 
 /**
@@ -62,7 +64,7 @@ export async function WireExample({
       <figcaption className="flex items-start gap-2 border-t border-fd-border bg-fd-secondary/50 px-4 py-2 font-mono text-[0.8125rem]">
         {outcome.kind === "value" ? (
           <>
-            <span aria-hidden className="select-none text-fd-muted-foreground">
+            <span aria-hidden className="text-fd-muted-foreground select-none">
               →
             </span>
             <span className="break-all whitespace-pre-wrap text-fd-foreground">
@@ -73,7 +75,7 @@ export async function WireExample({
           <>
             <span
               aria-hidden
-              className="select-none text-red-600 dark:text-red-400"
+              className="text-red-600 select-none dark:text-red-400"
             >
               ✗
             </span>
@@ -180,33 +182,4 @@ function runExample(
     );
   }
   return { kind: "threw", message: caught.message, name: throws };
-}
-
-/** Renders an example's result the way a reader would write it in source. */
-function show(value: unknown): string {
-  if (typeof value === "string") return JSON.stringify(value);
-  if (value === null || value === undefined || typeof value !== "object") {
-    return showValue(value);
-  }
-  if (value instanceof Date) return `Date("${value.toISOString()}")`;
-  if (Array.isArray(value)) {
-    return `[${value.map((element) => show(element)).join(", ")}]`;
-  }
-  const entries = Object.entries(value).map(
-    ([key, entry]) => `${showKey(key)}: ${show(entry)}`,
-  );
-  return entries.length === 0 ? "{}" : `{ ${entries.join(", ")} }`;
-}
-
-function showKey(key: string): string {
-  return /^[$A-Z_a-z][$\w]*$/.test(key) ? key : JSON.stringify(key);
-}
-
-/** String() hardened against values without a usable primitive conversion. */
-function showValue(value: unknown): string {
-  try {
-    return String(value);
-  } catch {
-    return `[unstringifiable ${typeof value}]`;
-  }
 }

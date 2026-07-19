@@ -5,6 +5,7 @@ declare module "paramour" {
   interface ParamourRegister {
     appRoutes:
       | "/"
-      | "/docs/[[...slug]]";
+      | "/docs/[[...slug]]"
+      | "/explorer";
   }
 }

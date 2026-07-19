@@ -1,5 +1,6 @@
 import eslint from "@eslint/js";
 import prettier from "eslint-config-prettier";
+import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import perfectionist from "eslint-plugin-perfectionist";
 import tseslint from "typescript-eslint";
 
@@ -50,6 +51,26 @@ export default tseslint.config(
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
+    },
+  },
+
+  // Tailwind class hygiene for the docs site (plan-docs-milestone-5
+  // decision 4): classes are checked against the real Tailwind 4 entry css,
+  // so unknown/conflicting/duplicate utilities are errors; the stylistic
+  // rules (class order, whitespace) stay warnings with autofix.
+  {
+    extends: [betterTailwindcss.configs["recommended-warn"]],
+    files: ["docs/**/*.{ts,tsx}"],
+    rules: {
+      // Wrapping every long class list into multi-line template literals is
+      // churn without a readability win at this codebase's class lengths.
+      "better-tailwindcss/enforce-consistent-line-wrapping": "off",
+      "better-tailwindcss/no-conflicting-classes": "error",
+      "better-tailwindcss/no-duplicate-classes": "error",
+      "better-tailwindcss/no-unknown-classes": "error",
+    },
+    settings: {
+      "better-tailwindcss": { entryPoint: "docs/app/global.css" },
     },
   },
 
