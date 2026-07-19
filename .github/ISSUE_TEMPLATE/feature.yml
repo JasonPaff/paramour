@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose new behavior, a new codec, or an API change.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >-
+        What can't you do (or can't do cleanly) today? Concrete route/URL
+        examples beat abstractions.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API
+      description: >-
+        Sketch what the call sites would look like. Don't worry about
+        implementation.
+      render: ts
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you're using now, or designs you rejected.
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd be willing to open a PR for this.
