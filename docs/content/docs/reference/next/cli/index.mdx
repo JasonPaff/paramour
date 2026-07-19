@@ -1,0 +1,47 @@
+---
+title: paramour CLI
+description: Invocation, configuration precedence, and the exit-code contract shared by all five commands.
+---
+
+Installing `@paramour-js/next` puts a `paramour` binary on your path with
+five commands. Run it through your package manager — a `package.json` script
+(the `"paramour"` script that [init](/docs/reference/next/cli/init) adds),
+`pnpm exec paramour`, or `npx paramour`:
+
+```bash
+npx paramour <command> [options]
+```
+
+| Command                                       | What it does                                                          |
+| --------------------------------------------- | --------------------------------------------------------------------- |
+| [`generate`](/docs/reference/next/cli/generate) | Generate `paramour-env.d.ts` from the app and pages directories.      |
+| [`check`](/docs/reference/next/cli/check)       | Verify the artifact is current; exit `1` on drift, never writes.      |
+| [`init`](/docs/reference/next/cli/init)         | Set up paramour in this project, non-interactively.                   |
+| [`list`](/docs/reference/next/cli/list)         | Print every route with its params/search shape.                       |
+| [`doctor`](/docs/reference/next/cli/doctor)     | Diagnose the project's paramour setup.                                |
+
+`paramour --help` (or `-h`, or bare `paramour help`) prints the command
+list; every command takes its own `--help` for its options. Running with no
+command, or an unknown one, prints usage and exits `2`.
+
+## Exit codes
+
+One contract holds across every command, so CI scripting never has to
+guess:
+
+| Code | Meaning                                                                                                          |
+| ---- | ---------------------------------------------------------------------------------------------------------------- |
+| `0`  | Success. Warnings still exit `0` (`doctor` warnings, `list` coverage warnings, `init`'s manual-fallback prints).  |
+| `1`  | The thing you asked to verify is not true — `check` / `generate --check` drift, any failed `doctor` check. Nothing else. |
+| `2`  | Usage, configuration, or operational error: unknown flags, an invalid `paramour.config`, missing route directories, route collisions, I/O failures. |
+
+## Configuration
+
+Commands that scan routes (`generate`, `check`, `list`) resolve their
+inputs with one precedence rule: **flags → `paramour.config` file →
+automatic discovery**. The config file is
+[`paramour.config.ts`](/docs/reference/next/with-typed-routes#paramourconfig)
+(or `.mjs`/`.json`) at the project root; every field is optional, and with
+no config at all the CLI infers `app/` / `src/app/` and `pages/` /
+`src/pages/`. Paths resolve against the current working directory — run the
+CLI where you'd run `next` itself.

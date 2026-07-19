@@ -1,0 +1,170 @@
+---
+title: withTypedRoutes
+description: The Next config wrapper — plus WithTypedRoutesOptions, ParamourConfig, and RouteCollisionError.
+---
+
+Everything on this page imports from the package's main entry,
+`@paramour-js/next`. These four exports are that entry's entire public
+surface.
+
+## withTypedRoutes
+
+Wraps a Next config so the [registry artifact](/docs/concepts/registry)
+(`paramour-env.d.ts`) is generated and kept current by `next dev` and
+validated by `next build`.
+
+```ts
+function withTypedRoutes<C extends object>(
+  config: C | ((phase: string, ctx: unknown) => C | Promise<C>),
+  options?: WithTypedRoutesOptions,
+): (phase: string, ctx: unknown) => C | Promise<C>;
+```
+
+It accepts either config form — a plain object or the `(phase, ctx) =>
+config` function, possibly async — and always returns the function form.
+Next's phase argument selects the behavior:
+
+- **`next build`** — one generation pass before the config is returned, so
+  the build type-checks against fresh routes. If the pass changed the file
+  (drift, or a missing artifact), a loud warning names the routes that
+  appeared and disappeared — or the build fails under `strict: true`.
+- **`next dev`** — one immediate generation pass, then a debounced watcher
+  that regenerates as route directories change. Two single-writer guards (an
+  in-process singleton and a cross-process pidfile lock) keep repeat config
+  evaluations and a concurrent `paramour generate --watch` from fighting
+  over the file.
+- **every other phase** (lint, info, …) — pass-through; no generation.
+
+```ts twoslash title="next.config.ts"
+import type { NextConfig } from "next";
+
+import { withTypedRoutes } from "@paramour-js/next";
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+};
+
+export default withTypedRoutes(nextConfig, { strict: true });
+```
+
+The wrapper reads exactly one field off the resolved config —
+`pageExtensions`, so custom extensions scan correctly — and passes
+everything else through untouched. Because it returns the function form, it
+composes with other wrappers by going **outermost**:
+
+```ts
+export default withTypedRoutes(withMDX(nextConfig), { strict: true });
+```
+
+Generation is never load-bearing for your app: an incidental generation
+failure (transient I/O, an unreadable directory) logs a warning and lets
+`next dev`/`next build` continue with stale route types. Two states are the
+deliberate exceptions and throw during config evaluation, because Next
+itself has no valid build for them:
+
+- a [`RouteCollisionError`](#routecollisionerror) — two files resolving to
+  one URL;
+- a populated route directory that Next is configured to ignore (a config
+  error discovery refuses to paper over).
+
+If no route directory exists at all (`app/`, `pages/`, `src/app/`,
+`src/pages/`), the wrapper warns once and skips generation entirely.
+
+<Callout title="withTypedRoutes does not read paramour.config">
+  The config file (`paramour.config.ts`) configures the **CLI**. The wrapper
+  takes its options directly — `outFile` via
+  `WithTypedRoutesOptions` — and reads `pageExtensions` from the Next config
+  it wraps. If you move the artifact with `outFile` in `paramour.config.ts`,
+  pass the same value to `withTypedRoutes` too, or the two will write to
+  different paths.
+</Callout>
+
+## WithTypedRoutesOptions
+
+The second argument to `withTypedRoutes`. Both fields are optional.
+
+| Option    | Default              | Description                                                                                                                  |
+| --------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `outFile` | `paramour-env.d.ts`  | Artifact location; relative paths resolve against the project root. The escape hatch for monorepos where the Next app root isn't where the file should live. |
+| `strict`  | `false`              | Upgrade build-phase drift from a loud warning to a build failure.                                                             |
+
+`strict: true` is for teams that treat the committed artifact as the law: if
+a `next build` finds the artifact stale — or missing, which counts as drift
+— the build fails instead of warning. The file is regenerated *first*, then
+the error is thrown, so the fix is always "commit the corrected file". The
+default is `false`, which stays friendly to gitignored-artifact workflows
+and CI images that generate on the fly. This docs site runs `strict: true`;
+the [CLI guide](/docs/guides/cli#check) compares it with the `paramour
+check` gate.
+
+Only *drift* can fail a strict build. An incidental generation failure still
+degrades to stale types with a warning, strict or not.
+
+## ParamourConfig
+
+The shape of `paramour.config.ts` (or `.mjs`/`.json`) at the project root —
+the **CLI's** config file, exported here so you can type the default export.
+Every field is optional; CLI precedence is flags → this file → automatic
+discovery.
+
+```ts twoslash title="paramour.config.ts"
+import type { ParamourConfig } from "@paramour-js/next";
+
+export default {
+  pageExtensions: ["tsx", "ts"],
+  routeFiles: ["app/**/route.def.ts"],
+} satisfies ParamourConfig;
+```
+
+| Field            | Default                             | Description                                                                                                     |
+| ---------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `appDir`         | discovered `app/` or `src/app/`     | App directory, relative to the project root.                                                                    |
+| `pagesDir`       | discovered `pages/` or `src/pages/` | Pages directory, relative to the project root.                                                                  |
+| `outFile`        | `paramour-env.d.ts`                 | Artifact path, relative to the project root.                                                                    |
+| `pageExtensions` | `["tsx", "ts", "jsx", "js"]`        | Page extensions, **no leading dots** — a leading dot is rejected because it would silently match nothing.       |
+| `routeFiles`     | automatic content scan              | Globs (relative to the project root) of modules exporting route definitions. Read by `list`/`doctor` only — generation never uses it. Set it when the automatic `defineAppRoute`/`definePagesRoute` source scan misfires. |
+
+The config file is discovered at the project root only (no upward
+traversal), first match wins: `paramour.config.ts`, then
+`paramour.config.mjs`, then `paramour.config.json`. `.ts`/`.mjs` files
+default-export the object. Validation is strict — an unknown key (say, a
+`pagesExtensions` typo) is an error, mapped to CLI exit `2`, not silently
+ignored.
+
+## RouteCollisionError
+
+Thrown when two files resolve to one URL — states Next itself refuses to
+build, so no valid artifact exists and the scanners throw instead of
+emitting one. It's a plain `Error` subclass with `name:
+"RouteCollisionError"`.
+
+Three shapes trigger it, checked within each router and across the two:
+
+- **Same path from both routers** — `app/pricing/page.tsx` and
+  `pages/pricing.tsx` both claim `/pricing`.
+- **Different slug names at one position** — `/x/[id]` beside `/x/[slug]`
+  ("You cannot use different slug names for the same dynamic path"). This
+  includes `[...a]` beside `[[...a]]` at the same level; `[id]` beside
+  `[...slug]` is *not* a collision — that's Next's documented priority
+  pattern.
+- **Optional catch-all vs. its base path** — `/docs` beside
+  `/docs/[[...slug]]`: an optional catch-all also matches its own base path.
+
+```txt
+route collision: "/x/[id]" (app) and "/x/[slug]" (app) declare conflicting
+dynamic segments ([id] vs [slug]) at the same position — Next refuses
+different slug names for the same dynamic path (PR9)
+```
+
+Where you see it depends on the entry point, but the fix is the same:
+rename or remove one of the conflicting files, matching what Next itself
+would demand.
+
+- `withTypedRoutes` rethrows it from config evaluation, dev and build phases
+  alike — naming the actual problem instead of leaving a stale artifact to
+  confuse the type errors that follow.
+- The CLI maps it to exit `2` (an operational error, not drift).
+- The one non-fatal path is a running watcher (`next dev` or `paramour
+  generate --watch`): a mid-watch collision is usually a file mid-move, so
+  it logs loudly on every rescan, keeps the last good artifact on disk, and
+  keeps watching for the fix.

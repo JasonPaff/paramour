@@ -1,0 +1,306 @@
+---
+title: href & path building
+description: Typed link building with href and the Href brand, plus the standalone path helpers.
+---
+
+`href` is the one function for turning a route plus values into a URL —
+fixed `path?query#hash` assembly, every value serialized through its codec.
+It's a standalone function rather than a route method on purpose: parse
+sites sit next to one route, but href sites import `{ href }` once and use
+it against many routes. The path helpers below it are the pieces `href`
+composes, public for route handlers, middleware, and static generation.
+
+## href
+
+Builds a link for a route object. Params are required, typed, and
+serialized for you; search values elide when equal to their value-form
+`.default()`; absent optionals are omitted — one canonical URL per state,
+per the [wire format](/docs/concepts/serialization):
+
+```ts twoslash
+import { defineAppRoute, href, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: {
+    page: p.integer().default(1),
+    q: p.string().optional(),
+  },
+});
+// ---cut---
+const link = href(productRoute, { params: { id: 42 } });
+//    ^?
+
+const filtered = href(productRoute, {
+  params: { id: 42 },
+  search: { page: 2, q: "wool socks" },
+  hash: "reviews",
+});
+// => "/product/42?page=2&q=wool%20socks#reviews"
+```
+
+The options object:
+
+| Option   | Type                       | Notes                                                                                  |
+| -------- | -------------------------- | -------------------------------------------------------------------------------------- |
+| `params` | the route's params input   | Required when the path has a required dynamic segment; banned when it has none at all. |
+| `search` | the route's search input   | Required only when a search key is required; omittable otherwise.                      |
+| `hash`   | `string`                   | Appended verbatim as `#hash`; the empty string emits no `#`.                           |
+
+Optionality is presence-driven on every level: when neither half has a
+required member, the entire options argument is omittable —
+`href(aboutRoute)` — and a half whose input has no keys at all may not be
+passed even empty.
+
+Handing `href` a value of the wrong type fails to compile:
+
+```ts twoslash
+// @errors: 2769
+import { defineAppRoute, href, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+// ---cut---
+href(productRoute, { params: { id: "42" } });
+```
+
+Runtime failures are `SerializeError` at link-build time — a value failing
+its codec or schema on serialize, a required param missing (from plain JS),
+a required catch-all given `[]`, or a segment serializing to the empty
+string. Errors surface in the component that introduced the bad value, not
+two navigations later.
+
+<Callout title="The hash is appended verbatim">
+  No encoding is applied to `hash` — the caller owns escaping, so a value
+  that already starts with `#` yields `##…`. Fragments come only from this
+  option: a `#` in the route path itself is rejected at define time.
+</Callout>
+
+### The string form
+
+A registered **static** path can stand in for the route object — same
+brand, same `hash` option, no route definition needed. Its argument is
+typed as `RegisteredStaticRoutePaths`, so once the
+[registry](/docs/concepts/registry) is generated, only static paths that
+exist on disk are accepted:
+
+```ts twoslash
+// @filename: paramour-env.d.ts
+import "paramour";
+
+declare module "paramour" {
+  interface ParamourRegister {
+    appRoutes: "/" | "/about" | "/product/[id]";
+  }
+}
+
+// @filename: nav.ts
+import { href } from "paramour";
+
+const about = href("/about", { hash: "team" });
+//    ^?
+```
+
+The string form takes no `params` or `search` — `params` is meaningless on
+a static path, and a query string only ever comes from a defined route's
+search codecs (an untyped side door around library-owned serialization is
+exactly what `href` exists to prevent). Both are banned at the type level
+(see [`StaticHrefOptions`](#related-types)), and the runtime backstops the
+contract for plain-JS callers: a path string containing `[`, `]`, `?`, or
+`#` throws (dynamic segments need a route object; query and hash never ride
+in the path string), as does passing `params`/`search` alongside a string.
+
+## Href
+
+```ts
+type Href<P extends string = string> = string & { [brand]: P };
+```
+
+The branded string every `href` call returns, carrying the route's path
+literal as its type argument. It is assignable **to** `string` — so
+`next/link`, `router.push`, `redirect`, and `generateMetadata` consume it
+unchanged — but not **from** `string`: only `href` mints one.
+
+```ts twoslash
+// @errors: 2322
+import { defineAppRoute, href, p, type Href } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+
+// Assignable TO string — drops straight into <Link href={...}>:
+const link: string = href(productRoute, { params: { id: 42 } });
+
+// Not assignable FROM string — only href() can produce one:
+const forged: Href = "/product/42";
+```
+
+The brand is applied by a compile-time cast — no runtime value exists, so
+it costs nothing and never leaks into serialization. It is also the
+substrate for planned "accept only paramour-built links" APIs, which is why
+it's committed to rather than incidental.
+
+## Related types
+
+| Type                | What it is                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HrefArgs<R>`       | `href`'s variadic options tuple for a route: `[options?]` when neither half has a required member, `[options]` otherwise. Useful when wrapping `href`.  |
+| `InferHrefInput<R>` | The options object type for a route — `{ params, search?, hash? }` with each half's optionality following its input type.                               |
+| `StaticHrefOptions` | The string form's options: `hash` only. `params` and `search` are `never`-typed — banned outright, so a non-fresh options object can't smuggle them in. |
+
+## Path helpers
+
+### buildPath
+
+Builds just the path portion — `/` plus the encoded segments joined with
+`/`. What `href` uses before appending the query and fragment:
+
+```ts twoslash
+import { buildPath, defineAppRoute, p } from "paramour";
+
+const docsRoute = defineAppRoute("/docs/[[...slug]]", {
+  params: { slug: p.string() },
+});
+
+const deep = buildPath(docsRoute, { slug: ["guides", "hooks"] });
+// => "/docs/guides/hooks"
+const root = buildPath(docsRoute, { slug: [] });
+// => "/docs"
+```
+
+An elided optional catch-all contributes no segments (the segment and its
+preceding `/` vanish); a fully-elided path yields `"/"`.
+
+### encodeParams
+
+Encodes a params input into ordered, already-percent-encoded URL segment
+strings — one entry per emitted URL segment:
+
+```ts twoslash
+import { defineAppRoute, encodeParams, p } from "paramour";
+
+const orderRoute = defineAppRoute("/orders/[orderId]/items/[...path]", {
+  params: { orderId: p.string(), path: p.string() },
+});
+
+const segments = encodeParams(orderRoute, {
+  orderId: "A 1",
+  path: ["a/b", "c"],
+});
+// => ["orders", "A%201", "items", "a%2Fb", "c"]
+```
+
+The rules, per segment kind: a static segment is emitted verbatim (never
+re-encoded — the path literal is already URL-shaped), a single param
+contributes one entry, a catch-all one entry per element, and an elided
+optional catch-all none. A catch-all element containing `/` becomes `%2F`
+and round-trips as a single element. `SerializeError` is thrown for a
+missing required param, a non-array catch-all value, a required catch-all
+given `[]` (Next has no route for it), a value serializing to `""` (which
+cannot form a path segment), and unencodable text such as lone surrogates.
+
+### encodeStaticParams
+
+Encodes a params input into the per-param wire-value record Next's
+static-generation surfaces expect — App Router `generateStaticParams`
+entries and Pages Router `getStaticPaths` `{ params }` objects:
+
+```ts twoslash title="app/product/[id]/page.tsx"
+// @filename: app/product/[id]/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+
+// @filename: app/product/[id]/page.tsx
+import { encodeStaticParams } from "paramour";
+
+import { productRoute } from "./route.def";
+
+export function generateStaticParams() {
+  return [1, 2, 3].map((id) => encodeStaticParams(productRoute, { id }));
+  // => [{ id: "1" }, { id: "2" }, { id: "3" }]
+}
+```
+
+Same codec serialization and validation as `encodeParams`, with two
+deliberate differences: static segments are skipped (Next wants only the
+dynamic params, keyed by name), and values are **not** percent-encoded —
+Next encodes static-params values itself when it materializes the concrete
+URLs, so pre-encoding here would double-encode. An elided optional
+catch-all omits its key entirely — the one spelling of "the base path"
+valid on both routers.
+
+The return type is `InferStaticParams<R>`: `[id]` → `string`, `[...slug]` →
+`string[]`, `[[...slug]]` → `string[]` behind an optional key — assignable
+to `generateStaticParams`' and `getStaticPaths`' params shapes without a
+cast.
+
+### decodeParams
+
+The sync twin of `route.parseParams` — decodes a params source against a
+route's codecs, for call sites that already hold the values (middleware,
+tooling, Pages static generation):
+
+```ts twoslash
+import { decodeParams, defineAppRoute, p } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+
+const params = decodeParams(productRoute, { id: "42" });
+//    ^?
+```
+
+Failures aggregate per key into a
+[`ParamsDecodeError`](/docs/reference/core/errors#paramsdecodeerror) —
+never a throw on the first problem. Shape mismatches (`[id]` given an
+array, a catch-all given a string, a missing required key, a non-string
+element) are recorded issues and are **not** `.catch()`-recoverable: a
+shape mismatch means the props came from a route this definition doesn't
+describe. Unknown source keys are never read (Next includes parent-layout
+params in the App Router's props), and an absent `[[...slug]]` normalizes
+to `[]`.
+
+`ParamsSource` is the accepted source shape —
+`Record<string, string | string[] | undefined>`, i.e. Next's `params` prop
+and `useParams()` return.
+
+**`DecodeParamsOptions`** has one knob, `percentDecode` (default `true`).
+The App Router hands the `params` prop and `useParams()` percent-*encoded*
+values (Next issues #48058/#64952), so core percent-decodes each segment
+before the codec grammar runs — that's the default. Pages sources
+(`ctx.params`, `ctx.query`, `router.query`) were already decoded by Node's
+querystring layer; pass `{ percentDecode: false }` there to avoid a
+double-decode (`/product/a%2520b` arrives from Node as `"a%20b"` and must
+survive as-is). A malformed percent sequence falls back to the raw string
+rather than failing the decode.
+
+### safeDecodeParams
+
+The [`SafeResult`](/docs/reference/core/routes#saferesult) twin of
+`decodeParams` — same decode, discriminated result instead of a throw:
+
+```ts twoslash
+import { defineAppRoute, p, safeDecodeParams } from "paramour";
+
+const productRoute = defineAppRoute("/product/[id]", {
+  params: { id: p.integer() },
+});
+// ---cut---
+const result = safeDecodeParams(productRoute, { id: "abc" });
+
+if (result.status === "error") {
+  result.error.issues;
+  //           ^?
+}
+```
+
+Only a `ParamsDecodeError` becomes the `error` arm; source-contract
+violations and foreign errors stay loud. This pair is also the supported
+path for `getStaticProps`, whose context `parseContext` rejects — decode
+`ctx.params` here (with `{ percentDecode: false }`).

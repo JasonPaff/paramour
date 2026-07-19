@@ -1,0 +1,63 @@
+---
+title: "@paramour-js/next"
+description: Entry points — withTypedRoutes, the router hooks, the devtools seam, and the paramour CLI.
+---
+
+`@paramour-js/next` is the Next.js integration for paramour: the build-time
+registry wrapper, client hooks for both routers, and the `paramour` CLI. The
+package ships four module entry points plus a binary — import from the entry
+that matches where the code runs.
+
+## `.` — build-time integration
+
+The main entry exports the Next config wrapper and its supporting types:
+[`withTypedRoutes`](/docs/reference/next/with-typed-routes) generates and
+validates the `paramour-env.d.ts` registry artifact during `next dev` and
+`next build`, with [`WithTypedRoutesOptions`](/docs/reference/next/with-typed-routes#withtypedroutesoptions)
+(`outFile`, `strict`) controlling where the artifact lives and whether drift
+fails the build. It also exports
+[`ParamourConfig`](/docs/reference/next/with-typed-routes#paramourconfig),
+the type of the `paramour.config.ts` file the CLI reads, and
+[`RouteCollisionError`](/docs/reference/next/with-typed-routes#routecollisionerror),
+thrown when two files resolve to one URL. These four are the entry's entire
+public surface.
+
+## `./app` — App Router hooks
+
+[Client hooks for App Router components](/docs/reference/next/app-hooks):
+`useRouteParams`, `useSearch`, and their `OrThrow` variants, all taking the
+same route objects you define with `defineAppRoute`. App-Router params are
+synchronously available on the client, so results are two-arm `SafeResult`
+unions with no loading state. Every hook accepts an optional
+[`SelectOptions`](/docs/reference/next/app-hooks#selectoptions) projection.
+The module carries `"use client"` — these are client-component hooks.
+
+## `./pages` — Pages Router hooks
+
+[Client hooks for Pages Router components](/docs/reference/next/pages-hooks):
+`useRouteParams` and `useSearch` for routes defined with `definePagesRoute`.
+They return a three-state
+[`RouterResult`](/docs/reference/next/pages-hooks#routerresult) —
+`SafeResult` plus a `pending` arm for the pre-hydration render of
+statically-optimized pages — and there are deliberately no `OrThrow`
+variants. The same `SelectOptions` bag applies.
+
+## `./devtools-seam` — devtools contract (types only)
+
+A types-only entry: the contract between the observation seam inside the
+hooks and the `@paramour-js/devtools` panel that consumes it. You import
+from it only when building tooling on top of the seam — application code
+never needs it. The panel itself is documented in the
+[`@paramour-js/devtools` reference](/docs/reference/devtools).
+
+## The `paramour` binary
+
+Installing the package puts a [`paramour` CLI](/docs/reference/next/cli) on
+your path with five commands —
+[`generate`](/docs/reference/next/cli/generate),
+[`check`](/docs/reference/next/cli/check),
+[`init`](/docs/reference/next/cli/init),
+[`list`](/docs/reference/next/cli/list), and
+[`doctor`](/docs/reference/next/cli/doctor) — covering artifact generation,
+CI drift verification, project setup, route inspection, and setup diagnosis.
+One exit-code contract holds across all of them.

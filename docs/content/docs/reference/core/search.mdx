@@ -1,0 +1,283 @@
+---
+title: Search helpers
+description: Standalone search-param decoding and encoding, the rawSearch escape hatch, and Standard Schema interop.
+---
+
+The route methods wrap these helpers; they're public for every call site
+that holds a search config or route without page props — route handlers,
+middleware, tests, derived tooling. One asymmetry to know up front: the
+encode/decode primitives (`decodeSearch`, `encodeSearch`, `searchToString`)
+take the **search config** itself, while the safe variants
+(`safeDecodeSearch`, like `safeDecodeParams`) take the **route object**.
+
+## decodeSearch
+
+Decodes search params against a config, from either source shape — a
+`URLSearchParams` (route handlers, middleware) or Next's `searchParams`
+record (an awaited props member):
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const config = {
+  page: p.integer().default(1),
+  q: p.string().optional(),
+};
+
+const fromUrl = decodeSearch(config, new URLSearchParams("?page=2"));
+//    ^?
+
+const fromProps = decodeSearch(config, { page: "2", q: "socks" });
+```
+
+Decode semantics, per key:
+
+- **Unknown keys are ignored** — source values are only read for declared
+  keys, so `?utm_source=…` junk can never fail a decode.
+- A missing required key is an issue; a missing optional key decodes to
+  `undefined` (the key is still present on the output); a missing defaulted
+  key gets its default.
+- Array codecs (`p.array`) consume every value for their key in wire order;
+  absent means `[]`.
+- Duplicate values for a single-value codec are an issue — never silently
+  disambiguated to first-or-last.
+- `.catch()` recovers parse failures per key (and per element, for
+  arrays); absence and shape problems are never caught.
+
+Failures aggregate — one [`Issue`](/docs/reference/core/errors#related-types)
+per failed key — into a single
+[`SearchDecodeError`](/docs/reference/core/errors#searchdecodeerror). A
+*declared* key whose source value isn't a `string` or `string[]` is
+different: that source is violating its own contract, and it throws a loud
+`SearchSourceError` instead.
+
+A [`rawSearch`](#rawsearch) config branches to the whole-object schema path:
+every source key reaches the schema, which owns stripping or passing
+through extras itself.
+
+## safeDecodeSearch
+
+The [`SafeResult`](/docs/reference/core/routes#saferesult) twin — takes the
+route object, returns instead of throwing:
+
+```ts twoslash
+import { defineAppRoute, p, safeDecodeSearch } from "paramour";
+
+const productsRoute = defineAppRoute("/products", {
+  search: { page: p.integer().default(1), tags: p.csv() },
+});
+
+const result = safeDecodeSearch(
+  productsRoute,
+  new URLSearchParams("?page=abc"),
+);
+
+if (result.status === "error") {
+  result.error.issues;
+  //           ^?
+}
+```
+
+Only a `SearchDecodeError` becomes the `error` arm; source-contract
+violations, foreign errors, and async-schema misuse stay loud.
+
+## encodeSearch
+
+Encodes an input object to ordered wire pairs — the decoded value layer,
+before any percent-encoding:
+
+```ts twoslash
+import { encodeSearch, p } from "paramour";
+
+const config = {
+  page: p.integer().default(1),
+  tags: p.csv(),
+};
+
+const pairs = encodeSearch(config, { page: 3, tags: ["sale", "new"] });
+// => [["page", "3"], ["tags", "sale,new"]]
+```
+
+Encode semantics:
+
+- **Deterministic order**: config declaration order, array elements in
+  order. (One JS caveat: integer-like keys such as `"0"` enumerate first in
+  numeric order regardless of declaration.)
+- An absent optional or defaulted key is omitted; an absent array key means
+  `[]` and produces nothing; a missing *required* key throws
+  `SerializeError`.
+- **Default elision**: a value equal to its value-form `.default()` (by
+  serialized wire form) is omitted, so every state has exactly one URL.
+  Factory defaults never elide — a time-varying factory would elide an
+  explicit value that later decodes differently.
+
+For a [`rawSearch`](#rawsearch) config there is no serializer to run: the
+caller's already-wire-shaped record passes straight through, one pair per
+string value and one per array element — the schema never runs on encode.
+
+## buildSearchString
+
+The byte layer: turns wire pairs into the final `?…` string.
+
+```ts twoslash
+import { buildSearchString } from "paramour";
+
+const qs = buildSearchString([
+  ["q", "wool socks"],
+  ["tags", "sale,new"],
+]);
+// => "?q=wool%20socks&tags=sale%2Cnew"
+```
+
+Hand-rolled on purpose — this is deliberately *not*
+`URLSearchParams#toString`, which emits `+` for a space. Paramour emits
+`%20`, and encoding is `encodeURIComponent`-strict, so a decoded URL means
+the same thing everywhere. An empty pair set returns `""` (no lone `?`);
+unencodable text (lone surrogates) throws `SerializeError`.
+
+## searchToString
+
+`encodeSearch` + `buildSearchString` in one step — the exact query half
+`href` builds:
+
+```ts twoslash
+import { p, searchToString } from "paramour";
+
+const config = {
+  page: p.integer().default(1),
+  q: p.string().optional(),
+};
+
+const qs = searchToString(config, { page: 1, q: "wool socks" });
+// => "?q=wool%20socks"
+```
+
+(`page: 1` equals its default, so it elided.) Use the two smaller pieces
+directly if you need to intervene between the value layer and the byte
+layer.
+
+## rawSearch
+
+The whole-object escape hatch: wraps a bare Standard Schema so a route's
+`search:` slot hands the *entire* search object to one schema of yours,
+bypassing per-key codecs:
+
+```ts twoslash
+import { defineAppRoute, rawSearch } from "paramour";
+import * as v from "valibot";
+
+export const legacyRoute = defineAppRoute("/legacy", {
+  search: rawSearch(v.object({ from: v.string(), to: v.string() })),
+});
+
+declare const props: import("paramour").RouteProps;
+const search = await legacyRoute.parseSearch(props);
+//    ^?
+```
+
+The schema receives every source key (the unknown-keys-are-ignored rule
+does not apply — a whole-object schema owns stripping or passing through
+extras), normalized to Next's own `searchParams` shape: one value as
+`string`, repeats as `string[]`, from either source kind. Validation is
+sync-only; an async `validate` throws.
+
+The trade is explicit, and it's why this is a greppable wrapper rather than
+a bare `search: schema`:
+
+- **No per-key `.default()` / `.catch()`** — those are codec modifiers, and
+  there are no codecs here.
+- **No round-trip encoding** — the schema never runs on encode, so `href`
+  accepts only the raw wire record (`Record<string, string | string[]>`)
+  for such a route. If you need bidirectional per-key transforms, that's
+  `p.custom`.
+
+A schema failure still surfaces as the standard `SearchDecodeError` with
+`issues[]`; a root-level schema issue is keyed `"<search>"`.
+
+## isRawSearch
+
+The runtime discriminant for a route's `search:` slot — a type guard
+returning `true` when the value is the marker `rawSearch` produced, `false`
+for a codec map. Exported so derived surfaces (the
+[nuqs adapter](/docs/guides/nuqs), devtools) can branch on the slot's shape
+without duplicating the marker literal; app code rarely needs it.
+
+## standardSearchSchema
+
+The interop seam in the other direction: exports a route's `search:` config
+**as** a spec-compliant Standard Schema, for consumers like tRPC inputs or
+TanStack Router's `validateSearch`:
+
+```ts twoslash
+import { defineAppRoute, p, standardSearchSchema } from "paramour";
+
+const productsRoute = defineAppRoute("/products", {
+  search: { page: p.integer().default(1), q: p.string().optional() },
+});
+
+const searchSchema = standardSearchSchema(productsRoute);
+//    ^?
+```
+
+Hand `searchSchema` to anything that speaks the spec and it enforces the
+same URL contract as your pages, from one definition. The semantics are
+byte-identical to `decodeSearch`:
+
+- Defaults apply, unknown keys strip, duplicate values on a single-value
+  codec reject.
+- `.catch()` recovers — which means invalid API input under a caught key
+  silently coerces to the fallback. That's the same contract your pages
+  see, but worth knowing at an API boundary.
+- **No coercion, ever**: the schema accepts wire strings (`"42"`), not
+  decoded values (`42`).
+
+The advertised input type is the wire-shaped record only —
+`URLSearchParams` is accepted at runtime but kept out of the type, so
+client-side inference (tRPC) never sees a shape that can't serialize over
+JSON. Because `validate` receives genuinely untrusted input, source-shape
+violations soften to spec issues at this one boundary instead of throwing;
+config mistakes and throwing validators stay loud, and a malformed config
+fails at construction, not at first `validate()`.
+
+## Low-level primitives
+
+### serializeValue
+
+Invokes a codec's element serializer under the string contract — the one
+implementation of "turn this value into its wire string" that search
+encoding, path-segment encoding, and derived surfaces (the nuqs adapter's
+equality/`clearOnDefault` checks) all share, so their judgment stays
+identical to default-elision's by construction:
+
+```ts twoslash
+import { p, serializeValue } from "paramour";
+
+const wire = serializeValue(
+  p.isoDate(),
+  'search param "since"',
+  new Date("2026-07-18T00:00:00Z"),
+);
+// => "2026-07-18"
+```
+
+The `label` names the value's site in error messages. A serializer
+returning anything but a string throws `SerializeError` — a plain-JS custom
+codec returning `undefined` must not reach the byte layer as the literal
+text `"undefined"`. For arity-`"many"` codecs this serializes **one**
+element, not the whole array. This is a tooling/advanced surface — apps
+building links should be calling `href`.
+
+Its parse-side twin, `parseValue`, is not exported from the package barrel;
+tooling authors will find it under `paramour/internal`.
+
+## Related types
+
+| Type                     | What it is                                                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `SearchConfig`           | A codec-map search config: `Record<string, AnyCodec>`.                                                                  |
+| `SearchSource`           | What the decoders accept: Next's `searchParams` record or a `URLSearchParams`. Both arrive already percent-decoded.     |
+| `SearchOutputOf<SC>`     | The decoded output type of a `search:` slot — codec map and `rawSearch` alike. What `parseSearch` resolves to.          |
+| `InferSearchInput<S>`    | The encode-side input of a codec map: required keys stay required; optional, defaulted, and array keys may be omitted.  |
+| `InferSearchOutput<S>`   | The parse-side output of a codec map: every declared key present; optional presence adds `undefined` to the value type. |
+| `RawSearch<S>`           | The branded marker `rawSearch` returns — what a route's `search:` slot holds in raw mode.                               |
+| `StandardSearchSchema<SC>` | The schema type `standardSearchSchema` returns: wire-shaped record in, decoded search out.                            |

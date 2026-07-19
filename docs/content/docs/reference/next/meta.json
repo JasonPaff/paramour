@@ -1,0 +1,4 @@
+{
+  "pages": ["index", "with-typed-routes", "app-hooks", "pages-hooks", "cli"],
+  "title": "@paramour-js/next"
+}

@@ -1,0 +1,68 @@
+---
+title: paramour list
+description: Print every filesystem route with its params/search shape.
+---
+
+Prints every filesystem route, overlaid with the params/search shape of its
+route definition:
+
+```bash
+npx paramour list
+```
+
+```txt
+app routes (2):
+  /              app/route.def.ts
+  /product/[id]  app/product/[id]/route.def.ts
+    params:
+      id: integer
+    search:
+      page: integer (default: 1)
+      q:    string (optional)
+```
+
+The filesystem scan is authoritative for *which* routes exist (same engine
+as [`generate`](/docs/reference/next/cli/generate)). Shapes come from your
+`defineAppRoute`/`definePagesRoute` call sites: list scans source files for
+those calls and **evaluates the matching modules** to read the route
+objects, using the same `describeRoute` reflection that powers the devtools
+panel. That evaluation is why definitions should stay
+[import-safe](/docs/concepts/route-objects#convention-routedefts-beside-the-page)
+— a `route.def.ts` that imports server-only code will fail to load here.
+Modules that fail to load are reported and skipped. Set `routeFiles` globs
+in [`paramour.config`](/docs/reference/next/with-typed-routes#paramourconfig)
+to pin which modules are scanned when the automatic content scan misfires.
+
+## Coverage warnings
+
+The output doubles as a coverage report, and all of these are warnings —
+they never change the exit code:
+
+- a filesystem route with no definition (`⚠ filesystem only (no route
+  definition found)`);
+- a definition whose `(router, path)` matches no filesystem route
+  (`definitions with no filesystem route:`);
+- duplicate definitions of one route (first wins);
+- modules that failed to evaluate.
+
+## Flags
+
+| Flag                       | Default                             | Description                       |
+| -------------------------- | ----------------------------------- | --------------------------------- |
+| `--app-dir <dir>`          | discovered `app/` or `src/app/`     | App directory.                    |
+| `--pages-dir <dir>`        | discovered `pages/` or `src/pages/` | Pages directory.                  |
+| `--page-extensions <list>` | `tsx,ts,jsx,js`                     | Comma-separated, no leading dots. |
+| `--json`                   | off                                 | Machine-readable output.          |
+| `--help`, `-h`             | —                                   | Show usage.                       |
+
+`--json` emits the same data as one JSON object — `appRoutes` and
+`pagesRoutes` (each route carrying `definition: null` when none was found,
+never an absent key), plus `orphanDefinitions`, `duplicates`, and
+`loadFailures`.
+
+## Exit codes
+
+| Code | When                                                                      |
+| ---- | -------------------------------------------------------------------------- |
+| `0`  | Report printed — warnings included.                                        |
+| `2`  | Usage/config errors, no route directories, route collisions, I/O failures. |

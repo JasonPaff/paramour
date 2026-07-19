@@ -1,0 +1,190 @@
+---
+title: Pages Router hooks
+description: useRouteParams, useSearch, RouterResult, and SelectOptions — from @paramour-js/next/pages.
+---
+
+Import from `@paramour-js/next/pages`, with routes built by
+`definePagesRoute`. These hooks layer over `next/router`'s `useRouter()`,
+and they carry no `"use client"` directive — that's an App Router concept;
+these are ordinary Pages-bundle code.
+
+The Pages Router has a platform fact the App Router doesn't: on a
+statically-optimized page, `router.query` is empty until hydration completes
+(`router.isReady` flips). Instead of papering over it, the result type adds
+a third arm — every hook returns a [`RouterResult`](#routerresult).
+
+Both hooks are gated to pages-branded routes: an app-branded route (from
+`defineAppRoute`) at either call site is a compile error, the mirror of the
+[App hooks' gate](/docs/reference/next/app-hooks#the-wrong-router-gate).
+Both accept the same optional [`SelectOptions`](#selectoptions) bag.
+
+## RouterResult
+
+The three-state result type both hooks return.
+
+```ts
+type RouterResult<T> = SafeResult<T> | { status: "pending" };
+```
+
+It is literally core's `SafeResult<T>` plus a `pending` member, so both
+routers' results destructure identically — `status` is `"success"`,
+`"error"`, or `"pending"`, and neither `data` nor `error` is reachable
+without a status check. The `pending` arm covers exactly the pre-`isReady`
+render of a statically-optimized page; on `getServerSideProps` pages the
+first render is already populated, so `pending` never surfaces there. The
+`pending` object is referentially stable across renders.
+
+## useRouteParams
+
+Decoded route params as a `RouterResult`.
+
+```ts
+function useRouteParams<R extends AnyPagesRoute>(route: R): RouterResult<InferRouteParams<R>>;
+function useRouteParams<R extends AnyPagesRoute, U>(
+  route: R,
+  options: SelectOptions<InferRouteParams<R>, U>,
+): RouterResult<U>;
+```
+
+The exhaustive `switch` is the pattern to copy — the compiler holds you to
+all three arms:
+
+```tsx twoslash title="components/product-badge.tsx"
+// @filename: lib/routes.ts
+import { definePagesRoute, p } from "paramour";
+
+export const productRoute = definePagesRoute("/products/[id]", {
+  params: { id: p.integer() },
+});
+
+// @filename: components/product-badge.tsx
+import { useRouteParams } from "@paramour-js/next/pages";
+
+import { productRoute } from "../lib/routes";
+
+export function ProductBadge() {
+  const params = useRouteParams(productRoute);
+  //    ^?
+
+  switch (params.status) {
+    case "error":
+      return <p role="alert">{params.error.message}</p>;
+    case "pending":
+      return <p>Loading…</p>;
+    case "success":
+      return <p>Product #{params.data.id}</p>;
+  }
+}
+```
+
+`router.query` merges route params and search params into one bag; this hook
+reads only the route's own segment names from it, so query junk never
+reaches the decode.
+
+## useSearch
+
+Decoded search params as a `RouterResult`.
+
+```ts
+function useSearch<R extends AnyPagesRoute>(route: R): RouterResult<SearchOutputOf<R["~search"]>>;
+function useSearch<R extends AnyPagesRoute, U>(
+  route: R,
+  options: SelectOptions<SearchOutputOf<R["~search"]>, U>,
+): RouterResult<U>;
+```
+
+```tsx twoslash title="components/search-summary.tsx"
+// @filename: lib/routes.ts
+import { definePagesRoute, p } from "paramour";
+
+export const productsRoute = definePagesRoute("/products/[id]", {
+  params: { id: p.integer() },
+  search: { page: p.integer().default(1), q: p.string().optional() },
+});
+
+// @filename: components/search-summary.tsx
+import { useSearch } from "@paramour-js/next/pages";
+
+import { productsRoute } from "../lib/routes";
+
+export function SearchSummary() {
+  const search = useSearch(productsRoute);
+  //    ^?
+
+  switch (search.status) {
+    case "error":
+      return <p role="alert">{search.error.message}</p>;
+    case "pending":
+      return null;
+    case "success":
+      return <p>Page {search.data.page}</p>;
+  }
+}
+```
+
+Before decoding, the hook subtracts the route's own path-param names from
+the merged `query` — the client twin of `parseContext`'s server-side
+subtraction — so a route param named like a search key can't shadow it.
+
+Like the App hooks, results are stabilized on the declared slice of the URL:
+`?utm_source=` churn returns the previous result by identity.
+
+## SelectOptions
+
+The same options bag as the [App Router
+hooks](/docs/reference/next/app-hooks#selectoptions), with identical
+semantics:
+
+| Option     | Default     | Description                                                                                                        |
+| ---------- | ----------- | ------------------------------------------------------------------------------------------------------------------ |
+| `select`   | — (required) | Pure projection of the decoded value. Runs on the success arm only; error **and pending** arms pass through untouched. |
+| `equality` | `Object.is` | Result-equality mode for the selected value; `"shallow"` opts in to one-level comparison.                          |
+
+```tsx twoslash title="components/page-badge.tsx"
+// @filename: lib/routes.ts
+import { definePagesRoute, p } from "paramour";
+
+export const productsRoute = definePagesRoute("/products/[id]", {
+  params: { id: p.integer() },
+  search: { page: p.integer().default(1), q: p.string().optional() },
+});
+
+// @filename: components/page-badge.tsx
+import { useSearch } from "@paramour-js/next/pages";
+
+import { productsRoute } from "../lib/routes";
+
+export function PageBadge() {
+  const page = useSearch(productsRoute, { select: (s) => s.page });
+  //    ^?
+
+  return page.status === "success" ? <span>p. {page.data}</span> : null;
+}
+```
+
+The one difference from the App module is mechanical: the selected result is
+`RouterResult<U>` — the `pending` arm stays in the union and is never fed to
+the selector.
+
+## No OrThrow variants — by design
+
+<Callout title="There is deliberately no useRouteParamsOrThrow / useSearchOrThrow here">
+  Throwing on `pending` would flash the error boundary on every
+  statically-optimized page's first render, and returning `T | undefined`
+  would make the name a lie. The three-state union forcing the check *is*
+  the design. If your page has `getServerSideProps`, read typed props from
+  `route.parseContext(ctx)` / `route.safeParseContext(ctx)` on the server
+  instead of reaching for a client hook — the [hooks
+  guide](/docs/guides/hooks#pages-router) shows the pattern.
+</Callout>
+
+## Rendering under the wrong router
+
+The type-level gate catches wrong-route mistakes, but component *placement*
+is invisible to the type system: in a hybrid app, a component holding a
+legitimately pages-branded route can still be rendered under `app/`, where
+`next/router` is never mounted. Instead of Next's "NextRouter was not
+mounted" (which points at the wrong fix), these hooks throw a
+`ParamourError` naming the actual mistake — import from
+`@paramour-js/next/app` and pass an app route for components that live in
+the App Router tree.

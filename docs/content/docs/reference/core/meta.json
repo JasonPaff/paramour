@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "index",
+    "p-builders",
+    "codecs",
+    "routes",
+    "href",
+    "search",
+    "describe",
+    "errors"
+  ],
+  "title": "paramour (core)"
+}
