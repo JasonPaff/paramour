@@ -1,13 +1,55 @@
 ---
 title: Migrating from next-typesafe-url
-description: Concept map, step-by-step guide, and honest differences.
+description: What changes, what stays, and how the migration runs.
 ---
 
-Coming from `next-typesafe-url`? You already know the problem space — this
-section will map its concepts to paramour's and walk through a manual
-migration.
+Coming from `next-typesafe-url`? You already know the problem space, and
+the architecture barely moves: one definition file per route, a codegen
+step, a typed path builder, hooks on both routers. What changes is the
+vocabulary, the validation model — codecs that serialize as well as
+parse, with any Standard Schema validator instead of required zod — and,
+for some params, the URL wire format.
 
-<Callout title="Under construction">
-  The concept-mapping table, step-by-step guide, and differences page land in
-  a later milestone.
+This section was written by migrating a real `next-typesafe-url` v6.1.0
+app route by route; every step and claim in it was executed before being
+documented.
+
+## What maps directly
+
+- **Route definition files** — `routeType.ts` becomes `route.def.ts`,
+  zod schemas become codecs
+  ([concept map](/docs/migrate/concept-map#the-map)).
+- **Path building** — `$path({ route, ... })` becomes
+  `href(route, ...)`, with the route object replacing the string key.
+- **Hooks** — same names, new import, a discriminated result instead of
+  `isLoading` / `isError` flags.
+- **Codegen** — one CLI swaps for another, with a difference: paramour's
+  is optional, and both can run side by side during the migration.
+
+## What changes on the wire
+
+<Callout title="Your URLs will change">
+  `next-typesafe-url` JSON-encodes object- and array-valued search
+  params into the query string. Paramour's default codecs write
+  conventional, human-readable params instead — which means existing
+  bookmarked or shared URLs with object-valued params stop parsing
+  unless you preserve the old encoding per key with `p.json`. Scalar
+  params carry over unchanged. See
+  [the differences page](/docs/migrate/differences#the-wire-format-changes)
+  and the [wire-format spec](/docs/reference/wire-format) before you
+  start.
 </Callout>
+
+## How this section is organized
+
+- **[Concept map](/docs/migrate/concept-map)** — every
+  `next-typesafe-url` term and its paramour equivalent, one table.
+- **[Step-by-step guide](/docs/migrate/guide)** — the incremental
+  migration: both libraries installed, one route at a time, remove the
+  old library last.
+- **[Differences](/docs/migrate/differences)** — what behaves
+  differently, what paramour deliberately doesn't have, and what you
+  gain.
+
+A codemod that automates the mechanical parts is planned; the manual
+path above is complete without it.

@@ -1,0 +1,186 @@
+---
+title: Concept Map
+description: Every next-typesafe-url concept and its paramour equivalent.
+---
+
+Same architecture, different vocabulary. Both libraries put a definition
+file next to each route, run a codegen step, build links through a typed
+helper, and read params through hooks. This table translates the whole
+surface; the sections after it expand the three mappings that aren't
+one-to-one renames.
+
+Code on the left is `next-typesafe-url` v6.1.0, shown as plain (uncompiled)
+snippets. Code on the right is live — compiled against the paramour
+packages on every docs build.
+
+## The map
+
+| next-typesafe-url                                        | paramour                                            | Notes                                                                                                    |
+| -------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `routeType.ts` beside the page                           | `route.def.ts` beside the page                      | Same convention, different filename ([route objects](/docs/concepts/route-objects))                       |
+| `const Route = {...} satisfies DynamicRoute`             | `defineAppRoute("/path/[seg]", { params, search })` | The path is an argument, checked against the config at compile time                                       |
+| `routeParams: z.object({...})`                           | `params: { seg: p.integer() }`                      | One codec per `[segment]` ([p.* builders](/docs/reference/core/p-builders))                               |
+| `searchParams: z.object({...})`                          | `search: { q: p.string() }`                         | Or `rawSearch(schema)` to keep one whole-object schema                                                    |
+| Object-valued search key (JSON on the wire)              | `p.json(schema)`                                    | The only codec that reproduces the old URL encoding — see [the guide](/docs/migrate/guide#step-6-decide-the-url-story-for-this-route) |
+| `.optional()` / `.default()` on zod schemas              | `.optional()` / `.default()` / `.catch()` on codecs | Paramour defaults also *elide* from URLs ([serialization](/docs/concepts/serialization))                  |
+| `z.string().transform((s) => new Date(s))`               | `p.isoDate()` / `p.timestamp()`                     | Dates are first-class; the `z.date()` prohibition is gone                                                 |
+| `$path({ route, routeParams, searchParams })`            | `href(route, { params, search })`                   | A route object instead of a string key; returns a branded string ([href](/docs/reference/core/href))      |
+| `withParamValidation(Page, Route)`                       | `await route.parse(props)` / `safeParse`            | **No direct equivalent by design** — parsing is an explicit call, not a wrapper                           |
+| `InferPagePropsType<RouteType>`                          | `RouteProps`                                        | Props stay one generic shape; the parse call produces the route-specific types                            |
+| `InferRoute<RouteType>`                                  | `InferRouteParams` / `InferSearchOutput`            | Params inference hangs off the route, search off the config                                               |
+| `useRouteParams(Route.routeParams)` (`/app`)             | `useRouteParams(route)` from `@paramour-js/next/app` | Takes the whole route; returns a two-arm `SafeResult` — no `isLoading`                                   |
+| `useSearchParams(Route.searchParams)` (`/app`)           | `useSearch(route)` from `@paramour-js/next/app`     | Same; `OrThrow` variants throw to your error boundary ([App hooks](/docs/reference/next/app-hooks))       |
+| `useRouteParams` / `useSearchParams` (`/pages`)          | Same names, from `@paramour-js/next/pages`          | Three-arm result; `pending` replaces `isLoading` ([Pages hooks](/docs/reference/next/pages-hooks))        |
+| `parseServerSideParams({ params, schema })`              | `route.parseContext(ctx)` / `safeParseContext`      | Pages server parsing moves onto the route object                                                          |
+| `next-typesafe-url` CLI (mandatory, `--watch`)           | `paramour generate` / `withTypedRoutes` (optional)  | The library works before the first generate; codegen adds path checking ([registry](/docs/concepts/registry)) |
+| Generated `_next-typesafe-url_.d.ts`                     | Generated `paramour-env.d.ts`                       | Both type-only; they augment different modules, so they coexist during migration                          |
+| Hand-rolled `generateStaticParams` values                | `encodeStaticParams(route, values)`                 | No helper existed before; this one is net-new                                                             |
+| Raw `ZodError` on failure                                | `ParamourError` hierarchy with `issues[]`           | Aggregated per-key issues, one shape everywhere ([errors](/docs/reference/core/errors))                   |
+| Catch-all via `z.array(z.string())`                      | An *element* codec on `[...slug]` / `[[...slug]]`   | The codec describes one element; arrayness comes from the segment kind                                    |
+
+Three rows deserve honesty up front. `withParamValidation` has no
+replacement wrapper — migrating means adding a parse call *inside* the
+page, which the [guide](/docs/migrate/guide#step-5-replace-withparamvalidation-with-a-parse-call)
+walks through. App Router hooks have no `isLoading` arm — if your
+components branch on it, that branch becomes dead code (see
+[differences](/docs/migrate/differences#app-router-hooks-lose-isloading)).
+And the JSON-blob URL format survives only where you opt into `p.json`
+per key (see
+[differences](/docs/migrate/differences#the-wire-format-changes)).
+
+## Schemas become codecs
+
+The one mapping that isn't a rename. A zod schema validates; a codec
+validates *and* owns the wire format — how the value is written into the
+URL and read back out. Your zod schemas don't disappear: they slot into
+codecs as refinements, because paramour accepts any
+[Standard Schema](/docs/concepts/standard-schema) validator.
+
+Before, with `next-typesafe-url`:
+
+```ts title="app/product/[productID]/routeType.ts"
+import { type DynamicRoute } from "next-typesafe-url";
+import { z } from "zod";
+
+export const Route = {
+  routeParams: z.object({
+    productID: z.number(),
+  }),
+  searchParams: z.object({
+    location: z.enum(["us", "eu"]).optional(),
+    userInfo: z.object({
+      name: z.string(),
+      age: z.number(),
+    }),
+  }),
+} satisfies DynamicRoute;
+export type RouteType = typeof Route;
+```
+
+After, with paramour:
+
+```ts twoslash title="app/product/[productID]/route.def.ts"
+import { defineAppRoute, p } from "paramour";
+import { z } from "zod";
+
+export const productRoute = defineAppRoute("/product/[productID]", {
+  params: { productID: p.number() },
+  search: {
+    location: p.enum(["us", "eu"]).optional(),
+    userInfo: p.json(z.object({ name: z.string(), age: z.number() })),
+  },
+});
+
+declare const props: import("paramour").RouteProps;
+const { search } = await productRoute.parse(props);
+//      ^?
+```
+
+Each codec states its own wire behavior: `p.number()` parses the segment
+with a strict grammar, `p.enum` writes the member string, `p.json` keeps
+the zod object JSON-encoded exactly like the old library did. The
+[codecs concept page](/docs/concepts/codecs) covers the full model.
+
+## Validation becomes parsing
+
+`withParamValidation` wrapped your page so validated props arrived from
+outside. Paramour has deliberately no wrapper: parsing is a call you make
+inside the component, which is also why the halves (`parseParams`,
+`parseSearch`) and the `safe*` twins exist — you choose the surface and
+the failure mode at the call site.
+
+Before:
+
+```tsx title="app/product/[productID]/page.tsx"
+import { withParamValidation } from "next-typesafe-url/app/hoc";
+import type { InferPagePropsType } from "next-typesafe-url";
+import { Route, type RouteType } from "./routeType";
+
+type PageProps = InferPagePropsType<RouteType>;
+
+async function Page({ routeParams, searchParams }: PageProps) {
+  const { productID } = await routeParams;
+  // ...
+}
+
+export default withParamValidation(Page, Route);
+```
+
+After:
+
+```tsx twoslash title="app/product/[productID]/page.tsx"
+// @filename: app/product/[productID]/route.def.ts
+import { defineAppRoute, p } from "paramour";
+
+export const productRoute = defineAppRoute("/product/[productID]", {
+  params: { productID: p.number() },
+});
+
+// @filename: app/product/[productID]/page.tsx
+import type { RouteProps } from "paramour";
+
+import { productRoute } from "./route.def";
+
+export default async function Page(props: RouteProps) {
+  const { params } = await productRoute.parse(props);
+  return <h1>Product {params.productID}</h1>;
+}
+```
+
+The [routes reference](/docs/reference/core/routes) lists every parse
+surface and when to reach for each.
+
+## Errors: ZodError becomes issues
+
+Where `next-typesafe-url` handed you a raw `ZodError`, every paramour
+failure is a `ParamourError` subclass carrying a flat `issues` array —
+every bad key reported at once, the same shape on the server, in hooks,
+and in standalone decoding.
+
+Before:
+
+```ts
+const { data, isLoading, isError, error } = useSearchParams(Route.searchParams);
+// error: z.ZodError | undefined
+```
+
+After:
+
+```ts twoslash
+import { defineAppRoute, p } from "paramour";
+
+const route = defineAppRoute("/product/[id]", { params: { id: p.integer() } });
+
+declare const props: import("paramour").RouteProps;
+const result = await route.safeParse(props);
+if (result.status === "error") {
+  result.error.issues;
+  //           ^?
+}
+```
+
+The [errors reference](/docs/reference/core/errors) documents the
+hierarchy.
+
+Ready to move code? The [step-by-step guide](/docs/migrate/guide) migrates
+a real app one route at a time.

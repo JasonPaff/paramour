@@ -1,4 +1,4 @@
 {
-  "pages": ["index"],
+  "pages": ["index", "concept-map", "guide", "differences"],
   "title": "Migrate"
 }

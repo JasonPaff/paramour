@@ -1,0 +1,142 @@
+---
+title: Differences
+description: What behaves differently, what paramour lacks, what it adds.
+---
+
+This page is the migration delta only — where the two libraries genuinely
+behave differently, in both directions, including the things
+`next-typesafe-url` does that paramour doesn't. Every claim here was
+verified against a live migration of a `next-typesafe-url` v6.1.0 app.
+
+## Behavioral differences
+
+### The wire format changes
+
+`next-typesafe-url` JSON-encodes object- and array-valued search params;
+paramour's default codecs write conventional per-key params. The same
+state, both captured from running apps:
+
+```txt
+next-typesafe-url:  /product/23?userInfo=%7B%22name%22%3A%22bob%22%2C%22age%22%3A23%7D
+paramour (p.json):  /product/23?userInfo=%7B%22name%22%3A%22bob%22%2C%22age%22%3A23%7D
+paramour (flat):    /product/23?age=23&name=bob
+```
+
+`p.json` is the compatibility valve: per key, it reproduces the old
+encoding exactly, so existing bookmarked and shared URLs keep parsing.
+Scalar params were already conventional in `next-typesafe-url` and carry
+over unchanged. The
+[guide's step 6](/docs/migrate/guide#step-6-decide-the-url-story-for-this-route)
+walks the preserve-vs-modernize decision; the
+[wire-format spec](/docs/reference/wire-format) defines every rule
+paramour follows.
+
+One byte-level nit: paramour writes query keys in deterministic
+(alphabetical) order, so a preserved URL may reorder its params. Both
+libraries parse either order.
+
+### Defaults elide from URLs
+
+`next-typesafe-url` serialized whatever zod resolved — a
+`page: z.number().default(1)` field emits `page=1` into every link.
+Paramour elides value-form defaults on serialize: `page: 1` never
+appears, whether omitted or passed explicitly. Inbound URLs that *do*
+carry `page=1` still parse fine — this changes the URLs you emit, not
+the ones you accept. If anything downstream keys on exact URLs
+(analytics, caches), canonical URLs change shape here. Details in
+[serialization](/docs/concepts/serialization).
+
+### Parsing is strict
+
+Wire grammars are anchored and explicit: `p.integer()` rejects `1.5` and
+`1e3`, `p.isoDate()` accepts ISO-8601 forms only. A
+`z.string().transform((s) => new Date(s))` field used to accept anything
+`new Date()` tolerated — `?since=Jan%2015%202026` parsed before and is a
+decode error after. That's the point of a codec, but it is a behavior
+change your inbound URLs may notice.
+
+### App Router hooks lose isLoading
+
+The old hooks returned `{ data, isLoading, isError, error }`, and
+`isLoading` tracked Next's internal router. Paramour's App Router hooks
+return a two-arm `SafeResult` — `status` is `"success"` or `"error"`,
+never loading: App-Router params are synchronously available on the
+client and results are SSR-consistent, so there is nothing to wait for.
+`isLoading` branches become dead code
+([guide, step 7](/docs/migrate/guide#step-7-migrate-the-client-hooks)).
+
+The Pages Router is different — there the pre-ready router state is
+real, and the hooks keep a third arm: `status: "pending"` replaces
+`isLoading`, and the type system forces you to handle it
+([Pages hooks](/docs/reference/next/pages-hooks)).
+
+### Errors are structured, and failure modes are yours to pick
+
+`next-typesafe-url` hands you raw `ZodError`s, and a request failing
+validation inside `withParamValidation` surfaces as an unhandled server
+error — our test app returned a 500 for a missing required search param.
+Paramour throws `ParamourError` subclasses carrying `issues[]` (every
+bad key at once), and the `safeParse` twins let a route choose its
+failure mode explicitly — the canonical pattern turns a malformed URL
+into `notFound()` instead ([errors](/docs/reference/core/errors)).
+
+### Codegen is optional, not load-bearing
+
+The old CLI is mandatory: `$path` autocompletes from the generated route
+map, and without the watcher running the types lie. Paramour works with
+zero codegen — path literals fall back to permissive strings — and
+`paramour generate` / [`withTypedRoutes`](/docs/reference/next/with-typed-routes)
+*upgrade* paths to a filesystem-checked union via a type-only
+augmentation ([registry](/docs/concepts/registry)). The
+"forgot to start the watcher" class of type lie is gone.
+
+## What paramour doesn't have
+
+**No string-keyed path builder.** `$path({ route: "/foo/[id]", ... })`
+builds a link to any route from just its string. Paramour has no global
+equivalent by design — you import the route object and pass it to
+`href`. That's what makes routes tree-shakeable, but if you liked
+building links without imports, this is the trade.
+
+**No validation wrapper.** `withParamValidation` made validation
+structurally unskippable — a page couldn't render without it. Paramour's
+parsing is an explicit call, so nothing stops a page from reading props
+raw. The mitigations are convention plus tooling: `paramour list` flags
+filesystem routes with no route definition.
+
+**Transforming schemas are parse-only.** `next-typesafe-url` ran zod
+transforms freely because URLs flowed one direction. Paramour serializes
+too, so a schema whose output type differs from its input can refine a
+decode but can't round-trip back to the wire. For bidirectional
+conversions the tool is `p.custom` — parse and serialize, stated
+explicitly ([Standard Schema](/docs/concepts/standard-schema)).
+
+## What you gain
+
+- **Dates as first-class codecs** — `p.isoDate()` / `p.timestamp()`
+  replace the `z.date()` prohibition and its string-transform
+  workaround.
+- **Any Standard Schema validator** — zod keeps working (it's no longer
+  a required peer); valibot and arktype work identically
+  ([Standard Schema](/docs/concepts/standard-schema)).
+- **Static-generation helpers** — `encodeStaticParams` feeds
+  `generateStaticParams` / `getStaticPaths` from the same route
+  definition ([href reference](/docs/reference/core/href)).
+- **A specified, round-tripping wire format** — every encode/decode rule
+  is public and testable ([spec](/docs/reference/wire-format)).
+- **Branded hrefs and checked paths** — `href` returns a `Href<Path>`
+  string and, once generated, route paths are verified against the
+  filesystem at compile time.
+- **The surrounding tooling** — a [devtools panel](/docs/guides/devtools),
+  a [nuqs adapter](/docs/guides/nuqs) for URL-state writing, and a CLI
+  with [`check`](/docs/reference/next/cli/check) /
+  [`list`](/docs/reference/next/cli/list) /
+  [`doctor`](/docs/reference/next/cli/doctor).
+
+## Version notes
+
+Verified 2026-07-18 against `next-typesafe-url` 6.1.0 (zod peer
+`^4.1.12`, Next peer `^13.4.12 || ^14 || ^15`) migrating to `paramour`
+0.4.0 with `@paramour-js/next` 0.2.1, on Next 15.5 with zod 4.4. If you
+are reading this much later, spot-check the mapped API names against the
+versions you run.
