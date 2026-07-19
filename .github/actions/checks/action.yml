@@ -13,15 +13,6 @@ runs:
     - run: pnpm build
       shell: bash
 
-    # examples/next-compat consumes the workspace packages as INJECTED
-    # (hard-copied) deps, so Next's default externals treatment matches a
-    # real install (see its build-app/next.config.ts). Injected copies are
-    # materialized at install time — before dist/ existed — and hard links
-    # don't grow new files, so re-install once after the build to sync the
-    # copies; lint/typecheck below resolve dist types through them.
-    - run: pnpm install --frozen-lockfile
-      shell: bash
-
     - run: pnpm lint
       shell: bash
 
