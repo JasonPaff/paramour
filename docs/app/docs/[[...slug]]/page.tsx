@@ -20,7 +20,14 @@ export async function generateMetadata(props: RouteProps) {
   const page = source.getPage(result.data.slug);
   if (!page) notFound();
 
-  return { description: page.data.description, title: page.data.title };
+  // Twitter card metadata falls back to openGraph, so images are set once.
+  return {
+    description: page.data.description,
+    openGraph: {
+      images: [`/docs-og/${[...page.slugs, "image.png"].join("/")}`],
+    },
+    title: page.data.title,
+  };
 }
 
 export function generateStaticParams() {

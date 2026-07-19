@@ -38,7 +38,7 @@
     "url": "git+https://github.com/JasonPaff/paramour.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/JasonPaff/paramour#readme",
+  "homepage": "https://paramour.dev",
   "bugs": {
     "url": "https://github.com/JasonPaff/paramour/issues"
   },

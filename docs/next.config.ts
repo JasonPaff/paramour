@@ -7,6 +7,11 @@ import { join } from "node:path";
 const withMDX = createMDX();
 
 const nextConfig: NextConfig = {
+  // The landing hero runs transformerTwoslash inside a server component
+  // (components/twoslash-code.tsx); TypeScript's virtual-fs module
+  // resolution cannot survive bundling, so these must load from
+  // node_modules at runtime.
+  serverExternalPackages: ["twoslash", "typescript"],
   // Pin the monorepo root: stray lockfiles outside the repo must not sway
   // Next's workspace-root inference (file tracing, watch scope).
   turbopack: { root: join(__dirname, "..") },

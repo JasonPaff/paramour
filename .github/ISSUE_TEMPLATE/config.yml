@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://paramour.dev
+    about: Guides, per-package API reference, and the wire-format spec.
+  - name: Migrating from next-typesafe-url
+    url: https://paramour.dev/docs/migrate
+    about: Concept map, step-by-step guide, and honest differences.

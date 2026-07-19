@@ -1,0 +1,23 @@
+# lychee link-checker configuration (.github/workflows/link-check.yml).
+# The sources job resolves doc-relative and root-relative links against the
+# content tree (--root-dir docs/content + mdx/md fallback extensions, with
+# app routes like /explorer remapped to the live site); the weekly live-site
+# job re-checks everything as rendered by feeding lychee the deployed
+# sitemap's pages.
+
+accept = ["200..=299", "403", "429"]
+fallback_extensions = ["mdx", "md"]
+max_retries = 3
+# /explorer is an app route, not a content file; by remap time root-dir
+# resolution has already turned it into a file: URI.
+remap = ["^file:.*/docs/content/explorer https://paramour.dev/explorer"]
+
+exclude = [
+  # Hosts that block or rate-limit bots unpredictably.
+  "^https://(www\\.)?linkedin\\.com",
+  "^https://(www\\.)?twitter\\.com",
+  "^https://x\\.com",
+  # Placeholder/example hosts that appear in docs snippets.
+  "^https?://example\\.com",
+  "^https?://localhost",
+]

@@ -44,13 +44,21 @@
   },
   "description": "Paramour devtools: a TanStack Devtools panel showing live route observations — wire vs parsed values, codec shapes, default/catch attribution, decode issues, and editable search params.",
   "author": "Jason Paff <jasonpaff@gmail.com>",
+  "keywords": [
+    "nextjs",
+    "devtools",
+    "tanstack-devtools",
+    "routing",
+    "typescript",
+    "type-safe"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/JasonPaff/paramour.git",
     "directory": "packages/devtools"
   },
-  "homepage": "https://github.com/JasonPaff/paramour#readme",
+  "homepage": "https://paramour.dev/docs/reference/devtools",
   "bugs": {
     "url": "https://github.com/JasonPaff/paramour/issues"
   },

@@ -1,6 +1,8 @@
 # @paramour-js/nuqs
 
-Derive [nuqs](https://nuqs.dev) parsers from [paramour](https://github.com/JasonPaff/paramour) search codecs — presence, defaults, catch recovery, and equality read off the route's codecs once, mechanically.
+Derive [nuqs](https://nuqs.dev) parsers from [paramour](https://paramour.dev) search codecs — presence, defaults, catch recovery, and equality read off the route's codecs once, mechanically.
+
+**Docs:** [adapter reference](https://paramour.dev/docs/reference/nuqs) · [guide](https://paramour.dev/docs/guides/nuqs)
 
 paramour owns the route contract: server-side `parseSearch`/`safeParseSearch` and typed `href()` links into the page. nuqs owns high-frequency in-page client URL state. Integrating them by hand costs a `createParser` bridge, every default declared twice, and hand-written `eq` functions for Dates and arrays. This package deletes all three layers: the adapter reads what the modified codec already carries.
 
