@@ -75,7 +75,13 @@ jobs:
       # field that blocks it (EBADDEVENGINES).
       - run: node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); delete pkg.devEngines; delete pkg.engines; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
 
-      - run: pnpm install --frozen-lockfile
+      # NOT --frozen-lockfile: pnpm records the devEngines runtime in the
+      # lockfile (node@runtime:>=24.18.0), so the strip above makes the
+      # frozen check fail by construction. Package resolution still follows
+      # the lockfile (specifiers are unchanged); `checks` remains the
+      # frozen-lockfile drift gate on the canonical manifest, and the guard
+      # below asserts the runtime this leg actually tests on.
+      - run: pnpm install --no-frozen-lockfile
 
       # Prove scripts actually see the floor runtime, not a managed newer one.
       - run: |
