@@ -55,24 +55,26 @@ export interface AppRoute<
    * FIRST — a params grammar failure means the URL doesn't denote this
    * route at all (morally a 404), so it throws before search is decoded.
    */
-  parse(props: RouteProps): Promise<{
+  parse(props: RoutePropsInput): Promise<{
     params: ParamsOutput<Path, PC>;
     search: SearchOutputOf<SC>;
   }>;
   /** Bare params object (RL6) — layout props are structurally assignable. */
-  parseParams(props: ParamsProps): Promise<ParamsOutput<Path, PC>>;
+  parseParams(props: ParamsPropsInput): Promise<ParamsOutput<Path, PC>>;
   /** Bare search object (RL6) — the search half alone. */
-  parseSearch(props: SearchProps): Promise<SearchOutputOf<SC>>;
-  safeParse(props: RouteProps): Promise<
+  parseSearch(props: SearchPropsInput): Promise<SearchOutputOf<SC>>;
+  safeParse(props: RoutePropsInput): Promise<
     SafeResult<{
       params: ParamsOutput<Path, PC>;
       search: SearchOutputOf<SC>;
     }>
   >;
   safeParseParams(
-    props: ParamsProps,
+    props: ParamsPropsInput,
   ): Promise<SafeResult<ParamsOutput<Path, PC>>>;
-  safeParseSearch(props: SearchProps): Promise<SafeResult<SearchOutputOf<SC>>>;
+  safeParseSearch(
+    props: SearchPropsInput,
+  ): Promise<SafeResult<SearchOutputOf<SC>>>;
 }
 
 /** Names of `[...name]` catch-all segments in the path literal (RL3). */
@@ -97,7 +99,15 @@ export type InferRouteParams<R extends AnyRoute> = ParamsOutput<
   R["~params"]
 >;
 
-/** Accepts Next 15/16's promised props and plain objects alike (RL6). */
+/**
+ * Accepts promised props and plain objects alike (RL6). This width lives on
+ * the parse INPUT surface ({@link RoutePropsInput} and friends), not on the
+ * annotation types: every supported Next (peer `>=15`) delivers page props
+ * as promises, and Next 15.5's generated `.next/types` page check requires
+ * a page's `params` prop to be `Promise<any> | undefined` — a sync arm in
+ * {@link RouteProps} fails `next build` there. Hand-built sync props (tests,
+ * server code calling `parse` directly) stay legal via the input types.
+ */
 export type MaybePromise<T> = Promise<T> | T;
 
 /**
@@ -217,6 +227,15 @@ export type ParamsOutput<Path extends string, PC> = {
  * global doesn't exist in fresh clones before `next dev` first runs.
  */
 export interface ParamsProps {
+  readonly params?: Promise<ParamsSource>;
+}
+
+/**
+ * What `parseParams` ACCEPTS (RL6): {@link ParamsProps} plus plain sync
+ * objects — see {@link MaybePromise} for why the annotation type is
+ * promise-only while the parse input stays wide.
+ */
+export interface ParamsPropsInput {
   readonly params?: MaybePromise<ParamsSource>;
 }
 
@@ -313,8 +332,17 @@ export type RouteConfig<
   ? { readonly params?: never; readonly search?: SC }
   : { readonly params: ConformParams<Path, PC>; readonly search?: SC };
 
-/** Full page-props contract (RL6): Next's `PageProps` is structurally assignable. */
+/**
+ * Full page-props contract (RL6): the type a page annotates its props with.
+ * Next's `PageProps` is structurally assignable, and both members are
+ * promise-only so the annotation survives Next 15.5's generated page check
+ * (see {@link MaybePromise}). Deliberately NOT Next's generated `PageProps`
+ * global — core stays framework-agnostic.
+ */
 export interface RouteProps extends ParamsProps, SearchProps {}
+
+/** What `parse`/`safeParse` ACCEPT (RL6): {@link RouteProps} plus sync props. */
+export interface RoutePropsInput extends ParamsPropsInput, SearchPropsInput {}
 
 /** Which router a route belongs to (PR3) — the value of the `~router` brand. */
 export type RouterKind = "app" | "pages";
@@ -333,6 +361,11 @@ export type SafeResult<T> =
  * shape is the same as the params side's, hence the shared source type.
  */
 export interface SearchProps {
+  readonly searchParams?: Promise<ParamsSource>;
+}
+
+/** Sync-accepting twin of {@link SearchProps} — see {@link ParamsPropsInput}. */
+export interface SearchPropsInput {
   readonly searchParams?: MaybePromise<ParamsSource>;
 }
 
@@ -410,7 +443,7 @@ export function defineAppRoute<
 >(path: Path, config: RouteConfig<Path, PC, SC>): AppRoute<Path, PC, SC> {
   const route: AppRoute<Path, PC, SC> = {
     ...routeData("app", path, config),
-    async parse(props: RouteProps) {
+    async parse(props: RoutePropsInput) {
       const [paramsSource, searchSource] = await awaitProps(props);
       // RL6: params first — a params failure throws before search decodes.
       const decodedParams = decodeParams(route, paramsSource ?? {});
@@ -419,21 +452,21 @@ export function defineAppRoute<
         search: decodeSearch(route["~search"], searchSource ?? {}),
       };
     },
-    async parseParams(props: ParamsProps) {
+    async parseParams(props: ParamsPropsInput) {
       const source = await awaitProp(props.params);
       return decodeParams(route, source ?? {});
     },
-    async parseSearch(props: SearchProps) {
+    async parseSearch(props: SearchPropsInput) {
       const source = await awaitProp(props.searchParams);
       return decodeSearch(route["~search"], source ?? {});
     },
-    safeParse(props: RouteProps) {
+    safeParse(props: RoutePropsInput) {
       return safely(() => route.parse(props));
     },
-    safeParseParams(props: ParamsProps) {
+    safeParseParams(props: ParamsPropsInput) {
       return safely(() => route.parseParams(props));
     },
-    safeParseSearch(props: SearchProps) {
+    safeParseSearch(props: SearchPropsInput) {
       return safely(() => route.parseSearch(props));
     },
   };
@@ -519,7 +552,7 @@ function awaitProp(
  * rejecting props promise into an unhandled rejection.
  */
 function awaitProps(
-  props: RouteProps,
+  props: RoutePropsInput,
 ): Promise<[ParamsSource | undefined, ParamsSource | undefined]> {
   return rebrandRejection(Promise.all([props.params, props.searchParams]));
 }

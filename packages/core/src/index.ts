@@ -58,6 +58,7 @@ export {
   type ParamourRegister,
   type ParamsConfig,
   type ParamsProps,
+  type ParamsPropsInput,
   type RegisteredAppRoutePaths,
   type RegisteredPagesRoutePaths,
   type RegisteredStaticAppRoutePaths,
@@ -65,9 +66,11 @@ export {
   type RegisteredStaticRoutePaths,
   type Route,
   type RouteProps,
+  type RoutePropsInput,
   type RouterKind,
   type SafeResult,
   type SearchProps,
+  type SearchPropsInput,
 } from "./route.js";
 export { safeDecodeParams, safeDecodeSearch } from "./safe-decode.js";
 export {

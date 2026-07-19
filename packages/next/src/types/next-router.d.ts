@@ -17,6 +17,12 @@
  * core's decoders, and naming the type instead of restating it removes the
  * drift. Real Next's `replace(url, as?, options?): Promise<boolean>` is
  * call-compatible with the 1-arity view declared here.
+ *
+ * The declared specifier is the extensionful `next/router.js` — it must
+ * match pages.ts's import exactly (see the comment there: the bare form
+ * dies under Node ESM resolution when the package is externalized on
+ * Next 15). Consumers' TS resolves the same specifier to real Next's
+ * root `router.d.ts` stub.
  * `examples/next-compat/src/router.ts` pins real Next's `useRouter().query`
  * against `ParamsSource` (and `replace`'s assignability) on every supported
  * major, which — because the ambient IS `ParamsSource` — is exactly a
@@ -24,7 +30,7 @@
  * throw-on-unmounted under `app/` is runtime behavior — covered by
  * `pages.test.tsx` and the example apps, not pinnable here.)
  */
-declare module "next/router" {
+declare module "next/router.js" {
   export function useRouter(): {
     asPath: string;
     isReady: boolean;

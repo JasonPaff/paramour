@@ -224,21 +224,10 @@ compares the two, and the
 (`parseParams` / `parseSearch`) when a layout or `generateMetadata` needs
 only one side.
 
-<Callout title="On Next 15, type the page with Next's PageProps">
-  Next 15's build-time page check requires props typed as plain
-  promises, which rejects paramour's `RouteProps` (it also accepts
-  Next 14's sync props). Type the page with Next's own generated helper
-  instead — it flows into `safeParse` unchanged:
-
-  ```tsx
-  export default async function Page(props: PageProps<"/product/[productID]">) {
-    const result = await productRoute.safeParse(props);
-    // ...
-  }
-  ```
-
-  On Next 16 this check is gone and `RouteProps` works as written above.
-</Callout>
+`RouteProps` passes Next 15's build-time page check as written above (its
+members are promise-only, exactly what the generated `.next/types` check
+requires); Next's own generated `PageProps<"/product/[productID]">` also
+works if you prefer it — either flows into `safeParse` unchanged.
 
 ## Step 6: Decide the URL story for this route
 
@@ -335,19 +324,13 @@ replaces `isLoading` before the router is ready. The
 [Pages hooks reference](/docs/reference/next/pages-hooks) cover both
 routers.
 
-<Callout title="Pages Router on Next 15: add transpilePackages">
-  On Next 15, importing `@paramour-js/next/pages` fails at build with
-  `ERR_MODULE_NOT_FOUND` for `next/router` — Next 15's page-data
-  collector loads externalized ESM with Node resolution rules that the
-  extensionless import doesn't satisfy (Next 16 is unaffected;
-  `next-typesafe-url`'s own `/pages` entry has the same problem). Until
-  it's fixed upstream, bundle the package instead:
-
-  ```js title="next.config.mjs"
-  const nextConfig = {
-    transpilePackages: ["@paramour-js/next"],
-  };
-  ```
+<Callout title="Migrating from next-typesafe-url's /pages entry?">
+  If your old `next.config` carried
+  `transpilePackages: ["next-typesafe-url"]` to work around its
+  Next 15 build failure (`ERR_MODULE_NOT_FOUND` for `next/router` at
+  page-data collection), drop the entry when the migration removes the
+  package — `@paramour-js/next/pages` builds on Next 15 without any
+  `transpilePackages` workaround.
 </Callout>
 
 ## Step 8: Repeat per route, in this order

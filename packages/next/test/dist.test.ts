@@ -71,6 +71,7 @@ describe.skipIf(!existsSync(distAppJs))("dist app entry (packaging)", () => {
     // make the negative assertion pass vacuously.
     expect(specifiers).toContain("next/navigation");
     expect(specifiers).not.toContain("next/router");
+    expect(specifiers).not.toContain("next/router.js");
   });
 });
 
@@ -95,7 +96,10 @@ describe.skipIf(!existsSync(distPagesJs))(
 
     it("no next/navigation is reachable from /pages (PR2 bundle hygiene)", () => {
       const specifiers = reachableSpecifiers(distPagesJs);
-      expect(specifiers).toContain("next/router");
+      // Extensionful on purpose — the bare specifier dies under Node ESM
+      // externalization on Next 15 (see src/pages.ts).
+      expect(specifiers).toContain("next/router.js");
+      expect(specifiers).not.toContain("next/router");
       expect(specifiers).not.toContain("next/navigation");
     });
   },
