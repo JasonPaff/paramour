@@ -1,0 +1,79 @@
+{
+  // Renovate (hosted Mend app) keeps four things fresh (CI-B2):
+  //   1. GitHub Actions SHA pins (CI-B1) — config:best-practices includes
+  //      helpers:pinGitHubActionDigests, so new actions get pinned too.
+  //   2. npm devDependencies + lockfile.
+  //   3. The Next compat-matrix pins in ci.yml (custom manager below).
+  //   4. The exact-pinned global npm in release.yml (custom manager below;
+  //      dormant until CI-U2 replaces `npm@^11` with an exact version).
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    // config:recommended + pinned action digests + pinned devDependencies
+    // + config migration. The initial onboarding PR will pin existing
+    // devDependency ranges to exact versions — expected, not noise.
+    "config:best-practices",
+    // Batch PRs to weekends; vulnerability PRs bypass this (see below).
+    "schedule:weekends",
+  ],
+  timezone: "America/New_York",
+
+  // Security fixes should not wait for the weekend.
+  vulnerabilityAlerts: {
+    schedule: ["at any time"],
+  },
+
+  lockFileMaintenance: {
+    automerge: true,
+    enabled: true,
+  },
+
+  packageRules: [
+    // Automerge the safe subset once the required "CI OK" check passes
+    // (the ruleset requires it strictly, so nothing lands without the full
+    // gate including the Next compat matrix). Majors and published-package
+    // dependencies always stay as PRs for human review.
+    {
+      automerge: true,
+      matchUpdateTypes: ["digest", "pin", "pinDigest"],
+    },
+    {
+      automerge: true,
+      matchDepTypes: ["devDependencies"],
+      matchUpdateTypes: ["minor", "patch"],
+    },
+    // Compat-matrix legs track the latest patch of THEIR major only. A new
+    // Next major means adding a matrix leg (a policy change), so the bot
+    // must never propose one here.
+    {
+      enabled: false,
+      matchDepNames: ["next"],
+      matchManagers: ["custom.regex"],
+      matchUpdateTypes: ["major"],
+    },
+  ],
+
+  customManagers: [
+    // Annotation-above-line pins in workflow YAML, e.g. the ci.yml matrix:
+    //   # renovate: datasource=npm depName=next
+    //   - "15.5.20"
+    {
+      customType: "regex",
+      managerFilePatterns: ["/\\.github/workflows/[^/]+\\.ya?ml$/"],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)\\s+- "(?<currentValue>[^"]+)"',
+      ],
+      versioningTemplate: "npm",
+    },
+    // Same-line annotated pins, e.g. release.yml's global npm (once CI-U2
+    // exact-pins it):
+    //   npm install -g npm@11.5.2 # renovate: datasource=npm depName=npm
+    {
+      customType: "regex",
+      managerFilePatterns: ["/\\.github/workflows/[^/]+\\.ya?ml$/"],
+      matchStrings: [
+        "npm@(?<currentValue>[0-9][\\w.-]*) # renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)",
+      ],
+      versioningTemplate: "npm",
+    },
+  ],
+}
