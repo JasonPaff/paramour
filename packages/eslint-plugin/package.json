@@ -1,0 +1,59 @@
+{
+  "name": "@paramour-js/eslint-plugin",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check:publish": "publint --strict && attw --pack . --profile esm-only",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "dependencies": {
+    "@typescript-eslint/utils": "^8.62.1"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0 || ^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@typescript-eslint/rule-tester": "^8.62.1",
+    "eslint": "^10.6.0",
+    "typescript": "^6.0.3"
+  },
+  "description": "ESLint plugin for paramour — flags raw string hrefs in Next.js navigation APIs that bypass paramour's typed href() building",
+  "author": "Jason Paff <jasonpaff@gmail.com>",
+  "keywords": [
+    "eslint",
+    "eslint-plugin",
+    "eslintplugin",
+    "nextjs",
+    "routing",
+    "type-safe",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JasonPaff/paramour.git",
+    "directory": "packages/eslint-plugin"
+  },
+  "homepage": "https://paramour.dev/docs/reference/eslint-plugin",
+  "bugs": {
+    "url": "https://github.com/JasonPaff/paramour/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
