@@ -5,13 +5,12 @@ import { z } from "zod";
 
 import {
   type Codec,
-  foreignMessage,
   p,
   ParamourError,
   ParseError,
-  parseValue,
   SerializeError,
 } from "../src";
+import { foreignMessage, parseValue } from "../src/internal.js";
 
 const parse = (
   codec: { "~parseElement": (raw: string) => unknown },

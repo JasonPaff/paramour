@@ -19,7 +19,6 @@ export {
   type SearchDescription,
 } from "./describe.js";
 export {
-  foreignMessage,
   type Issue,
   ParamourError,
   ParamsDecodeError,
@@ -78,7 +77,6 @@ export {
   type InferSearchInput,
   type InferSearchOutput,
   isRawSearch,
-  parseValue,
   rawSearch,
   type RawSearch,
   type SearchConfig,
