@@ -3,17 +3,716 @@ title: Wire-Format Spec
 description: The normative, numbered rules for paramour's URL serialization.
 ---
 
-<Callout title="Under construction">
-  The published spec and the interactive wire-format explorer land in a
-  later milestone.
-</Callout>
+This page is the public statement of paramour's wire format: every rule
+observable in a URL, numbered, with a stable anchor per rule (`#s3`,
+`#cv4`, …).
 
-Until the numbered rules are published here, the wire behavior is
-documented in two places:
+Three artifacts state these rules, in authority order:
 
-- [Serialization & the Wire Format](/docs/concepts/serialization) — the
-  narrative tour of the rules: per-codec wire grammars, default elision,
-  repeated keys vs. CSV, and the byte-layer encoding choices.
-- [Search helpers](/docs/reference/core/search) — the core functions that
-  implement those rules (`encodeSearch`, `decodeSearch`,
-  `buildSearchString`) and their exact contracts.
+1. **Code comments** at each rule's implementation site are the internal
+   statement of record.
+2. **The conformance suite** (`packages/core/test/conformance.test.ts`)
+   is the executable check — one test per observable behavior, citing the
+   rule IDs it pins.
+3. **This page** is the public republication. A CI test cross-checks the
+   rule IDs published here against the IDs cited in the conformance
+   suite, so the two cannot drift apart silently.
+
+Every example below is executed against the shipped `paramour` package
+when the docs are built: the snippet you read is the exact program that
+produced the output under it, and an example marked with ✗ *must* throw
+the error shown or the docs fail to build.
+
+Rule IDs are stable identifiers, not a contiguous sequence — gaps
+(`P2` with no published `P1`) are rules that were merged, retired, or
+kept internal before publication. Rules about API shape rather than wire
+behavior (type-state modifier chaining, builder grammar, reflection) live
+in the [codecs reference](/docs/reference/core/codecs), not here.
+
+## Byte layer (S)
+
+The byte layer turns ordered key/value pairs of *decoded text* into the
+final `?…` string. It is hand-rolled on purpose — `URLSearchParams`'s
+serializer emits `+` for space; paramour never does.
+
+<Rule id="S1" title="No pairs, no question mark">
+
+Serializing an empty pair set yields the empty string, never a bare `?`.
+An href whose search params all elide or are absent is just the path.
+
+<WireExample code={`searchToString({ q: p.string().optional() }, {})`} />
+
+</Rule>
+
+<Rule id="S2" title="Percent-encoding is encodeURIComponent-strict">
+
+Every key and every value is percent-encoded with `encodeURIComponent`
+semantics: spaces are `%20` — never `+` — and the encoding applies to
+keys exactly as it does to values. A paramour URL means the same thing
+under both of the web's `+` interpretations (see [P2](#p2)).
+
+<WireExample code={`searchToString({ q: p.string() }, { q: "a b" })`} />
+
+<WireExample code={`buildSearchString([["a b", "c"]])`} />
+
+</Rule>
+
+<Rule id="S3" title="Absence means omission; the empty string is a value">
+
+An absent optional or defaulted param is omitted from the wire entirely —
+no key, no `=`. The empty string is not absence: it is a real value and
+emits `key=`.
+
+<WireExample code={`searchToString({ q: p.string() }, { q: "" })`} />
+
+<WireExample
+  code={`searchToString({ q: p.string().optional() }, { q: undefined })`}
+/>
+
+</Rule>
+
+<Rule id="S4" title="The bare-key form is never emitted">
+
+Paramour never writes `?flag` — an empty value still gets its `=`
+(`?flag=`). On the decode side the platform makes the two forms
+indistinguishable anyway: `?q` and `?q=` both decode to the empty
+string.
+
+<WireExample code={`buildSearchString([["flag", ""]])`} />
+
+<WireExample
+  code={`decodeSearch({ q: p.string() }, new URLSearchParams("q"))`}
+/>
+
+</Rule>
+
+<Rule id="S5" title="Deterministic ordering">
+
+Pairs follow the search config's declaration order; a repeated-key
+array's elements keep their input order. Same state in, same URL out —
+byte for byte.
+
+<WireExample
+  code={`encodeSearch({ b: p.string(), a: p.string() }, { a: "2", b: "1" })`}
+/>
+
+**Documented deviation:** JavaScript property enumeration puts
+integer-like keys (`"0"`, `"42"`) first, in ascending numeric order,
+regardless of declaration order — declaration order is unrecoverable for
+those keys, so they sort numerically before all others. Still
+deterministic, just not declaration-ordered.
+
+<WireExample
+  code={`encodeSearch({ page: p.string(), "0": p.string() }, { "0": "b", page: "a" })`}
+/>
+
+</Rule>
+
+<Rule id="S6" title="An absent array key and [] are the same wire state">
+
+A repeated-key array param (`p.array`) that is absent or empty emits
+nothing. This is also why presence modifiers don't exist on array codecs
+— `.optional()`/`.default()` could never round-trip when absence and
+`[]` are indistinguishable on the wire. (Contrast `p.csv`, where `[]`
+has its own spelling — see [CV5](#cv5).)
+
+<WireExample
+  code={`[
+  searchToString({ tags: p.array() }, {}),
+  searchToString({ tags: p.array() }, { tags: [] }),
+]`}
+/>
+
+</Rule>
+
+<Rule id="S7" title="Unencodable text is a SerializeError">
+
+Text that cannot be percent-encoded — lone surrogates — throws a
+`SerializeError` at link-build time, in keys, values, and path segments
+alike. Never a mangled URL, never a raw `URIError`.
+
+<WireExample
+  code={`buildSearchString([["q", "\\uD800"]])`}
+  throws="SerializeError"
+/>
+
+</Rule>
+
+<Rule id="S8" title="No unicode normalization">
+
+Paramour never normalizes text. NFC and NFD spellings of the same
+glyph are distinct values with distinct wire forms, and each round-trips
+to exactly the code points you passed in.
+
+<WireExample
+  code={`// "é" as one code point vs. "e" + combining acute
+return [
+  searchToString({ q: p.string() }, { q: "\\u00e9" }),
+  searchToString({ q: p.string() }, { q: "e\\u0301" }),
+];`}
+/>
+
+</Rule>
+
+<Rule id="S9" title="Only declared params are emitted">
+
+Serialization reads exactly the keys the search config declares.
+Anything else on the input object — extra properties a JS caller
+smuggles past the types — never reaches the wire.
+
+<WireExample
+  code={`encodeSearch({ q: p.string() }, { junk: "x", q: "a" })`}
+/>
+
+</Rule>
+
+<Rule id="S10" title="The fragment is verbatim, and only ever explicit">
+
+A `#fragment` comes only from `href`'s explicit `hash` option — never
+from a route path or a search value — and is appended *verbatim*: no
+encoding, the caller owns escaping. The empty string emits no `#`.
+
+<WireExample
+  code={`const about = defineAppRoute("/about", {});
+return [href(about, { hash: "team" }), href(about, { hash: "" })];`}
+/>
+
+</Rule>
+
+## Parse layer (P)
+
+The parse layer consumes *decoded values* — Next's `searchParams`
+object or a `URLSearchParams` — and applies each codec's grammar. The
+platform has already done the percent-decoding (route params are the
+exception; see [R5](#r5)).
+
+<Rule id="P2" title="The value layer never re-interprets +">
+
+Whether `+` means space is the *platform decoder's* decision, made
+before paramour sees the value: `URLSearchParams` (and both of Next's
+query layers) decode `+` as a space, while an already-decoded object
+source keeps a literal `+`. Paramour never second-guesses either. On
+output this is moot by construction — paramour emits `%20` and `%2B`,
+never `+` ([S2](#s2)), so its URLs read identically under both
+interpretations.
+
+<WireExample
+  code={`[
+  decodeSearch({ q: p.string() }, new URLSearchParams("q=a+b")),
+  decodeSearch({ q: p.string() }, { q: "a+b" }),
+]`}
+/>
+
+</Rule>
+
+<Rule id="P5" title="Duplicate keys on a scalar codec are an error">
+
+A single-value codec receiving multiple wire values is a parse failure —
+never silently disambiguated to the first or last occurrence. Like any
+parse failure, it is recoverable per-key via `.catch()`
+([D2](#d2)).
+
+<WireExample
+  code={`decodeSearch({ page: p.integer() }, new URLSearchParams("page=2&page=3"))`}
+  throws="SearchDecodeError"
+/>
+
+<WireExample
+  code={`decodeSearch({ page: p.integer().catch(1) }, new URLSearchParams("page=2&page=3"))`}
+/>
+
+</Rule>
+
+<Rule id="P6" title="An absent array key decodes to []">
+
+The decode twin of [S6](#s6): a `p.array` key with no wire occurrences
+decodes to the empty array, not `undefined` — array-typed params always
+have an array.
+
+<WireExample code={`decodeSearch({ tags: p.array() }, {})`} />
+
+</Rule>
+
+<Rule id="P8" title="Unknown keys are ignored — and never validated">
+
+Decoding reads (and validates) source values only for declared keys.
+Junk under keys paramour doesn't own — `utm_*` params, `qs`-style
+bracket keys, even non-string values from richer query parsers — can
+never fail a decode.
+
+<WireExample
+  code={`decodeSearch({ q: p.string() }, { junk: 42, q: "ok" })`}
+/>
+
+</Rule>
+
+<Rule id="P9" title="Semicolons are not separators">
+
+Only `&` separates pairs. A `;` is an ordinary character inside a
+value, matching the modern platform (`URLSearchParams`) rather than the
+retired HTML4 recommendation.
+
+<WireExample
+  code={`decodeSearch({ a: p.string() }, new URLSearchParams("a=1;b=2"))`}
+/>
+
+</Rule>
+
+## Whole-object search: the rawSearch escape hatch (SS)
+
+A route's `search:` slot normally holds a codec map. `rawSearch(schema)`
+swaps the whole slot for a single Standard Schema that validates the
+entire search object at once — trading paramour's per-key machinery for
+schema-level control.
+
+<Rule id="SS1" title="The escape hatch is explicit">
+
+Raw mode is entered only through the `rawSearch()` wrapper — a bare
+schema in the `search:` slot is not accepted, so a route never falls
+into the degraded whole-object mode by accident, and every use is
+greppable.
+
+<WireExample
+  code={`const schema = z.object({ q: z.string() });
+return decodeSearch(rawSearch(schema), new URLSearchParams("q=hi"));`}
+/>
+
+</Rule>
+
+<Rule id="SS2" title="The search slot has exactly two shapes">
+
+A `search:` config is either a codec map or a `rawSearch` marker, and
+the two are unambiguously distinguishable at runtime (the marker's
+reserved `~kind` brand — codec maps never carry top-level `~` keys).
+`isRawSearch` is the shared public discriminant.
+
+<WireExample
+  code={`[isRawSearch(rawSearch(z.string())), isRawSearch({ q: p.string() })]`}
+/>
+
+</Rule>
+
+<Rule id="SS3" title="On decode, the schema receives every key">
+
+Unlike a codec map ([P8](#p8)), a whole-object schema owns the entire
+source: every key reaches it, normalized to Next's own `searchParams`
+shape — one occurrence collapses to `string`, repeats become
+`string[]` — identically for both source kinds.
+
+<WireExample
+  code={`const schema = z.object({ q: z.string(), tags: z.array(z.string()) });
+return decodeSearch(rawSearch(schema), new URLSearchParams("q=a&tags=x&tags=y"));`}
+/>
+
+</Rule>
+
+<Rule id="SS4" title="Schema issues map onto the shared issue shape">
+
+A failing raw-search decode throws the same `SearchDecodeError` as a
+codec map, with each schema issue's path dot-joined into the issue
+`key`. A root-level issue (empty path) gets the sentinel key
+`"<search>"`.
+
+<WireExample
+  code={`decodeSearch(rawSearch(z.string()), new URLSearchParams("q=hi"))`}
+  throws="SearchDecodeError"
+/>
+
+</Rule>
+
+<Rule id="SS5" title="On encode, the schema never runs">
+
+No serializer exists for a whole-object schema, so encoding a raw-search
+config is a pass-through: the caller provides already-wire-shaped
+strings (`string` or `string[]` per key), each array element becomes one
+repeated pair, and the schema is not consulted. Non-string leaves are a
+`SerializeError` — there is nothing to coerce with.
+
+<WireExample
+  code={`const schema = z.object({ q: z.literal("never-checked-on-encode") });
+return searchToString(rawSearch(schema), { q: "hi", tags: ["a", "b"] });`}
+/>
+
+</Rule>
+
+<Rule id="SS6" title="Raw-search types follow the runtime split">
+
+The encode side accepts the raw wire record; the decode side returns the
+schema's own inferred output. The types simply state what SS3/SS5 do.
+
+```ts twoslash
+import { rawSearch, type SearchOutputOf } from "paramour";
+import { z } from "zod";
+
+const raw = rawSearch(z.object({ q: z.string(), tags: z.array(z.string()) }));
+
+type Out = SearchOutputOf<typeof raw>;
+//   ^?
+```
+
+</Rule>
+
+<Rule id="SS7" title="Raw mode gives up round-tripping">
+
+Per-key `.default()`/`.catch()` and library-owned round-trip encoding
+are deliberately unavailable in raw mode — decode and encode are
+independent one-way doors. A schema-side default applies on decode but
+can never elide on encode ([D8](#d8) does not exist here). If you need
+bidirectional per-key transforms, that is `p.custom`, not `rawSearch`.
+
+<WireExample
+  code={`const schema = z.object({ q: z.string().default("fallback") });
+return [searchToString(rawSearch(schema), {}), decodeSearch(rawSearch(schema), {})];`}
+/>
+
+</Rule>
+
+## Codec grammar on the wire (D)
+
+The full codec-modifier API is documented in the
+[codecs reference](/docs/concepts/codecs); the rules below are the
+subset with directly observable wire behavior.
+
+<Rule id="D2" title=".catch() recovers parse failures, never absence">
+
+`.catch()` supplies a fallback when a *present* wire value fails its
+grammar. Absence is presence's job (`.optional()`/`.default()`): a
+missing required param is still an error under `.catch()`.
+
+<WireExample
+  code={`decodeSearch({ page: p.integer().catch(1) }, { page: "x" })`}
+/>
+
+<WireExample
+  code={`decodeSearch({ q: p.string().catch("fallback") }, {})`}
+  throws="SearchDecodeError"
+/>
+
+</Rule>
+
+<Rule id="D4" title="Presence governs absence — and every declared key appears">
+
+An absent key decodes by its presence: `required` records an issue,
+`.optional()` yields `undefined`, `.default()` yields the default. The
+decoded object always carries *every* declared key as an own property —
+consumers never need `in` checks.
+
+<WireExample
+  code={`const config = {
+  a: p.string().optional(),
+  b: p.integer().default(7),
+  c: p.string().catch("x"),
+};
+return decodeSearch(config, { c: "hi" });`}
+/>
+
+</Rule>
+
+<Rule id="D5" title="Route params take no presence modifiers">
+
+`params:` codecs are always presence-`required` — `.optional()` and
+`.default()` do not exist there (the path grammar already owns
+optionality via `[[...slug]]`). The wire consequence: a missing dynamic
+segment value is always an error, never defaulted away.
+
+<WireExample
+  code={`const user = defineAppRoute("/user/[id]", { params: { id: p.string() } });
+return decodeParams(user, {});`}
+  throws="ParamsDecodeError"
+/>
+
+</Rule>
+
+<Rule id="D6" title="A catch-all's codec describes one element">
+
+For `[...slug]` and `[[...slug]]` the param's codec describes a *single
+segment element*; the array comes from the route shape. Parsing and
+`.catch()` recovery are therefore element-wise — each failing element
+recovers independently — and an absent optional catch-all normalizes to
+`[]`.
+
+<WireExample
+  code={`const files = defineAppRoute("/files/[...path]", {
+  params: { path: p.integer().catch(0) },
+});
+return decodeParams(files, { path: ["1", "x", "3"] });`}
+/>
+
+<WireExample
+  code={`const docs = defineAppRoute("/docs/[[...slug]]", { params: { slug: p.string() } });
+return decodeParams(docs, {});`}
+/>
+
+</Rule>
+
+<Rule id="D8" title="Params equal to their default are elided">
+
+A value-form `.default()` participates in elision: an input equal to the
+default (compared by serialized wire form, against the *live* default,
+re-serialized per encode) is omitted, so every state has exactly one
+canonical URL. Factory defaults (`.default(() => …)`) never elide — a
+time-varying factory would swallow explicit values that later decode
+differently.
+
+<WireExample
+  code={`const config = { page: p.integer().default(1) };
+return [searchToString(config, { page: 1 }), searchToString(config, { page: 2 })];`}
+/>
+
+<WireExample
+  code={`searchToString({ page: p.integer().default(() => 1) }, { page: 1 })`}
+/>
+
+</Rule>
+
+## CSV lists (CV)
+
+`p.csv` packs a list into **one** wire value. Its sibling `p.array`
+repeats the key instead; both are first-class ([CV7](#cv7)).
+
+<Rule id="CV1" title="One wire value, comma only">
+
+A csv list is a single `key=a,b,c` pair — arity "single", so the full
+modifier set applies to the list ([CV5](#cv5)). The separator is the
+comma, not configurable.
+
+<WireExample code={`searchToString({ tags: p.csv() }, { tags: ["a", "b"] })`} />
+
+</Rule>
+
+<Rule id="CV2" title="Typed elements by composition">
+
+`p.csv(element)` parses and serializes each segment with the given
+scalar codec (strings when omitted). Elements are *unmodified* scalars:
+presence, default, and catch belong to the list, not its elements, and
+a csv cannot nest inside a csv — the illegal compositions fail at
+compile time and throw at construction time for plain-JS callers.
+
+<WireExample code={`decodeSearch({ ids: p.csv(p.integer()) }, { ids: "1,2,3" })`} />
+
+<WireExample code={`p.csv(p.csv())`} throws="ParamourError" />
+
+</Rule>
+
+<Rule id="CV3" title="The grammar, strictly">
+
+The empty wire string decodes to `[]`. Any other value must be
+`elem ("," elem)*` with every element non-empty: `a,,b`, a trailing
+`a,`, and a lone `,` are parse failures (recoverable via the list's
+`.catch()`, per [D2](#d2)). Element order is preserved, nothing is
+deduplicated, and the first element failure aborts the list parse —
+one key, one issue.
+
+<WireExample code={`decodeSearch({ tags: p.csv() }, { tags: "" })`} />
+
+<WireExample
+  code={`decodeSearch({ tags: p.csv() }, { tags: "a,,b" })`}
+  throws="SearchDecodeError"
+/>
+
+</Rule>
+
+<Rule id="CV4" title="Serialize-side collision guard">
+
+Serialization rejects any element whose serialized form is empty (an
+empty segment on re-parse — `[""]` is deliberately unrepresentable,
+since the empty wire string already means `[]`) or contains a comma
+(would mis-split on re-parse). There is no in-element escaping scheme,
+by design: everything serialize emits, parse re-reads identically, and
+the failure is loud at link-build time.
+
+<WireExample
+  code={`encodeSearch({ tags: p.csv() }, { tags: ["a,b"] })`}
+  throws="SerializeError"
+/>
+
+</Rule>
+
+<Rule id="CV5" title="Scalar arity is the point: full modifier support">
+
+A csv list takes every modifier an ordinary scalar takes, and
+absent-vs-empty is well-defined: an absent key follows presence
+([S3](#s3)); a present-but-empty `?tags=` is `[]`. Under
+`.default([])` both roads reach `[]`, and [D8](#d8) elision makes the
+bare URL the canonical spelling of "no tags".
+
+<WireExample
+  code={`const config = { tags: p.csv().default([]) };
+return [
+  decodeSearch(config, {}),
+  decodeSearch(config, { tags: "" }),
+  searchToString(config, { tags: [] }),
+];`}
+/>
+
+</Rule>
+
+<Rule id="CV7" title="Two list formats, both first-class">
+
+`p.array` (repeated keys — the HTML-form idiom) and `p.csv` (one-key
+packing — the copy-paste-friendly, nuqs-compatible spelling) are both
+fully supported. Same in-memory value, two deliberate wire spellings.
+
+<WireExample
+  code={`[
+  searchToString({ tags: p.array() }, { tags: ["a", "b"] }),
+  searchToString({ tags: p.csv() }, { tags: ["a", "b"] }),
+]`}
+/>
+
+</Rule>
+
+## Typed lists and index (PP)
+
+<Rule id="PP1" title="p.array composes a typed element codec">
+
+`p.array(element)` gives repeated-key lists typed elements under the
+same composition rules as [CV2](#cv2) — unmodified scalar elements,
+modifiers on the list. Repeated-key values have no separator to collide
+with, so no [CV4](#cv4) twin exists; a failing element fails the key,
+and a *list-level* `.catch()` recovers it whole.
+
+<WireExample
+  code={`decodeSearch({ ids: p.array(p.integer()) }, new URLSearchParams("ids=1&ids=2"))`}
+/>
+
+</Rule>
+
+<Rule id="PP5" title="p.index is 1-based on the wire, 0-based in memory">
+
+`?page=1` decodes to index `0`; index `0` encodes to `?page=1`. Wire
+values below `1` are parse failures (recoverable via `.catch()`, like
+any malformed input), and a negative in-memory index — which cannot
+round-trip through the 1-based wire floor — is a `SerializeError` at
+link-build time.
+
+<WireExample
+  code={`[
+  decodeSearch({ page: p.index() }, { page: "1" }),
+  searchToString({ page: p.index() }, { page: 0 }),
+]`}
+/>
+
+<WireExample
+  code={`decodeSearch({ page: p.index() }, { page: "0" })`}
+  throws="SearchDecodeError"
+/>
+
+</Rule>
+
+## Route segments (R)
+
+Path building serializes each dynamic segment with its param codec, then
+percent-encodes at the same byte layer as search values ([S7](#s7)
+applies). Static segments are emitted verbatim.
+
+<Rule id="R1" title="A single param is exactly one segment">
+
+`[id]` consumes one value and contributes one percent-encoded path
+segment.
+
+<WireExample
+  code={`const user = defineAppRoute("/user/[id]", { params: { id: p.string() } });
+return buildPath(user, { id: "a b" });`}
+/>
+
+</Rule>
+
+<Rule id="R2" title="Catch-all elements encode independently">
+
+`[...slug]` contributes one segment per element. A `/` *inside* an
+element percent-encodes to `%2F`, so it round-trips as a single element
+rather than splitting into two ([R5](#r5) restores it on decode).
+
+<WireExample
+  code={`const site = defineAppRoute("/[...slug]", { params: { slug: p.string() } });
+return buildPath(site, { slug: ["a/b", "c"] });`}
+/>
+
+<WireExample
+  code={`const site = defineAppRoute("/[...slug]", { params: { slug: p.string() } });
+return decodeParams(site, { slug: ["a%2Fb", "c"] });`}
+/>
+
+</Rule>
+
+<Rule id="R3" title="An optional catch-all elides; a required one can't be empty">
+
+`[[...slug]]` given `[]` or nothing emits no segments — the segment and
+its preceding `/` vanish, leaving the base path. A *required* catch-all
+given `[]` is a `SerializeError`: Next has no route for it. (Decode
+mirror: no real URL produces a present-but-empty required catch-all, so
+hand-built props doing so are a decode issue.)
+
+<WireExample
+  code={`const docs = defineAppRoute("/docs/[[...slug]]", { params: { slug: p.string() } });
+return [buildPath(docs, {}), buildPath(docs, { slug: [] })];`}
+/>
+
+<WireExample
+  code={`const files = defineAppRoute("/files/[...path]", { params: { path: p.string() } });
+return buildPath(files, { path: [] });`}
+  throws="SerializeError"
+/>
+
+</Rule>
+
+<Rule id="R4" title="A segment value can never be empty">
+
+A param that serializes to the empty string cannot form a path segment —
+it would produce `//` or a vanishing segment — and is a
+`SerializeError` at link-build time, on every surface that serializes
+params.
+
+<WireExample
+  code={`const user = defineAppRoute("/user/[id]", { params: { id: p.string() } });
+return buildPath(user, { id: "" });`}
+  throws="SerializeError"
+/>
+
+</Rule>
+
+<Rule id="R5" title="App Router param surfaces arrive percent-encoded">
+
+Next hands the App Router's `params` prop and `useParams()` values
+percent-*encoded* (Next issues #48058/#64952), so — contrary to the
+byte-layer's usual "the platform already decoded it" stance — core
+percent-decodes each segment before the codec grammar runs. A malformed
+sequence (`%zz`) falls back to the raw string unchanged. The Pages
+Router surfaces are already decoded by Node's querystring layer and opt
+out via `{ percentDecode: false }` to avoid double-decoding.
+
+<WireExample
+  code={`const product = defineAppRoute("/product/[name]", { params: { name: p.string() } });
+return [
+  decodeParams(product, { name: "a%20b" }),
+  decodeParams(product, { name: "a%20b" }, { percentDecode: false }),
+];`}
+/>
+
+</Rule>
+
+<Rule id="R6" title="No trailing slashes">
+
+The root route builds `/`; every other href ends in a non-slash — an
+elided optional catch-all leaves the bare base path, never
+`/docs/`.
+
+<WireExample
+  code={`const root = defineAppRoute("/", {});
+const docs = defineAppRoute("/docs/[[...slug]]", { params: { slug: p.string() } });
+return [href(root), buildPath(docs, {})];`}
+/>
+
+</Rule>
+
+## Related pages
+
+- [Serialization & the wire format](/docs/concepts/serialization) — the
+  narrative tour of why these rules exist.
+- [`p.*` codec builders](/docs/reference/core/p-builders) — each codec's
+  anchored value grammar (`p.integer` rejects `1e3`, `p.boolean` accepts
+  exactly `true`/`false`, …).
+- [Search helpers](/docs/reference/core/search) — the functions that
+  implement these rules (`encodeSearch`, `decodeSearch`,
+  `buildSearchString`).

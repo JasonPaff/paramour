@@ -10,6 +10,11 @@ encode/decode primitives (`decodeSearch`, `encodeSearch`, `searchToString`)
 take the **search config** itself, while the safe variants
 (`safeDecodeSearch`, like `safeDecodeParams`) take the **route object**.
 
+The exact wire behavior these helpers implement — absence vs. the empty
+string, ordering, duplicate keys, elision — is the
+[wire-format spec](/docs/reference/wire-format)'s numbered rule set; this
+page documents the function contracts.
+
 ## decodeSearch
 
 Decodes search params against a config, from either source shape — a

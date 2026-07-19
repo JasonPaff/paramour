@@ -22,19 +22,10 @@ value — and the exact value from the URL — the format is doing its job.
 
 ## What values look like on the wire
 
-Every example below is real output from the shipped library (the docs build
-runs these codecs):
+Every example below is real output from the shipped library — the "On the
+wire" column is computed by the docs build, not hand-written:
 
-| Codec | In memory | On the wire |
-| --- | --- | --- |
-| `p.boolean()` | `true` | `?debug=true` |
-| `p.isoDate()` | `Date` (2026-07-18 UTC) | `?since=2026-07-18` |
-| `p.timestamp()` | `Date` | `?at=2026-07-18T12%3A30%3A00.000Z` |
-| `p.index()` | `0` | `?page=1` (1-based on the wire) |
-| `p.json(schema)` | `{ a: 1 }` | `?f=%7B%22a%22%3A1%7D` |
-| `p.array()` | `["sale", "new"]` | `?tags=sale&tags=new` |
-| `p.csv()` | `["sale", "new"]` | `?tags=sale%2Cnew` |
-| `p.string()` | `"wool socks"` | `?q=wool%20socks` |
+<CodecWireTable />
 
 Two layers are visible here. The **value layer** is each codec's grammar —
 `true`/`false` for booleans, `YYYY-MM-DD` for dates, one repeated key per
@@ -114,8 +105,12 @@ Per-key recovery is opt-in via [`.catch()`](/docs/concepts/codecs#modifiers).
 
 ## The normative spec
 
-Everything on this page is behavior; the letter of the law is a numbered
-rule set (each rule pinned by the library's conformance test suite),
-republished as the [wire-format spec](/docs/reference/wire-format). An
-interactive explorer — compose codecs, watch the URL, paste a query string,
-watch it decode — lands on that page in a later milestone.
+Everything on this page is behavior; the letter of the law is the
+[wire-format spec](/docs/reference/wire-format) — every rule numbered and
+stable-anchored (`#s3`, `#cv4`, …), each pinned by the library's
+conformance test suite and illustrated with examples the docs build
+computes against the shipped package. When you need to know *exactly* what
+lands in the URL — absence vs. the empty string, duplicate keys, catch-all
+segments, csv grammar — the spec is the page to cite. An interactive
+explorer — compose codecs, watch the URL, paste a query string, watch it
+decode — lands in a later milestone.
