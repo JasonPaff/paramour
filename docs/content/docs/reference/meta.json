@@ -1,4 +1,4 @@
 {
-  "pages": ["core", "next", "nuqs", "devtools", "wire-format"],
+  "pages": ["core", "next", "nuqs", "devtools", "eslint-plugin", "wire-format"],
   "title": "Reference"
 }
