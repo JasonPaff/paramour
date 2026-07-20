@@ -1,0 +1,146 @@
+---
+title: "@paramour-js/eslint-plugin"
+description: The ESLint plugin — find every raw string href paramour never sees.
+---
+
+`@paramour-js/eslint-plugin` exists because paramour's value proposition —
+validated params, typed path building, explicit serialization — evaporates
+silently the moment someone writes `<Link href="/users/123">` or
+`router.push("/shop?page=2")`. The code compiles, the navigation works, and
+the route's codecs simply never run. In a codebase mid-migration this is
+the default failure mode, not an edge case: every pre-existing link is a
+raw string, and every new one written from habit is too. The plugin's one
+rule finds them all.
+
+## Install
+
+```sh
+pnpm add -D @paramour-js/eslint-plugin
+```
+
+Requires ESLint 9 or 10 with flat config. There is no legacy-eslintrc
+preset.
+
+## Setup
+
+Spread the recommended preset into `eslint.config.js`:
+
+```js title="eslint.config.js"
+import paramour from "@paramour-js/eslint-plugin";
+
+export default [
+  // ...your other config
+  paramour.configs.recommended,
+];
+```
+
+Or wire the rule manually:
+
+```js title="eslint.config.js"
+import paramour from "@paramour-js/eslint-plugin";
+
+export default [
+  {
+    plugins: { paramour },
+    rules: {
+      "paramour/no-raw-hrefs": "warn",
+    },
+  },
+];
+```
+
+The preset registers the rule at `warn` on purpose: a raw string href is
+*working* code, and this is a nudge toward migration, not a correctness
+gate. Once your routes are migrated, promote it in one line:
+
+```js
+rules: { "paramour/no-raw-hrefs": "error" }
+```
+
+## no-raw-hrefs
+
+Reports string literals — and template literals with no `${}` expressions —
+that start with `/`, in three Next.js App Router surfaces:
+
+1. **`<Link href>`** — the `href` attribute of `Link` imported from
+   `next/link`, under any local name. Imports are tracked through scope
+   resolution, not name matching: `import L from "next/link"` fires on
+   `<L href="/x" />`, while a component that happens to be called `Link`
+   but comes from anywhere else never fires.
+2. **Router methods** — the first argument of `push`, `replace`, and
+   `prefetch` on a router obtained from `next/navigation`'s `useRouter()`,
+   in both the variable form (`const router = useRouter()`) and the
+   destructured form (`const { push } = useRouter()`, including renames
+   like `const { push: go } = useRouter()`).
+3. **Server redirects** — arguments to `redirect` and `permanentRedirect`
+   imported from `next/navigation`. The server-side bypass, and the one
+   most often forgotten.
+
+```tsx
+import Link from "next/link";
+import { redirect, useRouter } from "next/navigation";
+
+<Link href="/users/123" />; // ✗ flagged
+redirect("/login"); // ✗ flagged
+
+const router = useRouter();
+router.push("/shop?page=2"); // ✗ flagged
+
+<Link href={usersRoute.href({ id: 123 })} />; // ✓ what the rule nudges toward
+```
+
+There is no autofix and no suggestion: a correct fix requires knowing
+which route object to import, from where, and what params to pass — none
+of it mechanically derivable from the string. The report message names the
+`href()` alternative instead.
+
+### What is exempt
+
+Anything that does not start with `/` is ignored — external URLs
+(`https://…`), fragments (`#…`), `mailto:`/`tel:`, relative paths, and
+empty strings all pass without a protocol allowlist to maintain.
+Protocol-relative URLs (`//cdn.example.com/x`) are external too, and are
+exempt despite their leading slashes.
+
+Type-only imports (`import type Link from "next/link"`) never fire — a
+value usage of one is already a TypeScript error.
+
+### Options
+
+| Option        | Type       | Default | Description                                 |
+| ------------- | ---------- | ------- | ------------------------------------------- |
+| `ignorePaths` | `string[]` | `[]`    | Path prefixes to exempt during a migration. |
+
+`ignorePaths` is the escape hatch for incremental adoption: a project that
+has migrated 10 of 80 routes silences the sections it has not reached yet
+instead of drowning in warnings it cannot act on.
+
+```js
+rules: {
+  "paramour/no-raw-hrefs": ["warn", { ignorePaths: ["/legacy", "/admin"] }],
+}
+```
+
+Matching is by path segment, not raw substring: `"/legacy"` exempts
+`/legacy`, `/legacy/old`, `/legacy?tab=1`, and `/legacy#top` — but **not**
+`/legacybar`. A trailing slash on the configured prefix is ignored
+(`"/legacy/"` behaves like `"/legacy"`), and `"/"` exempts everything.
+Prefixes only — no globs.
+
+### Deliberately out of scope (v1)
+
+Recorded so the omissions read as decisions, not oversights:
+
+- **Dynamic strings** — `"/users/" + id` and template literals with
+  expressions are the riskiest hrefs but also the noisiest to flag; the
+  static surfaces prove the false-positive policy first.
+- **The Pages router** — `next/router`'s `useRouter` does not fire.
+- **The `UrlObject` href form** — `href={{ pathname: "/foo" }}`.
+- **Wrapper components** — `Link` re-exported through a design-system
+  wrapper is undetectable syntactically; a `linkComponents` option is the
+  natural future answer.
+- **Routers crossing boundaries** — a router instance passed as an
+  argument or through props escapes the same-scope initializer check. The
+  rule is purely syntactic by design: no type information, no
+  `parserOptions.project` requirement, works in any parser setup that
+  produces JSX nodes.

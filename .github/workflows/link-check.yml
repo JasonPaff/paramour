@@ -31,11 +31,17 @@ jobs:
         with:
           persist-credentials: false
 
+      # Absolute self-site docs URLs (package READMEs must use them — they
+      # render on npm) are remapped into the content tree: a page added in
+      # the same PR that links it would 404 on the live site until merge.
+      # The live-site job still checks them as deployed. The \$1 escape
+      # survives the action's eval so lychee receives the $1 backreference.
       - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: >-
             --config lychee.toml
             --root-dir "$GITHUB_WORKSPACE/docs/content"
+            --remap "https://paramour\.dev/docs/(.*) file://$GITHUB_WORKSPACE/docs/content/docs/\$1"
             --no-progress
             README.md
             docs/README.md

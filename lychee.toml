@@ -1,8 +1,10 @@
 # lychee link-checker configuration (.github/workflows/link-check.yml).
 # The sources job resolves doc-relative and root-relative links against the
 # content tree (--root-dir docs/content + mdx/md fallback extensions, with
-# app routes like /explorer remapped to the live site); the weekly live-site
-# job re-checks everything as rendered by feeding lychee the deployed
+# app routes like /explorer remapped to the live site, and absolute
+# https://paramour.dev/docs/* URLs remapped back into the tree via a CLI
+# --remap so pages added in the same PR resolve); the weekly live-site job
+# re-checks everything as rendered by feeding lychee the deployed
 # sitemap's pages.
 
 accept = ["200..=299", "403", "429"]
