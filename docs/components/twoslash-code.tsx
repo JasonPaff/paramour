@@ -16,9 +16,11 @@ import { JsxEmit } from "typescript";
 export async function TwoslashCode({
   code,
   lang = "ts",
+  title,
 }: {
   code: string;
   lang?: "ts" | "tsx";
+  title?: string;
 }) {
   const rendered = await highlight(code, {
     components: {
@@ -45,5 +47,9 @@ export async function TwoslashCode({
     ],
   });
 
-  return <CodeBlock className="text-left">{rendered}</CodeBlock>;
+  return (
+    <CodeBlock className="text-left" title={title}>
+      {rendered}
+    </CodeBlock>
+  );
 }
