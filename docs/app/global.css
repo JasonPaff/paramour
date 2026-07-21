@@ -5,3 +5,53 @@
 
 @source "../node_modules/fumadocs-ui/dist/**/*.js";
 @source "../node_modules/fumadocs-twoslash/dist/**/*.js";
+
+/* Landing-page URL assembly (components/url-assembly.tsx): segments fade in
+   on a stagger driven by --segment-delay; codec-produced segments get one
+   highlight pulse after appearing. Reduced motion shows the finished URL. */
+@keyframes landing-segment-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes landing-segment-flash {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: color-mix(
+      in oklab,
+      var(--color-fd-primary) 18%,
+      transparent
+    );
+  }
+}
+
+@utility landing-segment {
+  display: inline-block;
+  animation: landing-segment-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--segment-delay, 0s);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility landing-segment-codec {
+  animation:
+    landing-segment-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both,
+    landing-segment-flash 0.9s ease-in-out both;
+  animation-delay:
+    var(--segment-delay, 0s), calc(var(--segment-delay, 0s) + 0.35s);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
