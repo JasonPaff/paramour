@@ -116,7 +116,8 @@ const ECOSYSTEM = [
     slug: ["reference", "core"],
   },
   {
-    blurb: "withTypedRoutes, App and Pages Router hooks, and the paramour CLI.",
+    blurb:
+      "withTypedRoutes, App and Pages Router hooks, a testing provider, and the paramour CLI.",
     name: "@paramour-js/next",
     slug: ["reference", "next"],
   },
@@ -178,6 +179,12 @@ const COMPARISON = [
   },
   { feature: "Devtools panel", ntu: "—", paramour: "✓", typedRoutes: "—" },
   { feature: "nuqs adapter", ntu: "—", paramour: "✓", typedRoutes: "—" },
+  {
+    feature: "Testing provider (no next/* mocks)",
+    ntu: "—",
+    paramour: "✓",
+    typedRoutes: "—",
+  },
   {
     feature: "ESLint rule for raw hrefs",
     ntu: "—",

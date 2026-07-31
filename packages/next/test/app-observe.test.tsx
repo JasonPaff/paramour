@@ -6,12 +6,15 @@
  * observations reported BEFORE the OrThrow rethrow, full pre-`select`
  * payloads, a working `navigate`, and the production no-emit guard.
  */
+import type { ReactNode } from "react";
+
 import { renderHook } from "@testing-library/react";
 import { defineAppRoute, p, SearchDecodeError } from "paramour";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ParamourObservation } from "../src/devtools-seam.js";
+import type { ParamourTestingOptions } from "../src/testing.js";
 
 import {
   useRouteParams,
@@ -21,13 +24,7 @@ import {
 } from "../src/app.js";
 import { getParamourSeam } from "../src/devtools-seam.js";
 import { useStableResult } from "../src/select.js";
-import {
-  __getReplaceCalls,
-  __resetReplaceCalls,
-  __setParams,
-  __setPathname,
-  __setSearchParams,
-} from "./stubs/next-navigation.js";
+import { ParamourTestingProvider } from "../src/testing.js";
 
 const productRoute = defineAppRoute("/product/[id]", {
   params: { id: p.integer() },
@@ -41,14 +38,38 @@ function buffer(): readonly ParamourObservation[] {
   return getParamourSeam().buffer;
 }
 
+// TA7 dogfooding: URL state and replace-capture are provider props, not a
+// framework-hook module mock. Mid-test reassignments of `current` take
+// effect on the next rerender() through the provider's stable adapter
+// pair (TA4).
+let current: ParamourTestingOptions = {};
+let replaceCalls: string[] = [];
+
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <ParamourTestingProvider {...current}>{children}</ParamourTestingProvider>
+);
+
+// The provider sits INSIDE StrictMode so its own adapters live under the
+// dev double render exactly like a consumer's would.
+const strictModeWrapper = ({ children }: { children: ReactNode }) => (
+  <StrictMode>
+    <ParamourTestingProvider {...current}>{children}</ParamourTestingProvider>
+  </StrictMode>
+);
+
 beforeEach(() => {
   const seam = getParamourSeam();
   seam.buffer.length = 0;
   seam.listeners.clear();
-  __resetReplaceCalls();
-  __setParams({ id: "42" });
-  __setPathname("/product/42");
-  __setSearchParams(new URLSearchParams("page=2&q=hi"));
+  replaceCalls = [];
+  current = {
+    onReplace: (href) => {
+      replaceCalls.push(href);
+    },
+    params: { id: "42" },
+    pathname: "/product/42",
+    search: new URLSearchParams("page=2&q=hi"),
+  };
 });
 
 afterEach(() => {
@@ -57,7 +78,7 @@ afterEach(() => {
 
 describe("one observation per decode change (DT4)", () => {
   it("emits exactly once on mount with the full payload", () => {
-    const { result } = renderHook(() => useSearch(productRoute));
+    const { result } = renderHook(() => useSearch(productRoute), { wrapper });
     expect(buffer()).toHaveLength(1);
     const observation = buffer()[0];
     expect(observation?.hook).toBe("app.useSearch");
@@ -73,7 +94,7 @@ describe("one observation per decode change (DT4)", () => {
   });
 
   it("does not emit on a same-fingerprint re-render", () => {
-    const { rerender } = renderHook(() => useSearch(productRoute));
+    const { rerender } = renderHook(() => useSearch(productRoute), { wrapper });
     expect(buffer()).toHaveLength(1);
     rerender();
     rerender();
@@ -81,8 +102,8 @@ describe("one observation per decode change (DT4)", () => {
   });
 
   it("emits exactly one more when the declared slice changes", () => {
-    const { rerender } = renderHook(() => useSearch(productRoute));
-    __setSearchParams(new URLSearchParams("page=3&q=hi"));
+    const { rerender } = renderHook(() => useSearch(productRoute), { wrapper });
+    current = { ...current, search: new URLSearchParams("page=3&q=hi") };
     rerender();
     expect(buffer()).toHaveLength(2);
     expect(buffer()[1]?.wire).toEqual([
@@ -92,12 +113,12 @@ describe("one observation per decode change (DT4)", () => {
   });
 
   it("emits exactly once under StrictMode's dev double render", () => {
-    renderHook(() => useSearch(productRoute), { wrapper: StrictMode });
+    renderHook(() => useSearch(productRoute), { wrapper: strictModeWrapper });
     expect(buffer()).toHaveLength(1);
   });
 
   it("params hooks emit a decode-time copy of the params record", () => {
-    renderHook(() => useRouteParams(productRoute));
+    renderHook(() => useRouteParams(productRoute), { wrapper });
     expect(buffer()).toHaveLength(1);
     const observation = buffer()[0];
     expect(observation?.hook).toBe("app.useRouteParams");
@@ -108,10 +129,10 @@ describe("one observation per decode change (DT4)", () => {
 
 describe("OrThrow hooks report before throwing (DT4)", () => {
   it("emits the error observation carrying the LIVE error, then rethrows", () => {
-    __setSearchParams(new URLSearchParams("page=abc"));
+    current = { ...current, search: new URLSearchParams("page=abc") };
     let thrown: unknown;
     try {
-      renderHook(() => useSearchOrThrow(productRoute));
+      renderHook(() => useSearchOrThrow(productRoute), { wrapper });
     } catch (error) {
       thrown = error;
     }
@@ -134,7 +155,7 @@ describe("OrThrow hooks report before throwing (DT4)", () => {
   });
 
   it("emits a success observation when the decode succeeds", () => {
-    renderHook(() => useRouteParamsOrThrow(productRoute));
+    renderHook(() => useRouteParamsOrThrow(productRoute), { wrapper });
     expect(buffer()).toHaveLength(1);
     const observation = buffer()[0];
     expect(observation?.hook).toBe("app.useRouteParamsOrThrow");
@@ -157,16 +178,19 @@ describe("OrThrow hooks report before throwing (DT4)", () => {
     // directly — catching around the full hook would skip the selector
     // hook's slot and trip React's hook-count invariant.
     let computeCount = 0;
-    const { rerender, result } = renderHook(() => {
-      try {
-        return useStableResult(productRoute, "same-invalid-url", () => {
-          computeCount += 1;
-          throw new Error("boom");
-        });
-      } catch (error) {
-        return error;
-      }
-    });
+    const { rerender, result } = renderHook(
+      () => {
+        try {
+          return useStableResult(productRoute, "same-invalid-url", () => {
+            computeCount += 1;
+            throw new Error("boom");
+          });
+        } catch (error) {
+          return error;
+        }
+      },
+      { wrapper },
+    );
     expect(computeCount).toBe(1);
     const firstThrown = result.current;
     expect(firstThrown).toBeInstanceOf(Error);
@@ -182,8 +206,9 @@ describe("OrThrow hooks report before throwing (DT4)", () => {
 
 describe("observations are pre-select (DT12)", () => {
   it("carries the full decoded result, not the projection", () => {
-    const { result } = renderHook(() =>
-      useSearch(productRoute, { select: (search) => search.page }),
+    const { result } = renderHook(
+      () => useSearch(productRoute, { select: (search) => search.page }),
+      { wrapper },
     );
     expect(result.current).toEqual({ data: 2, status: "success" });
     const observation = buffer()[0];
@@ -199,13 +224,13 @@ describe("navigate capability (DT8)", () => {
     // The panel sends ONLY the serialized search string: `usePathname()` is
     // basePath-/locale-relative, so the hook-side join is what keeps a
     // configured basePath from doubling through router.replace.
-    renderHook(() => useSearch(productRoute));
+    renderHook(() => useSearch(productRoute), { wrapper });
     buffer()[0]?.navigate("?page=9");
-    expect(__getReplaceCalls()).toEqual(["/product/42?page=9"]);
+    expect(replaceCalls).toEqual(["/product/42?page=9"]);
   });
 
   it("observations carry the hook's basePath-relative pathname", () => {
-    renderHook(() => useSearch(productRoute));
+    renderHook(() => useSearch(productRoute), { wrapper });
     expect(buffer()[0]?.pathname).toBe("/product/42");
   });
 });
@@ -218,9 +243,9 @@ describe("pathname re-emission (DT8)", () => {
     // bound to /product/42. Committing an edit through it would silently
     // navigate BACK to the old resource, so the seam must re-emit with the
     // new resolution base.
-    const { rerender } = renderHook(() => useSearch(productRoute));
+    const { rerender } = renderHook(() => useSearch(productRoute), { wrapper });
     expect(buffer()).toHaveLength(1);
-    __setPathname("/product/43");
+    current = { ...current, pathname: "/product/43" };
     rerender();
     expect(buffer()).toHaveLength(2);
     expect(buffer()[1]?.pathname).toBe("/product/43");
@@ -228,11 +253,11 @@ describe("pathname re-emission (DT8)", () => {
     // cached result by identity (SEL4 stability is untouched).
     expect(buffer()[1]?.result).toBe(buffer()[0]?.result);
     buffer()[1]?.navigate("?page=9");
-    expect(__getReplaceCalls()).toEqual(["/product/43?page=9"]);
+    expect(replaceCalls).toEqual(["/product/43?page=9"]);
   });
 
   it("does not re-emit while the pathname holds still", () => {
-    const { rerender } = renderHook(() => useSearch(productRoute));
+    const { rerender } = renderHook(() => useSearch(productRoute), { wrapper });
     rerender();
     rerender();
     expect(buffer()).toHaveLength(1);
@@ -242,7 +267,7 @@ describe("pathname re-emission (DT8)", () => {
 describe("production guard (DT6)", () => {
   it("safe hooks decode normally and emit nothing", () => {
     vi.stubEnv("NODE_ENV", "production");
-    const { result } = renderHook(() => useSearch(productRoute));
+    const { result } = renderHook(() => useSearch(productRoute), { wrapper });
     expect(result.current).toEqual({
       data: { page: 2, q: "hi" },
       status: "success",
@@ -252,7 +277,9 @@ describe("production guard (DT6)", () => {
 
   it("OrThrow hooks take the prod early-return branch and emit nothing", () => {
     vi.stubEnv("NODE_ENV", "production");
-    const { result } = renderHook(() => useSearchOrThrow(productRoute));
+    const { result } = renderHook(() => useSearchOrThrow(productRoute), {
+      wrapper,
+    });
     expect(result.current).toEqual({ page: 2, q: "hi" });
     expect(buffer()).toHaveLength(0);
   });

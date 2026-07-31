@@ -18,8 +18,13 @@ import {
   SearchDecodeError,
   type SearchOutputOf,
 } from "paramour";
+import { useContext } from "react";
 
 import { searchWireSnapshot } from "./devtools-seam.js";
+import {
+  type AppNavigationAdapter,
+  AppNavigationContext,
+} from "./navigation-adapter.js";
 import {
   makeAppNavigate,
   type ObservationSpec,
@@ -118,9 +123,10 @@ export function useRouteParams<R extends AnyAppRoute, U>(
   route: R,
   options?: SelectOptions<InferRouteParams<R>, U>,
 ): SafeResult<InferRouteParams<R>> | SafeResult<U> {
-  const params = useParams() ?? {};
-  const router = useRouter();
-  const pathname = usePathname();
+  const nav = useAppNavigation();
+  const params = nav.useParams() ?? {};
+  const router = nav.useRouter();
+  const pathname = nav.usePathname();
   const emitter = useDevtoolsEmitter();
   const spec: ObservationSpec | undefined =
     process.env.NODE_ENV === "production"
@@ -171,9 +177,10 @@ export function useRouteParamsOrThrow<R extends AnyAppRoute, U>(
   route: R,
   options?: SelectOptions<InferRouteParams<R>, U>,
 ): InferRouteParams<R> | U {
-  const params = useParams() ?? {};
-  const router = useRouter();
-  const pathname = usePathname();
+  const nav = useAppNavigation();
+  const params = nav.useParams() ?? {};
+  const router = nav.useRouter();
+  const pathname = nav.usePathname();
   const emitter = useDevtoolsEmitter();
   const spec: ObservationSpec | undefined =
     process.env.NODE_ENV === "production"
@@ -230,9 +237,10 @@ export function useSearch<R extends AnyAppRoute, U>(
   route: R,
   options?: SelectOptions<SearchOutputOf<R["~search"]>, U>,
 ): SafeResult<SearchOutputOf<R["~search"]>> | SafeResult<U> {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
+  const nav = useAppNavigation();
+  const searchParams = nav.useSearchParams();
+  const router = nav.useRouter();
+  const pathname = nav.usePathname();
   const emitter = useDevtoolsEmitter();
   const spec: ObservationSpec | undefined =
     process.env.NODE_ENV === "production"
@@ -279,9 +287,10 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
   route: R,
   options?: SelectOptions<SearchOutputOf<R["~search"]>, U>,
 ): SearchOutputOf<R["~search"]> | U {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
+  const nav = useAppNavigation();
+  const searchParams = nav.useSearchParams();
+  const router = nav.useRouter();
+  const pathname = nav.usePathname();
   const emitter = useDevtoolsEmitter();
   const spec: ObservationSpec | undefined =
     process.env.NODE_ENV === "production"
@@ -337,4 +346,28 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
     emitter.refresh(spec);
   }
   return useSelectedValue(value, options);
+}
+
+/**
+ * Real-Next fallback for the adapter seam (design-16 TA3): the /testing
+ * provider overrides these reads through {@link AppNavigationContext}; with
+ * no provider mounted the context's `null` default resolves here, so
+ * production behavior (and this module's `next/navigation`-only bundle
+ * graph, per dist.test.ts) is unchanged.
+ */
+const realAppAdapter: AppNavigationAdapter = {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+};
+
+/**
+ * Every hook resolves the adapter ONCE at its top and calls the adapter's
+ * reads unconditionally, exactly where the direct Next calls previously sat
+ * — hook call order is identical across renders and across provider
+ * presence (TA4).
+ */
+function useAppNavigation(): AppNavigationAdapter {
+  return useContext(AppNavigationContext) ?? realAppAdapter;
 }

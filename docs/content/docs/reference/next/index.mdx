@@ -1,11 +1,11 @@
 ---
 title: "@paramour-js/next"
-description: Entry points — withTypedRoutes, the router hooks, the devtools seam, and the paramour CLI.
+description: Entry points — withTypedRoutes, the router hooks, the testing provider, the devtools seam, and the paramour CLI.
 ---
 
 `@paramour-js/next` is the Next.js integration for paramour: the build-time
 registry wrapper, client hooks for both routers, and the `paramour` CLI. The
-package ships four module entry points plus a binary — import from the entry
+package ships five module entry points plus a binary — import from the entry
 that matches where the code runs.
 
 ## `.` — build-time integration
@@ -41,6 +41,15 @@ They return a three-state
 `SafeResult` plus a `pending` arm for the pre-hydration render of
 statically-optimized pages — and there are deliberately no `OrThrow`
 variants. The same `SelectOptions` bag applies.
+
+## `./testing` — testing provider
+
+[A provider for unit-testing client components](/docs/reference/next/testing)
+that call the hooks: `ParamourTestingProvider` and `withParamourTesting`,
+the latter a wrapper factory for testing-library's `wrapper` option. One
+provider feeds both router flavors, and it overrides the hooks' framework
+reads through context — no `next/*` module mocking, any test runner. The
+entry depends only on React and is client-only, like the hook modules.
 
 ## `./devtools-seam` — devtools contract (types only)
 

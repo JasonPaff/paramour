@@ -194,6 +194,15 @@ export function Oops() {
 }
 ```
 
+## Testing components that use these hooks
+
+In a unit test there is no Next to read the URL from — but there is no need
+to mock `next/navigation` or `next/router` either. Wrap the component in
+`withParamourTesting` from `@paramour-js/next/testing` and hand it the URL
+state; both routers' hooks read from the same provider. Server code
+(`parse`/`safeParse`, server components) needs no harness at all — the
+[testing guide](/docs/guides/testing) starts from that distinction.
+
 ## Where next
 
 - [Search params guide](/docs/guides/search-params) — declaring the configs
@@ -201,3 +210,5 @@ export function Oops() {
 - [nuqs adapter](/docs/guides/nuqs) — *writing* search state from the
   client, derived from the same codecs.
 - [Devtools panel](/docs/guides/devtools) — watch every hook decode live.
+- [Testing guide](/docs/guides/testing) — unit-test hook-calling components
+  with no `next/*` mocks.
