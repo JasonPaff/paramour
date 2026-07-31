@@ -1,0 +1,213 @@
+---
+title: Testing
+description: Unit-test client components that call the hooks — without mocking next/navigation.
+---
+
+Start here: you may not need a testing helper at all. `parse`, `safeParse`,
+`href`, and every server component that takes `params`/`searchParams` as
+props are pure functions over their inputs — hand them a plain object and
+assert on the result:
+
+```ts twoslash
+import { defineAppRoute, p } from "paramour";
+
+const productsRoute = defineAppRoute("/products", {
+  search: { page: p.integer().default(1), q: p.string().optional() },
+});
+// ---cut---
+// a server-component test is a function call — no renderer, no provider
+const result = await productsRoute.safeParseSearch({
+  searchParams: { page: "7" },
+});
+
+result.status;
+//     ^?
+```
+
+The helper below exists for the one place purity runs out: **client
+components that call the [hooks](/docs/guides/hooks) internally**
+(`useSearch`, `useRouteParams`, either router). Those hooks read the URL
+from Next, and in a unit test there is no Next — which is where people start
+hand-rolling `vi.mock("next/navigation")` stubs. `@paramour-js/next/testing`
+replaces that ceremony with a provider.
+
+## Wrapping a render
+
+`withParamourTesting(options)` returns a wrapper component for
+testing-library's `wrapper` option. Give it the URL state your component
+should see:
+
+```tsx title="app/products/filter-summary.test.tsx"
+import { withParamourTesting } from "@paramour-js/next/testing";
+import { render, screen } from "@testing-library/react";
+import { expect, test } from "vitest";
+
+import { FilterSummary } from "./filter-summary";
+
+test("renders the page and query from the URL", () => {
+  render(<FilterSummary />, {
+    wrapper: withParamourTesting({ search: "?page=2&q=paramour" }),
+  });
+
+  expect(screen.getByText(/Page 2/)).toBeDefined();
+});
+```
+
+`renderHook` works the same way, which is handy for asserting on the decoded
+result directly:
+
+```tsx title="app/products/use-search.test.tsx"
+import { useSearch } from "@paramour-js/next/app";
+import { withParamourTesting } from "@paramour-js/next/testing";
+import { renderHook } from "@testing-library/react";
+import { expect, test } from "vitest";
+
+import { productsRoute } from "./route.def";
+
+test("decodes through the route's codecs", () => {
+  const { result } = renderHook(() => useSearch(productsRoute), {
+    wrapper: withParamourTesting({ search: "page=7" }),
+  });
+
+  expect(result.current.status).toBe("success");
+});
+```
+
+The options mirror what Next hands the hooks: `pathname` (default `"/"`),
+`search` (a string — `"?page=2"` and `"page=2"` are both accepted — or a
+`URLSearchParams`), and `params`, which takes **raw wire values** as Next
+delivers them (`{ id: "42" }`, not `{ id: 42 }`) so your test exercises the
+same decode a browser would. One provider feeds both routers — App and
+Pages components use the same wrapper, and hybrid apps need no second
+import. Navigations the hooks issue through `replace()` — including ones
+driven from the [devtools panel](/docs/guides/devtools) — land in an
+optional `onReplace` callback, so a plain `vi.fn()` captures them.
+
+## Changing the URL mid-test
+
+The provider holds one stable adapter for its lifetime; prop changes update
+what the hooks read without remounting your component. So a mid-test URL
+change is just a rerender with new props — use `ParamourTestingProvider`
+directly when you need that:
+
+```tsx title="app/products/filter-summary.pagination.test.tsx"
+import { ParamourTestingProvider } from "@paramour-js/next/testing";
+import { render, screen } from "@testing-library/react";
+import { expect, test } from "vitest";
+
+import { FilterSummary } from "./filter-summary";
+
+test("tracks a page change", () => {
+  const { rerender } = render(
+    <ParamourTestingProvider search="?page=1">
+      <FilterSummary />
+    </ParamourTestingProvider>,
+  );
+
+  rerender(
+    <ParamourTestingProvider search="?page=2">
+      <FilterSummary />
+    </ParamourTestingProvider>,
+  );
+
+  expect(screen.getByText(/Page 2/)).toBeDefined();
+});
+```
+
+## Storybook
+
+`ParamourTestingProvider` is exported precisely so it composes into wrappers
+you own — a Storybook decorator is one line:
+
+```tsx title=".storybook/preview.tsx"
+import { ParamourTestingProvider } from "@paramour-js/next/testing";
+
+export const decorators = [
+  (Story) => (
+    <ParamourTestingProvider pathname="/products" search="?page=2&q=demo">
+      <Story />
+    </ParamourTestingProvider>
+  ),
+];
+```
+
+Per-story URL state works the same way inside a story's own `decorators`.
+
+## The states a hand-rolled mock never models
+
+Two URL-reading states exist in real Next apps that almost nobody stubbing
+`next/navigation` by hand thinks to reproduce — and paramour's hooks
+deliberately handle both, so your tests can too:
+
+- **`params: null`** — outside an App-Router tree (including the initial
+  render of every pages-router page in a hybrid app), Next's `useParams()`
+  returns `null`, not `{}`. The app hooks degrade it to an empty source, so
+  required params surface as ordinary "missing" issues on the error arm
+  instead of crashing. Passing `params: null` reproduces exactly that state;
+  only *omitting* `params` means `{}`.
+- **`mounted: false`** — a pages-branded component rendered where
+  `next/router` is never mounted (under `app/`) hits the router's
+  throw-on-unmounted behavior, which the pages hooks translate to a
+  `ParamourError` naming the actual mistake. `mounted: false` reproduces the
+  throw so you can pin that failure mode:
+
+```tsx title="components/product-badge.unmounted.test.tsx"
+import { withParamourTesting } from "@paramour-js/next/testing";
+import { render } from "@testing-library/react";
+import { ParamourError } from "paramour";
+import { expect, test } from "vitest";
+
+import { ProductBadge } from "./product-badge";
+
+test("rendering under app/ names the real mistake", () => {
+  expect(() =>
+    render(<ProductBadge />, { wrapper: withParamourTesting({ mounted: false }) }),
+  ).toThrow(ParamourError);
+});
+```
+
+A third pages-only knob covers the [three-state
+`RouterResult`](/docs/reference/next/pages-hooks#routerresult): on a
+statically-optimized page, `router.query` is empty until hydration
+completes, and the hooks report `{ status: "pending" }`. `isReady: false`
+puts the provider in that pre-hydration state so the `pending` arm of your
+component is testable:
+
+```tsx title="components/product-badge.pending.test.tsx"
+import { useRouteParams } from "@paramour-js/next/pages";
+import { withParamourTesting } from "@paramour-js/next/testing";
+import { renderHook } from "@testing-library/react";
+import { expect, test } from "vitest";
+
+import { productRoute } from "../lib/routes";
+
+test("reports pending before hydration", () => {
+  const { result } = renderHook(() => useRouteParams(productRoute), {
+    wrapper: withParamourTesting({ isReady: false, params: { id: "42" } }),
+  });
+
+  expect(result.current.status).toBe("pending");
+});
+```
+
+## No module mocking involved
+
+The provider overrides the hooks' framework reads through React context, not
+by replacing `next/*` modules. That has three practical consequences:
+
+- **Any runner works** — the examples use vitest, but there is no `vi.mock`,
+  `jest.mock`, or bundler alias to port. Jest, node's test runner, and
+  browser-mode runners all get the same one-liner.
+- **No collisions** — a component that also imports `redirect` or `notFound`
+  from `next/navigation` keeps the real ones; nothing else in the module is
+  touched.
+- **Zero production footprint** — real apps render no provider at all; the
+  hooks fall through to real Next.
+
+## Where next
+
+- [Testing reference](/docs/reference/next/testing) — the full options
+  table, the pages-derived values, and both exports' signatures.
+- [Hooks guide](/docs/guides/hooks) — the components you'd be testing.
+- [Search params guide](/docs/guides/search-params) — the server-side
+  parsing that needs none of this.

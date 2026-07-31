@@ -1,0 +1,111 @@
+---
+title: Testing provider
+description: ParamourTestingProvider, withParamourTesting, and ParamourTestingOptions — from @paramour-js/next/testing.
+---
+
+Import from `@paramour-js/next/testing`. The entry exports a provider that
+overrides the [hooks'](/docs/reference/next/app-hooks) framework reads
+through React context, so client components calling `useSearch` /
+`useRouteParams` (either router) can be unit-tested without mocking
+`next/navigation` or `next/router` — no `vi.mock` / `jest.mock`, no bundler
+alias, and no collision with anything else the component imports from
+`next/navigation` (`redirect`, `notFound` stay real). One provider feeds
+**both** router flavors, so hybrid apps and Pages components need no second
+import.
+
+The module depends only on React — it imports neither `next/*` nor
+`@testing-library/*`. It is client-only and carries `"use client"` like the
+hook modules; in a test runner that just means a DOM environment (jsdom,
+happy-dom, browser mode). The [testing guide](/docs/guides/testing) covers
+usage patterns — and why server code (`parse`/`safeParse`, server
+components) needs none of this.
+
+## withParamourTesting
+
+Returns a wrapper component for testing-library's `wrapper` option
+(mirroring nuqs's `withNuqsTestingAdapter`).
+
+```ts
+function withParamourTesting(
+  options?: ParamourTestingOptions,
+): (props: { children?: ReactNode }) => ReactElement;
+```
+
+```tsx title="app/products/filter-summary.test.tsx"
+import { withParamourTesting } from "@paramour-js/next/testing";
+import { render } from "@testing-library/react";
+
+import { FilterSummary } from "./filter-summary";
+
+render(<FilterSummary />, {
+  wrapper: withParamourTesting({
+    pathname: "/products",
+    search: "?page=2&q=paramour",
+  }),
+});
+```
+
+## ParamourTestingProvider
+
+The provider itself, for composing your own wrappers — Storybook
+decorators, custom render helpers, or tests that change the URL mid-test by
+rerendering with new props.
+
+```ts
+function ParamourTestingProvider(
+  props: ParamourTestingOptions & { children?: ReactNode },
+): ReactElement;
+```
+
+```tsx title=".storybook/preview.tsx"
+import { ParamourTestingProvider } from "@paramour-js/next/testing";
+
+export const decorators = [
+  (Story) => (
+    <ParamourTestingProvider pathname="/products" search="?page=2">
+      <Story />
+    </ParamourTestingProvider>
+  ),
+];
+```
+
+<Callout title="Prop changes never remount — that's the contract">
+  A provider instance holds one stable adapter pair for its lifetime; prop
+  changes update what the hooks *read*, they never swap hook
+  implementations. Drive mid-test URL changes through ordinary rerenders
+  with new props — the component under test keeps its state.
+</Callout>
+
+## ParamourTestingOptions
+
+Every field is optional; an empty call models `"/"` with no params and no
+search string.
+
+| Option      | Default | Description                                                                                                                                                                                                                     |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isReady`   | `true`  | Pages flavor only. `false` is the pre-hydration state of a statically-optimized page (`query` not yet populated) — the hooks report their `pending` arm.                                                                        |
+| `mounted`   | `true`  | Pages flavor only. `false` reproduces `next/router`'s throw-on-unmounted state (a pages component rendered under `app/`) — the pages hooks translate it to a `ParamourError` naming the actual mistake.                          |
+| `onReplace` | —       | Captures `replace(href)` from either flavor's router, including devtools-driven navigations. A plain `vi.fn()` works.                                                                                                            |
+| `params`    | `{}`    | Route params as **raw wire values**, exactly as Next hands them (`{ id: "42" }`, not `{ id: 42 }`). `null` is the hybrid-app `useParams()` state outside an App-Router tree and passes through as `null`; only omitted means `{}`. |
+| `pathname`  | `"/"`   | The current pathname.                                                                                                                                                                                                            |
+| `search`    | `""`    | The search string, as a `string` or a `URLSearchParams`. `"?page=2"` and `"page=2"` are both accepted.                                                                                                                           |
+
+## Pages-derived values
+
+The Pages-flavor router the provider fakes derives its remaining fields from
+the options rather than taking them separately, matching what real Next
+computes:
+
+- **`asPath`** is `pathname` plus the normalized `search`
+  (`"/products?page=2"`) — no separate option, so the two can't disagree.
+- **`query`** is the merged bag real Next builds: search entries first
+  (single value → scalar, repeated key → `string[]`), then `params` entries
+  override — path params win.
+- **`replace()`** resolves `Promise<boolean>` → `true`, as a completed
+  replace does in real `next/router`.
+- **`isReady`** is only meaningful while mounted; `mounted: false` throws
+  before any field is read.
+
+App-flavor reads are direct: `useParams()` returns `params`, `usePathname()`
+returns `pathname`, `useSearchParams()` returns a `URLSearchParams` built
+from `search`, and the router's `replace(href)` forwards to `onReplace`.

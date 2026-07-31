@@ -21,6 +21,12 @@ const distSeamJs = fileURLToPath(
 const distSeamDts = fileURLToPath(
   new URL("../dist/devtools-seam.d.ts", import.meta.url),
 );
+const distTestingJs = fileURLToPath(
+  new URL("../dist/testing.js", import.meta.url),
+);
+const distTestingDts = fileURLToPath(
+  new URL("../dist/testing.d.ts", import.meta.url),
+);
 
 /**
  * Every import specifier reachable from `entry` through RELATIVE imports —
@@ -121,6 +127,33 @@ describe.skipIf(!existsSync(distSeamJs))(
       expect(content).toContain('from "paramour"');
       expect(content).not.toContain("next/navigation");
       expect(content).not.toContain("next/router");
+    });
+  },
+);
+
+describe.skipIf(!existsSync(distTestingJs))(
+  "dist testing entry (packaging, design-16)",
+  () => {
+    it('dist/testing.js keeps the "use client" RSC boundary banner through tsc (TA5)', () => {
+      const content = readFileSync(distTestingJs, "utf8");
+      expect(content.startsWith('"use client";')).toBe(true);
+    });
+
+    it("dist/testing.d.ts is hermetic: no next type import leaks", () => {
+      const content = readFileSync(distTestingDts, "utf8");
+      expect(content).not.toContain("next/navigation");
+      expect(content).not.toContain("next/router");
+    });
+
+    it("no next/* is reachable from /testing (TA3 bundle hygiene)", () => {
+      const specifiers = reachableSpecifiers(distTestingJs);
+      // Guard the guard: the entry must actually reach the adapter-seam
+      // module, or the negative assertions would pass vacuously on an
+      // entry that stopped importing anything.
+      expect(specifiers).toContain("./navigation-adapter.js");
+      expect(specifiers).not.toContain("next/navigation");
+      expect(specifiers).not.toContain("next/router");
+      expect(specifiers).not.toContain("next/router.js");
     });
   },
 );

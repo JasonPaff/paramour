@@ -15,8 +15,13 @@ import {
   type SafeResult,
   type SearchOutputOf,
 } from "paramour";
+import { useContext } from "react";
 
 import { recordWireSnapshot } from "./devtools-seam.js";
+import {
+  type PagesNavigationAdapter,
+  PagesNavigationContext,
+} from "./navigation-adapter.js";
 import {
   makePagesNavigate,
   type ObservationSpec,
@@ -214,16 +219,31 @@ function omitPathParams(
 }
 
 /**
+ * Real-Next fallback for the adapter seam (design-16 TA3): the /testing
+ * provider overrides the read through {@link PagesNavigationContext}; with
+ * no provider mounted the context's `null` default resolves here, so
+ * production behavior (and this module's `next/router.js`-only bundle
+ * graph, per dist.test.ts) is unchanged. The adapter is resolved via an
+ * unconditional `useContext` BEFORE the try below, exactly where the direct
+ * call previously sat, keeping hook call order identical across renders and
+ * across provider presence (TA4).
+ */
+const realPagesAdapter: PagesNavigationAdapter = { useRouter };
+
+/**
  * `useRouter` with the one failure the brand cannot catch translated (PR5):
  * in a hybrid project a component rendered under `app/` can legally hold a
  * pages-branded route, but `next/router` has no mount there and throws
  * "NextRouter was not mounted" — a message pointing at the wrong fix
  * (component placement is invisible to the type system). Rethrow a
- * `ParamourError` naming the actual mistake; everything else propagates.
+ * `ParamourError` naming the actual mistake; everything else propagates —
+ * and the adapter's `useRouter()` stays INSIDE the try so a testing
+ * adapter's unmounted reproduction gets the same translation.
  */
 function usePagesRouter(): ReturnType<typeof useRouter> {
+  const nav = useContext(PagesNavigationContext) ?? realPagesAdapter;
   try {
-    return useRouter();
+    return nav.useRouter();
   } catch (error) {
     if (
       error instanceof Error &&

@@ -5,7 +5,8 @@
     "hooks",
     "cli",
     "nuqs",
-    "devtools"
+    "devtools",
+    "testing"
   ],
   "title": "Guides"
 }

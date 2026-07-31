@@ -17,6 +17,10 @@
     "./pages": {
       "types": "./dist/pages.d.ts",
       "default": "./dist/pages.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
     }
   },
   "sideEffects": false,
