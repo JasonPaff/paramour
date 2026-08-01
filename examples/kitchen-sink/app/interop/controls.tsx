@@ -7,11 +7,11 @@ import { interopParsers } from "./search-params";
 const ALL_LABELS = ["blue", "green", "red"];
 const ALL_TAGS = ["audio", "cable", "video"];
 
-// nuqs client state over parsers derived from the route (NQ12). Note what is
-// ABSENT here compared to a hand-rolled bridge: no createParser wrappers, no
-// restated .withDefault(1), no hand-written eq for the Date or the arrays —
-// equality is the codec's own wire form (NQ4), so clearOnDefault agrees with
-// paramour's D8 elision by construction.
+// nuqs client state over parsers derived from the route. Note what is ABSENT
+// here compared to a hand-rolled bridge: no createParser wrappers, no restated
+// .withDefault(1), no hand-written eq for the Date or the arrays — equality is
+// the codec's own wire form, so clearOnDefault agrees with paramour's default
+// elision by construction.
 export function Controls() {
   const [search, setSearch] = useQueryStates(interopParsers);
 
@@ -55,7 +55,8 @@ export function Controls() {
           </label>
           <div className="field">
             <span>
-              page — .default(1): 1 clears the key (clearOnDefault ≡ D8)
+              page — .default(1): 1 clears the key (clearOnDefault matches
+              default elision)
             </span>
             <div className="pager">
               <button

@@ -42,68 +42,67 @@ import {
 export type { SelectOptions } from "./select.js";
 
 /**
- * Client hooks (DESIGN §9, design-07). Each layers over Next's
- * `useSearchParams()` / `useParams()` — App-Router params are synchronous on
- * the client, so there is no loading state, no `useEffect`/`useState`, and
- * the result is SSR-consistent. Two layers per hook (design-07):
+ * Client hooks. Each layers over Next's `useSearchParams()` / `useParams()`
+ * — App-Router params are synchronous on the client, so there is no loading
+ * state, no `useEffect`/`useState`, and the result is SSR-consistent. Two
+ * layers per hook:
  *
- * - Raw-slice stabilization (SEL4): the decode is keyed on the DECLARED
- *   slice of the raw source, not on Next's object reference — a URL change
- *   that only touches keys the route doesn't own (`?utm_source=` churn)
- *   returns the previous result by identity, without re-decoding. Next still
- *   re-renders every subscriber on any URL change (it owns the subscription
- *   — SEL7: selectors stabilize slices, they cannot skip renders); this
- *   layer makes that render cheap and downstream-invisible.
- * - Selection (SEL1–SEL3): every hook takes an optional `{ select }` that
- *   projects the decoded value, with result-equality checking (`Object.is`,
+ * - Raw-slice stabilization: the decode is keyed on the DECLARED slice of
+ *   the raw source, not on Next's object reference — a URL change that only
+ *   touches keys the route doesn't own (`?utm_source=` churn) returns the
+ *   previous result by identity, without re-decoding. Next still re-renders
+ *   every subscriber on any URL change (it owns the subscription; selectors
+ *   stabilize slices, they cannot skip renders); this layer makes that
+ *   render cheap and downstream-invisible.
+ * - Selection: every hook takes an optional `{ select }` that projects the
+ *   decoded value, with result-equality checking (`Object.is`,
  *   `equality: "shallow"` opt-in) so an unchanged selection keeps its
  *   previous reference when OTHER params change.
  *
- * Both layers are render-phase ref caches (SEL8) — the one sanctioned
- * departure from the pure-`useMemo` discipline these hooks previously held.
+ * Both layers are render-phase ref caches — the one sanctioned departure
+ * from the pure-`useMemo` discipline these hooks previously held.
  *
  * Two surfaces per half, mirroring core's server `parse` vs `safeParse`:
  * - `useSearch` / `useRouteParams` return the `SafeResult` union
- *   (discriminated on `status`, PR12) — a user editing the URL never crashes
- *   the component. The selector runs on the success arm only (SEL2).
+ *   (discriminated on `status`) — a user editing the URL never crashes the
+ *   component. The selector runs on the success arm only.
  * - `useSearchOrThrow` / `useRouteParamsOrThrow` throw the decode error in
  *   render, to the nearest client error boundary.
  *
  * Both read the route's blessed-internal `~search` / `~params` via the core
- * decoders (design-03 RL6 — `@paramour/next` is a sanctioned consumer).
+ * decoders — `@paramour/next` is a sanctioned consumer of those internals.
  *
- * Every hook is gated to `AnyAppRoute` (design-06 PR3): a pages-branded route
- * at one of these call sites is a compile error, not a runtime surprise —
- * these hooks read Next's App-Router navigation hooks, whose pages twin has
- * different state cardinality (`@paramour-js/next/pages`).
+ * Every hook is gated to `AnyAppRoute`: a pages-branded route at one of
+ * these call sites is a compile error, not a runtime surprise — these hooks
+ * read Next's App-Router navigation hooks, whose pages twin has different
+ * state cardinality (`@paramour-js/next/pages`).
  *
- * Devtools instrumentation (design-12): each hook reports through the shared
- * emitter in observe.ts — `observe` from inside the `useStableResult`
- * compute callback, which runs exactly on a `(route, fingerprint)` cache
- * miss, so the SEL4 fingerprint layer IS the decode-change dedup (DT4;
- * StrictMode's dev double render reuses the ref cache and cannot
- * double-emit), and `refresh` after the stable result returns, re-emitting
- * the CACHED result when the pathname moved under an unchanged decode so
- * the seam's `navigate`/`pathname` never go stale (DT8). Observations carry
- * the full pre-`select` result (DT12), and the `OrThrow` hooks report the
- * error observation BEFORE rethrowing — only render-phase can, since an
- * effect never runs for a throwing render. Every emit sits behind
- * `process.env.NODE_ENV !== "production"`, which bundlers constant-fold and
- * erase along with the seam module (DT6); the spec each hook hands the
- * emitter is built behind the same literal guard, so prod allocates
- * nothing. `useRouter` and `usePathname` are called unconditionally in
- * every hook (rules of hooks — a build-constant-guarded call would make
- * hook order differ between dev and prod bundles); their cost is a
- * referentially-stable context read each, and only the dev-only spec
- * captures them. The `navigate` capability receives the panel's SEARCH
+ * Devtools instrumentation: each hook reports through the shared emitter in
+ * observe.ts — `observe` from inside the `useStableResult` compute callback,
+ * which runs exactly on a `(route, fingerprint)` cache miss, so the
+ * fingerprint layer IS the decode-change dedup (StrictMode's dev double
+ * render reuses the ref cache and cannot double-emit), and `refresh` after
+ * the stable result returns, re-emitting the CACHED result when the pathname
+ * moved under an unchanged decode so the seam's `navigate`/`pathname` never
+ * go stale. Observations carry the full pre-`select` result, and the
+ * `OrThrow` hooks report the error observation BEFORE rethrowing — only
+ * render-phase can, since an effect never runs for a throwing render. Every
+ * emit sits behind `process.env.NODE_ENV !== "production"`, which bundlers
+ * constant-fold and erase along with the seam module; the spec each hook
+ * hands the emitter is built behind the same literal guard, so prod
+ * allocates nothing. `useRouter` and `usePathname` are called
+ * unconditionally in every hook (rules of hooks — a build-constant-guarded
+ * call would make hook order differ between dev and prod bundles); their
+ * cost is a referentially-stable context read each, and only the dev-only
+ * spec captures them. The `navigate` capability receives the panel's SEARCH
  * STRING only and resolves it against `usePathname()` — basePath-/locale-
- * relative, exactly what `router.replace` expects back (DT8; the live hash
- * is preserved at call time).
+ * relative, exactly what `router.replace` expects back (the live hash is
+ * preserved at call time).
  */
 
 /**
- * Decoded route params as a `SafeResult` (discriminated on `status`, PR12),
- * optionally projected through `options.select` (design-07 SEL1/SEL2).
+ * Decoded route params as a `SafeResult` (discriminated on `status`),
+ * optionally projected through `options.select`.
  *
  * `useParams()` returns `null` outside an App-Router tree — including the
  * initial render of every pages-router page in a hybrid app — so a `null`
@@ -160,7 +159,7 @@ export function useRouteParams<R extends AnyAppRoute, U>(
 /**
  * Decoded route params, or a thrown {@link ParamsDecodeError} (→ nearest
  * client error boundary) on a malformed URL. Optionally projected through
- * `options.select` (design-07 SEL1/SEL2).
+ * `options.select`.
  *
  * A `null` `useParams()` (outside an App-Router tree, e.g. a hybrid app's
  * pages-router initial render) degrades to `{}` so required params throw the
@@ -196,7 +195,7 @@ export function useRouteParamsOrThrow<R extends AnyAppRoute, U>(
         };
   const value = useStableResult(route, paramsFingerprint(route, params), () => {
     // The duplicated decode call across the prod/dev branches is the price
-    // of literal-zero prod cost — the bundler keeps exactly one branch (DT6).
+    // of literal-zero prod cost — the bundler keeps exactly one branch.
     if (process.env.NODE_ENV === "production") {
       return decodeParams(route, params);
     }
@@ -207,7 +206,7 @@ export function useRouteParamsOrThrow<R extends AnyAppRoute, U>(
       }
       return data;
     } catch (error) {
-      // Report BEFORE the throw reaches the error boundary (DT4). Only the
+      // Report BEFORE the throw reaches the error boundary. Only the
       // decode-error class is observed — foreign errors are not URL facts
       // the panel explains, matching safeDecode*'s taxonomy.
       if (error instanceof ParamsDecodeError && spec !== undefined) {
@@ -223,8 +222,8 @@ export function useRouteParamsOrThrow<R extends AnyAppRoute, U>(
 }
 
 /**
- * Decoded search params as a `SafeResult` (discriminated on `status`, PR12),
- * optionally projected through `options.select` (design-07 SEL1/SEL2).
+ * Decoded search params as a `SafeResult` (discriminated on `status`),
+ * optionally projected through `options.select`.
  */
 export function useSearch<R extends AnyAppRoute>(
   route: R,
@@ -274,7 +273,7 @@ export function useSearch<R extends AnyAppRoute, U>(
 /**
  * Decoded search params, or a thrown {@link SearchDecodeError} (→ nearest
  * client error boundary) on a malformed URL. Optionally projected through
- * `options.select` (design-07 SEL1/SEL2).
+ * `options.select`.
  */
 export function useSearchOrThrow<R extends AnyAppRoute>(
   route: R,
@@ -307,7 +306,7 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
   const value = useStableResult(
     route,
     searchParamsFingerprint(route, searchParams),
-    // decodeSearch is keyed on SearchOutputOf (design-04 SS6) — the correct
+    // decodeSearch is keyed on SearchOutputOf (SS6) — the correct
     // public type — but AnyAppRoute erases its SC to `any`, so for a still-
     // generic R the call's SearchOutputOf<R["~search"]> reduces to `unknown`
     // on the value side while staying deferred on the annotation side. The
@@ -315,7 +314,7 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
     // rawSearch route now infers its schema output here, not a garbage
     // {~kind, ~schema} shape. The cast appears in both branches below — the
     // prod/dev split (and its duplicated decode call) is the price of
-    // literal-zero prod cost; the bundler keeps exactly one branch (DT6).
+    // literal-zero prod cost; the bundler keeps exactly one branch.
     () => {
       if (process.env.NODE_ENV === "production") {
         return decodeSearch(route["~search"], searchParams) as SearchOutputOf<
@@ -332,9 +331,8 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
         }
         return data;
       } catch (error) {
-        // Report BEFORE the throw reaches the error boundary (DT4); only
-        // the decode-error class is observed, matching safeDecode*'s
-        // taxonomy.
+        // Report BEFORE the throw reaches the error boundary; only the
+        // decode-error class is observed, matching safeDecode*'s taxonomy.
         if (error instanceof SearchDecodeError && spec !== undefined) {
           emitter.observe(spec, { error, status: "error" });
         }
@@ -349,8 +347,8 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
 }
 
 /**
- * Real-Next fallback for the adapter seam (design-16 TA3): the /testing
- * provider overrides these reads through {@link AppNavigationContext}; with
+ * Real-Next fallback for the adapter seam: the /testing provider overrides
+ * these reads through {@link AppNavigationContext}; with
  * no provider mounted the context's `null` default resolves here, so
  * production behavior (and this module's `next/navigation`-only bundle
  * graph, per dist.test.ts) is unchanged.
@@ -366,7 +364,7 @@ const realAppAdapter: AppNavigationAdapter = {
  * Every hook resolves the adapter ONCE at its top and calls the adapter's
  * reads unconditionally, exactly where the direct Next calls previously sat
  * — hook call order is identical across renders and across provider
- * presence (TA4).
+ * presence.
  */
 function useAppNavigation(): AppNavigationAdapter {
   return useContext(AppNavigationContext) ?? realAppAdapter;

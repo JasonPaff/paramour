@@ -11,7 +11,7 @@ import {
 } from "./errors.js";
 import { runStandardSchemaSync } from "./schema.js";
 
-// Wire grammars per wire-format spec §4. `Number()` alone is too loose
+// Wire grammars for the scalar kinds. `Number()` alone is too loose
 // (accepts hex, trims whitespace), hence explicit anchored patterns.
 const INTEGER_RE = /^-?\d+$/;
 const NUMBER_RE = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
@@ -23,8 +23,8 @@ const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 /**
  * Serialize-side Date guard. Years outside 0000–9999 are rejected:
  * toISOString switches to the expanded ±6-digit-year form there, which the
- * wire grammars (§4) cannot represent — better a loud SerializeError than a
- * URL that can never round-trip.
+ * wire grammars cannot represent — better a loud SerializeError than a URL
+ * that can never round-trip.
  */
 function expectSerializableDate(value: unknown): Date {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
@@ -102,9 +102,10 @@ function refineForSerialize(schema: StandardSchemaV1, value: unknown): unknown {
 /**
  * Shared element admission for `p.array`/`p.csv` (PP1/CV2): resolves the
  * no-arg default and mirrors the type-state exclusions — presence, catch,
- * and arity-many inners — for JS consumers (the RL1 ethos). Only the
- * element's parse/serialize functions are captured by the list builders, so
- * an accepted modifier would be silently dropped, not applied; one guard
+ * and arity-many inners — for JS consumers, who get the same fail-fast
+ * rejection at definition time that the type layer gives TS callers. Only
+ * the element's parse/serialize functions are captured by the list builders,
+ * so an accepted modifier would be silently dropped, not applied; one guard
  * keeps that runtime mirror of the type-state in a single place.
  */
 function resolveListElement(
@@ -176,12 +177,12 @@ function stringifyJson(value: unknown): string {
 let defaultListElement: AnyCodec | undefined;
 
 /**
- * The `p.*` wire-codec builders (DESIGN §5 layer 1, design-02 D9).
- * Each codec defines how one value crosses the URL boundary, both directions.
+ * The `p.*` wire-codec builders. Each codec defines how one value
+ * crosses the URL boundary, in both directions.
  */
 export const p = {
   /**
-   * A repeated-key list (`?tags=a&tags=b`, design-13 PP1): arity "many", so
+   * A repeated-key list (`?tags=a&tags=b`, PP1): arity "many", so
    * presence modifiers are unavailable — absent and `[]` are the same wire
    * state (S6/P6) — unlike `p.csv`'s one-key packing (CV7). Elements are
    * strings unless an element codec is given.
@@ -228,19 +229,18 @@ export const p = {
   },
 
   /**
-   * A comma-separated scalar list in ONE wire value (design-11 CV1): arity
+   * A comma-separated scalar list in ONE wire value (CV1): arity
    * "single", so the full modifier set applies — unlike `p.array`'s
    * repeated-key format (CV7: both are first-class; csv is the one-key
    * packing). Elements are strings unless an element codec is given.
    */
   csv<E = string>(element?: Codec<E>): Codec<E[]> {
     // CV2: presence, catch, and arity-many inners are excluded by the
-    // parameter type (the D3 philosophy); resolveListElement mirrors that
-    // type-state for JS consumers (the RL1 ethos). Nesting is detected
+    // parameter type (the same type-state philosophy); resolveListElement
+    // mirrors that type-state for JS consumers. Nesting is detected
     // structurally via ~element (never via ~kind, which is reflection-only
-    // and free-form for p.custom labels). Comma-emitting p.custom inners
-    // are undetectable here and are caught by the CV4 serialize guard
-    // instead.
+    // and free-form for p.custom labels). Comma-emitting p.custom inners are
+    // undetectable here and are caught by the CV4 serialize guard instead.
     const inner = resolveListElement(element, "p.csv");
     // The shared guard ran first: p.array also carries ~element (PP1), and
     // the arity guard owns the "array codecs" wording — the ~element guard
@@ -368,13 +368,14 @@ export const p = {
 
   /**
    * A 1-based-on-wire / 0-based-in-memory integer for pagination-style
-   * params (`?page=1` ↔ index 0, design-13 PP5). Deliberately stricter than
-   * nuqs's `parseAsIndex`, whose below-floor behavior is unspecified: wire
-   * values below 1 are a ParseError (recoverable via `.catch()`, like any
-   * other malformed input), and a negative in-memory index — which cannot
+   * params (`?page=1` ↔ index 0, PP5). Deliberately stricter than nuqs's
+   * `parseAsIndex`, whose below-floor behavior is unspecified: wire values
+   * below 1 are a ParseError (recoverable via `.catch()`, like any other
+   * malformed input), and a negative in-memory index — which cannot
    * round-trip through the 1-based wire floor — is a SerializeError at
-   * link-build time (the RL1 ethos). The optional schema validates the
-   * in-memory (0-based) value on both sides.
+   * link-build time, failing where the link is written rather than on the
+   * next navigation. The optional schema validates the in-memory (0-based)
+   * value on both sides.
    */
   index<S extends StandardSchemaV1<number, number>>(
     schema?: S,

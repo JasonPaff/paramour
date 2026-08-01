@@ -4,11 +4,11 @@ description: Devtools panel API and the observation-seam contract.
 ---
 
 `@paramour-js/devtools` is a [TanStack Devtools](https://tanstack.com/devtools)
-panel that observes the hooks in `@paramour-js/next` as they decode routes
-(design-12). The public surface is deliberately tiny — the plugin-entry
-helper and the panel component — because the panel never re-implements
-decoding: it subscribes to an observation seam the hooks emit through, so
-what it renders is what your components actually got.
+panel that observes the hooks in `@paramour-js/next` as they decode routes.
+The public surface is deliberately tiny — the plugin-entry helper and the
+panel component — because the panel never re-implements decoding: it
+subscribes to an observation seam the hooks emit through, so what it renders
+is what your components actually got.
 
 For setup and a tour of what the panel shows, see the
 [devtools guide](/docs/guides/devtools). This page is the API reference,

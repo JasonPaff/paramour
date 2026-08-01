@@ -1,15 +1,15 @@
 {
   // World-B (post-generation) tstyche config: module augmentation is
   // program-global, so the registry tests live in their own compilation
-  // unit (design-03 testing plan). The paths mapping lets them import the
+  // unit. The paths mapping lets them import the
   // real "paramour" specifier — resolved to the BUILT types entry (the same
   // file package.json's exports publishes), so the suite certifies that
   // declaration emit preserves ParamourRegister augmentation for real
   // consumers. Requires `pnpm build` first; registry-target.test.ts guards
   // this mapping against drifting from the published exports.
   //
-  // The @paramour-js/next hook entries are mapped the same way (design-06
-  // PR3/PR11 §3) — built d.ts, not src — so the hook-gating tests see the
+  // The @paramour-js/next hook entries are mapped the same way — built
+  // d.ts, not src — so the hook-gating tests see the
   // hooks exactly as consumers do, through declaration emit. A paths
   // mapping instead of a devDependency: core → next would be a workspace
   // dependency cycle, and the suite needs only types.

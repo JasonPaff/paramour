@@ -13,15 +13,15 @@ import type {
 import { emitObservation } from "./devtools-seam.js";
 
 /**
- * Shared devtools seam wiring for the six read hooks (design-12 DT4/DT8):
- * the navigate builders (one per router flavor) and the per-hook emitter
- * that owns WHEN an observation goes out. Deliberately NO `"use client"`
- * directive — app.ts (which carries one) and pages.ts (which must not,
- * PR2) both import from here, like select.ts.
+ * Shared devtools seam wiring for the six read hooks: the navigate builders
+ * (one per router flavor) and the per-hook emitter that owns WHEN an
+ * observation goes out. Deliberately NO `"use client"` directive — app.ts
+ * (which carries one) and pages.ts (which must not) both import from here,
+ * like select.ts.
  *
  * Emission policy: the hooks call {@link DevtoolsEmitter.observe} from
- * inside the `useStableResult` compute — the SEL4 fingerprint cache miss IS
- * the decode-change dedup (DT4), and only render-phase can report the
+ * inside the `useStableResult` compute — the fingerprint cache miss IS the
+ * decode-change dedup, and only render-phase can report the
  * OrThrow hooks' error observation before the rethrow. `observe` alone
  * would leave one staleness hole: a component that survives a navigation
  * whose decode is unchanged (`/product/1?q=a` → `/product/2?q=a` in a
@@ -30,10 +30,10 @@ import { emitObservation } from "./devtools-seam.js";
  * navigate back to the old resource. {@link DevtoolsEmitter.refresh},
  * called render-phase after the stable result returns, closes it: when the
  * resolution base (or a HMR-reminted route) moved under a cached decode, it
- * re-emits the CACHED result with the fresh spec — decode stability (SEL4)
- * is untouched, only the seam payload is renewed.
+ * re-emits the CACHED result with the fresh spec — decode stability is
+ * untouched, only the seam payload is renewed.
  *
- * Production erasure (DT6): every call site keeps a literal
+ * Production erasure: every call site keeps a literal
  * `process.env.NODE_ENV` guard the bundler constant-folds, and both emitter
  * methods early-return behind the same literal guard, so the
  * `emitObservation` import above is dead in a production bundle and drops
@@ -75,8 +75,8 @@ interface LastEmit {
 }
 
 /**
- * App-flavor navigate capability (DT8): `next/navigation`'s `replace`
- * returns void and resolves the basePath-/locale-relative join itself.
+ * App-flavor navigate capability: `next/navigation`'s `replace` returns void
+ * and resolves the basePath-/locale-relative join itself.
  */
 export function makeAppNavigate(
   router: { replace: (href: string) => void },
@@ -88,8 +88,8 @@ export function makeAppNavigate(
 }
 
 /**
- * Pages-flavor navigate capability (DT8): `next/router`'s `replace` returns
- * a promise that REJECTS on routine navigation aborts (rapid re-commits
+ * Pages-flavor navigate capability: `next/router`'s `replace` returns a
+ * promise that REJECTS on routine navigation aborts (rapid re-commits
  * from the panel), marked with next's `cancelled` discriminant — those must
  * not surface as unhandled rejections. Anything else is a real failure
  * (render error, route-info error) silently discarding the user's edit, so

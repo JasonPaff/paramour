@@ -5,8 +5,8 @@ import type { RouteSession } from "../store.js";
 import { RouterBadge, StatusDot } from "./primitives.js";
 
 /**
- * DT10/DT15's session rail: every route observed this session in
- * first-observed order — route pattern, router micro-badge, last-status dot
+ * The session rail: every route observed this session in first-observed
+ * order — route pattern, router micro-badge, last-status dot
  * (gray/stale when not matching the current URL). Selecting an entry pins
  * it; selecting the pinned entry again returns to auto-follow-current.
  */

@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 /**
- * The explorer's URL-state descriptor (plan-docs-milestone-5 B1/B2).
+ * The explorer's URL-state descriptor.
  *
  * The whole explorer — composed config, encode-pane inputs, decode-pane query
  * — is one JSON value carried by a single `p.json(explorerStateSchema)` search
- * param, so a shared link reproduces exactly what the sharer saw (decision 8).
+ * param, so a shared link reproduces exactly what the sharer saw.
  *
  * Modifier values (`.default()` / `.catch()`) and encode inputs are stored as
  * WIRE-FORM STRINGS and parsed through the described codec itself

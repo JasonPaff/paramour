@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 /**
- * The copy-url source (design-12 DT9): a CURRENT session copies the live
+ * The copy-url source: a CURRENT session copies the live
  * `window.location.href`; a STALE session's snapshot is a page that is no
- * longer mounted, so its URL is rebuilt from the parsed halves via `href` —
- * copying the live location there would hand the user the WRONG page.
+ * longer mounted, so its URL is rebuilt from the parsed halves via `href`
+ * — copying the live location there would hand the user the WRONG page.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { defineAppRoute, p } from "paramour";
@@ -49,7 +49,7 @@ function observeProduct(): void {
   );
 }
 
-describe("copy url (DT9)", () => {
+describe("copy url", () => {
   it("a stale session copies ITS snapshot URL, not the live location", () => {
     setUrl("/shop");
     observeProduct();

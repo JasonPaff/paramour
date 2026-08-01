@@ -9,5 +9,5 @@ const nextConfig: NextConfig = {
 };
 
 // strict: true — the committed paramour-env.d.ts is the law; a CI
-// `next build` fails on artifact drift (TR3/TR4 committed-file contract).
+// `next build` fails if the generated artifact has drifted from it.
 export default withTypedRoutes(nextConfig, { strict: true });

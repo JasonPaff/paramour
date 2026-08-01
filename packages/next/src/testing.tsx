@@ -16,47 +16,43 @@ import {
 } from "./navigation-adapter.js";
 
 /**
- * `@paramour-js/next/testing` (design-16): a provider that overrides the
- * hooks' framework reads through the adapter seam (TA1), so client
- * components calling `useSearch`/`useRouteParams` (either flavor) can be
- * unit-tested without runner-specific `next/*` module mocking. One provider
- * feeds BOTH flavor contexts (TA5) — hybrid apps and pages components need
- * no second import. Server code needs none of this: `parse`/`safeParse` and
- * server components are pure functions over props (TA8).
+ * `@paramour-js/next/testing`: a provider that overrides the hooks'
+ * framework reads through the adapter seam, so client components calling
+ * `useSearch`/`useRouteParams` (either flavor) can be unit-tested without
+ * runner-specific `next/*` module mocking. One provider feeds BOTH flavor
+ * contexts — hybrid apps and pages components need no second import. Server
+ * code needs none of this: `parse`/`safeParse` and server components are
+ * pure functions over props.
  *
  * This module imports ONLY react and the (Next-free) adapter-seam module —
- * no `next/*` specifier and no `@testing-library/*` (TA5; dist.test.ts pins
- * the bundle graph, and the hermeticity check there is why these docs never
- * spell out the two Next specifiers). It carries `"use client"` like
- * app.ts.
+ * no `next/*` specifier and no `@testing-library/*`; dist.test.ts pins the
+ * bundle graph, and the hermeticity check there is why these docs never
+ * spell out the two Next specifiers. It carries `"use client"` like app.ts.
  *
- * Stability contract (TA4): the provider holds ONE adapter pair for its
- * lifetime, created once and closing over a latest-props ref that is
- * reassigned every render — prop changes mutate what the stable adapters
- * RETURN, they never mint new adapters, so the hooks' context reads stay
- * identity-stable and mid-test URL changes are driven by ordinary rerenders
- * with new props.
+ * Stability contract: the provider holds ONE adapter pair for its lifetime,
+ * created once and closing over a latest-props ref that is reassigned every
+ * render — prop changes mutate what the stable adapters RETURN, they never
+ * mint new adapters, so the hooks' context reads stay identity-stable and
+ * mid-test URL changes are driven by ordinary rerenders with new props.
  */
 
 /**
- * Input shape mirrors what Next hands the hooks (TA6) — no `url`
- * reverse-matching in v1 (deferred: needs a core matcher). `params: null`
- * and `mounted: false` are first-class because they are the two states
- * nobody hand-rolling a mock models.
+ * Input shape mirrors what Next hands the hooks — no `url` reverse-matching
+ * in v1 (deferred: needs a core matcher). `params: null` and
+ * `mounted: false` are first-class because they are the two states nobody
+ * hand-rolling a mock models.
  */
 export interface ParamourTestingOptions {
   /**
    * Pages flavor only: `false` is the pre-hydration state of a
-   * statically-optimized page (`query` not yet populated — the PR5
-   * `pending` arm). Defaults to `true`. design-16 listed this as deferred,
-   * but TA7 migrates the whole pages suite — which pins the pending arm —
-   * to this provider, so it was promoted from the deferred list.
+   * statically-optimized page (`query` not yet populated — the hooks'
+   * `pending` arm). Defaults to `true`.
    */
   isReady?: boolean;
   /**
    * Pages flavor only: `false` reproduces the pages router's
-   * throw-on-unmounted state under `app/` (PR5) — pages.ts translates it to
-   * a `ParamourError` naming the actual mistake.
+   * throw-on-unmounted state under `app/` — pages.ts translates it to a
+   * `ParamourError` naming the actual mistake.
    */
   mounted?: boolean;
   /** Captures `replace(href)` from either flavor's router. */
@@ -77,15 +73,15 @@ interface LatestOptions {
 }
 
 /**
- * Renders BOTH flavor contexts' providers around `children` (TA5). Exported
- * for people composing their own wrappers (Storybook decorators, custom
- * render helpers); testing-library users want {@link withParamourTesting}.
+ * Renders BOTH flavor contexts' providers around `children`. Exported for
+ * people composing their own wrappers (Storybook decorators, custom render
+ * helpers); testing-library users want {@link withParamourTesting}.
  */
 export function ParamourTestingProvider(
   props: ParamourTestingOptions & { children?: ReactNode },
 ): ReactElement {
-  // Latest-ref pattern (TA4): reassigned every render so the stable
-  // adapters below always read the CURRENT render's props.
+  // Latest-ref pattern: reassigned every render so the stable adapters
+  // below always read the CURRENT render's props.
   const latest = useRef<ParamourTestingOptions>(props);
   latest.current = props;
   const [adapters] = useState(() => createAdapters(latest));
@@ -99,8 +95,8 @@ export function ParamourTestingProvider(
 }
 
 /**
- * Wrapper-component form for testing-library's `wrapper` option (TA5,
- * mirroring `withNuqsTestingAdapter`).
+ * Wrapper-component form for testing-library's `wrapper` option, mirroring
+ * `withNuqsTestingAdapter`.
  */
 export function withParamourTesting(
   options: ParamourTestingOptions = {},
@@ -117,10 +113,10 @@ export function withParamourTesting(
 }
 
 /**
- * The one adapter pair a provider instance ever holds (TA4). Every read
- * defers to `latest.current`, so the adapters are stable while their
- * answers track prop updates. Fresh `URLSearchParams` per call is fine —
- * the hooks fingerprint the declared slice (SEL4), not the instance.
+ * The one adapter pair a provider instance ever holds. Every read defers to
+ * `latest.current`, so the adapters are stable while their answers track
+ * prop updates. Fresh `URLSearchParams` per call is fine — the hooks
+ * fingerprint the declared slice, not the instance.
  */
 function createAdapters(latest: LatestOptions): {
   app: AppNavigationAdapter;
@@ -152,22 +148,22 @@ function createAdapters(latest: LatestOptions): {
       const options = latest.current;
       if (options.mounted === false) {
         // Verbatim prefix of next/router's real unmounted error — pages.ts
-        // matches on the message to translate it (PR5).
+        // matches on the message to translate it.
         throw new Error(
           "NextRouter was not mounted. https://nextjs.org/docs/messages/next-router-not-mounted",
         );
       }
       const search = normalizeSearch(options.search);
       return {
-        // asPath derives from pathname + normalized search (TA6) —
+        // asPath derives from pathname + normalized search —
         // basePath-relative, what the devtools navigate capability resolves
-        // against (DT8).
+        // against.
         asPath: (options.pathname ?? "/") + (search === "" ? "" : `?${search}`),
         isReady: options.isReady ?? true,
         query: mergedQuery(options),
         replace(url: string): Promise<boolean> {
           latest.current.onReplace?.(url);
-          // Real next/router resolves `true` on a completed replace (TA6).
+          // Real next/router resolves `true` on a completed replace.
           return Promise.resolve(true);
         },
       };

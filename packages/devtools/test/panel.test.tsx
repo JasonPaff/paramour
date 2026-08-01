@@ -39,7 +39,7 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("describeRoute-driven rendering (DT7)", () => {
+describe("describeRoute-driven rendering", () => {
   it("renders wire, parsed, and shape per codec kind", () => {
     const seam = freshSeam();
     seam.buffer.push(
@@ -93,7 +93,7 @@ describe("describeRoute-driven rendering (DT7)", () => {
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("params rows are read-only: no edit widget in the params table (DT8)", () => {
+  it("params rows are read-only: no edit widget in the params table", () => {
     const seam = freshSeam();
     seam.buffer.push(
       paramsObservation(

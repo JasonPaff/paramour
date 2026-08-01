@@ -9,25 +9,28 @@ import { DEFAULT_PAGE_EXTENSIONS, scanAppRoutes } from "./scan-app.js";
 import { scanPagesRoutes } from "./scan-pages.js";
 
 /**
- * The thin orchestrator over the two scanners (PR8): joint directory
- * discovery, delegation, and the cross-router collision checks (PR9).
+ * The thin orchestrator over the two scanners: joint directory discovery,
+ * delegation, and the cross-router collision checks.
  */
 
-/** The two route dirs of a project; either may be absent (PR1 hybrid). */
+/**
+ * The two route dirs of a project; either may be absent — hybrid app/pages
+ * projects are supported, as are app-only and pages-only ones.
+ */
 export interface RouteDirs {
   appDir?: string | undefined;
   pagesDir?: string | undefined;
 }
 
-/** Result of {@link scanRoutes} — the input shape of the PR9 artifact. */
+/** Result of {@link scanRoutes} — the input shape of the artifact. */
 export interface ScanRoutesResult {
   appRoutes: string[];
   pagesRoutes: string[];
 }
 
 /**
- * Joint route-dir discovery (spike-2 ruling). Next's documented rule is one
- * decision, not two probes: `src/app` AND `src/pages` are both ignored
+ * Joint route-dir discovery. Next's documented rule is one decision, not
+ * two probes: `src/app` AND `src/pages` are both ignored
  * whenever `app/` OR `pages/` exists at the project root. An ignored src dir
  * that contains page files is a hard config error — Next silently serves
  * none of those pages (and has shipped bugs in the mixed case,
@@ -72,10 +75,10 @@ export function resolveRouteDirs(
 }
 
 /**
- * Scan whichever route dirs exist and return both route unions (PR1). After
- * each scanner's own intra-router checks, two cross-router passes run (PR9):
- * a path in BOTH unions is Next's "Conflicting app and page file" build
- * error, and the structural pass re-runs over the merged, labeled union so
+ * Scan whichever route dirs exist and return both route unions. After each
+ * scanner's own intra-router checks, two cross-router passes run: a path in
+ * BOTH unions is Next's "Conflicting app and page file" build error, and the
+ * structural pass re-runs over the merged, labeled union so
  * shared-prefix slug conflicts and cross-router optional-catch-all
  * specificity are caught too.
  */
@@ -93,7 +96,7 @@ export function scanRoutes(
   const shared = pagesRoutes.filter((path) => appSet.has(path));
   if (shared.length > 0) {
     throw new RouteCollisionError(
-      `route collision between app/ and pages/: ${shared.map((path) => `"${path}"`).join(", ")} — Next fails the build on conflicting app and page files (PR9)`,
+      `route collision between app/ and pages/: ${shared.map((path) => `"${path}"`).join(", ")} — Next fails the build on conflicting app and page files`,
     );
   }
   assertNoStructuralCollisions([

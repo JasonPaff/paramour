@@ -1,9 +1,9 @@
 /**
- * Type-level tests for the package's public surface (design-12): panel
- * props under exactOptionalPropertyTypes, the plugin helper's return shape,
- * and — the load-bearing one — assignability of the structurally-declared
- * plugin entry to the REAL `@tanstack/react-devtools` plugins prop (the
- * reason the shell is a devDependency here).
+ * Type-level tests for the package's public surface: panel props under
+ * exactOptionalPropertyTypes, the plugin helper's return shape, and — the
+ * load-bearing one — assignability of the structurally-declared plugin
+ * entry to the REAL `@tanstack/react-devtools` plugins prop (the reason the
+ * shell is a devDependency here).
  */
 import type { ComponentProps, JSX, ReactElement } from "react";
 
@@ -51,7 +51,7 @@ test("plugin helper returns the entry shape", () => {
   expect(paramourDevtoolsPlugin().render).type.toBeAssignableTo<ReactElement>();
 });
 
-test("the entry is assignable to the REAL shell's plugins array (DT1/DT13)", () => {
+test("the entry is assignable to the REAL shell's plugins array", () => {
   expect(paramourDevtoolsPlugin()).type.toBeAssignableTo<ShellPlugin>();
   expect([paramourDevtoolsPlugin()]).type.toBeAssignableTo<
     NonNullable<ShellPlugins>

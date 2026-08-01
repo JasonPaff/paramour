@@ -21,11 +21,10 @@ export type Arity = "many" | "single";
  *
  * `Out` is the decoded in-memory type. `P`, `C`, `A`, and `E` are type-state:
  * modifier methods are conditionally `never`, so illegal chains
- * (`.optional().default()`, double `.catch()`) fail to compile (design-02 D3).
- * `E` carries `~defaultElides` as a literal after `.default()` (NQ6a).
- * Presence modifiers are also `never` for arity-"many" codecs: absent and `[]`
- * are the same wire state (S6/P6), so `.default()`/`.optional()` could never
- * round-trip there.
+ * (`.optional().default()`, double `.catch()`) fail to compile. `E` carries
+ * `~defaultElides` as a literal after `.default()`. Presence modifiers are
+ * also `never` for arity-"many" codecs: absent and `[]` are the same wire
+ * state (S6/P6), so `.default()`/`.optional()` could never round-trip there.
  *
  * `.default()` and `.catch()` accept either a value or a zero-arg factory;
  * factories are invoked per decode/encode, so reference-typed defaults can be
@@ -47,8 +46,8 @@ export interface Codec<
     ? (fallback: (() => Out) | Out) => Codec<Out, P, true, A, E>
     : never;
   /**
-   * Overloaded so the value/factory split is visible in type-state (NQ6a):
-   * the factory overload comes FIRST and must stay first. The runtime
+   * Overloaded so the value/factory split is visible in type-state: the
+   * factory overload comes FIRST and must stay first. The runtime
    * {@link isFactory} check treats ANY function as a factory, so a function
    * argument must either match the factory overload or fail to compile
    * ({@link NonFactoryValue}) — E=true is only ever inferred for arguments
@@ -83,19 +82,18 @@ export interface Codec<
    * factory would elide an explicitly-passed value that later decodes as a
    * different one.
    *
-   * Literal-typed via `E` (NQ6a) so derived surfaces (`@paramour-js/nuqs`)
-   * can give value-defaulted keys non-nullable reads while keeping
-   * factory-defaulted keys honestly nullable. A hand-written
-   * `Codec<…, "defaulted">` leaves `E` at its `boolean` default, which
-   * consumers must treat as the factory (nullable) branch — the safe
-   * reading.
+   * Literal-typed via `E` so derived surfaces (`@paramour-js/nuqs`) can give
+   * value-defaulted keys non-nullable reads while keeping factory-defaulted
+   * keys honestly nullable. A hand-written `Codec<…, "defaulted">` leaves
+   * `E` at its `boolean` default, which consumers must treat as the factory
+   * (nullable) branch — the safe reading.
    */
   readonly "~defaultElides": E;
   /** Stored as a thunk regardless of the form passed to `.default()`. */
   readonly "~defaultValue": (() => Out) | undefined;
   /**
    * Element codec of a composite list codec (`p.csv`, `p.array`) — the
-   * per-segment/per-key scalar; undefined for every non-composite kind (CV6).
+   * per-segment/per-key scalar; undefined for every non-composite kind.
    */
   readonly "~element": AnyCodec | undefined;
   /** Members of a `p.enum` codec; undefined for every other kind. */
@@ -116,13 +114,13 @@ export interface Codec<
 
 export type OutputOf<C extends AnyCodec> = C["~out"];
 
-/** Codecs legal in a `params:` config — no presence modifiers (design-02 D5). */
+/** Codecs legal in a `params:` config — no presence modifiers (D5). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ParamCodec = Codec<any, "required", boolean>;
 
 /**
  * Presence governs absence semantics and property optionality on both the
- * parse-output and href-input sides (design-02 D4). Catch is orthogonal:
+ * parse-output and href-input sides (D4). Catch is orthogonal:
  * it recovers parse *failures*, never absence (D2).
  */
 export type Presence = "defaulted" | "optional" | "required";
@@ -145,8 +143,8 @@ interface CodecState<Out> {
  * Rejects value-form `.default()` arguments whose static type includes any
  * function member: runtime {@link isFactory} would treat them as factories,
  * so letting them infer the value branch would let type-state assert an
- * elision (`E = true`) the runtime never performs (NQ6a). Non-distributive
- * on purpose — a union with a function member is rejected whole, since its
+ * elision (`E = true`) the runtime never performs. Non-distributive on
+ * purpose — a union with a function member is rejected whole, since its
  * runtime branch is unknowable at compile time.
  */
 type NonFactoryValue<V> = [Extract<V, (...args: never[]) => unknown>] extends [

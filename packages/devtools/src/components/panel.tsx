@@ -11,18 +11,17 @@ import { Sidebar } from "./sidebar.js";
 export interface ParamourDevtoolsPanelProps {
   /**
    * Injected by the TanStack shell (the one contract it guarantees every
-   * panel, regardless of framework); selects the DT14 token set via a
-   * `data-theme` attribute — no theme context, no remount.
+   * panel, regardless of framework); selects the stylesheet's token set via
+   * a `data-theme` attribute — no theme context, no remount.
    */
   readonly theme?: "dark" | "light";
 }
 
 /**
- * The paramour devtools panel (design-12 DT7/DT10/DT15): session sidebar on
- * the left; the main pane auto-follows the route(s) whose observations
- * match the current URL (layout and page may both report — both render,
- * stacked), or shows a pinned session's last-known snapshot read-only with
- * a stale marker.
+ * The paramour devtools panel: session sidebar on the left; the main pane
+ * auto-follows the route(s) whose observations match the current URL
+ * (layout and page may both report — both render, stacked), or shows a
+ * pinned session's last-known snapshot read-only with a stale marker.
  */
 export function ParamourDevtoolsPanel({
   theme,

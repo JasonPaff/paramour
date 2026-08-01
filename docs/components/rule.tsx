@@ -1,12 +1,11 @@
 import type { ReactNode } from "react";
 
 /**
- * One numbered wire-format rule (plan-docs-milestone-5 A2): an anchored,
- * permalinked section whose `id` renders as a badge. The lowercased rule ID
- * is the stable anchor (`#s3`), and the literal `<Rule id="…">` spelling in
- * the MDX source is what `wire-spec-publication.test.ts` extracts to
- * cross-check publication against the conformance suite — keep the attribute
- * a plain string literal.
+ * One numbered wire-format rule: an anchored, permalinked section whose `id`
+ * renders as a badge. The lowercased rule ID is the stable anchor (`#s3`),
+ * and the literal `<Rule id="…">` spelling in the MDX source is what
+ * `wire-spec-publication.test.ts` extracts to cross-check publication against
+ * the conformance suite — keep the attribute a plain string literal.
  */
 export function Rule({
   children,

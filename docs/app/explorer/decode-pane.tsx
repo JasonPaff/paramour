@@ -22,11 +22,11 @@ type Result =
   | { kind: "other"; message: string };
 
 /**
- * The decode pane (plan-docs-milestone-5 B3): a pasted query string runs
- * through the shipped `decodeSearch`, rendering decoded values or the
- * aggregated `issues[]` — with `.catch()` recovery made visible by probing
- * each key's raw parse outcome (the same `parseValue` probe the devtools
- * panel uses for catch attribution).
+ * The decode pane: a pasted query string runs through the shipped
+ * `decodeSearch`, rendering decoded values or the aggregated `issues[]` —
+ * with `.catch()` recovery made visible by probing each key's raw parse
+ * outcome (the same `parseValue` probe the devtools panel uses for catch
+ * attribution).
  */
 export function DecodePane({
   config,

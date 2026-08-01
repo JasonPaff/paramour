@@ -5,10 +5,10 @@ import { href } from "paramour";
 import { homeRoute } from "../app/route.def";
 import { legacyRoute } from "../lib/legacy.def";
 
-// PR1 end-to-end: a Pages Router route living beside the app/ tree. One
-// artifact registers both unions (appRoutes + pagesRoutes), the hooks import
-// from @paramour-js/next/pages (the app/ components use /app), and href()
-// links across the router boundary in both directions.
+// The hybrid setup end-to-end: a Pages Router route living beside the app/
+// tree. One artifact registers both unions (appRoutes + pagesRoutes), the
+// hooks import from @paramour-js/next/pages (the app/ components use /app),
+// and href() links across the router boundary in both directions.
 export default function LegacyPage() {
   const search = useSearch(legacyRoute);
 

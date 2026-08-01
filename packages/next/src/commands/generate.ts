@@ -64,13 +64,13 @@ const CHECK_USAGE = [
 ].join("\n");
 
 /**
- * @internal `paramour generate` and its `check` alias (TR7), in-process
- * testable: returns the exit code instead of exiting. Codes are grep-style
- * so CI can tell drift from breakage: 0 success, 1 check-drift ONLY, 2
- * usage/config/operational errors — route collisions included (PR9: Next
- * itself fails that build, so there is no artifact to emit). Unlike the
- * wrapper's never-load-bearing stance (§7.3), the CLI fails loudly —
- * running it is explicit user intent.
+ * @internal `paramour generate` and its `check` alias, in-process testable:
+ * returns the exit code instead of exiting. Codes are grep-style so CI can
+ * tell drift from breakage: 0 success, 1 check-drift ONLY, 2
+ * usage/config/operational errors — route collisions included (Next itself
+ * fails that build, so there is no artifact to emit). Unlike the wrapper,
+ * which is never load-bearing, the CLI fails loudly — running it is explicit
+ * user intent.
  */
 export async function runGenerate(
   argv: readonly string[],
@@ -140,7 +140,7 @@ function describeRoutes(result: GenerateResult): string {
   return parts.length === 0 ? "0 routes" : parts.join(", ");
 }
 
-/** `--check` (TR7): exit 1 on any drift, including a missing artifact. */
+/** `--check`: exit 1 on any drift, including a missing artifact. */
 function runCheck(
   inputs: GenerateInputs,
   stdout: (line: string) => void,
@@ -172,7 +172,7 @@ function runCheck(
   return 1;
 }
 
-/** One-shot `paramour generate` (TR7). */
+/** One-shot `paramour generate`. */
 function runOnce(
   inputs: GenerateInputs,
   stdout: (line: string) => void,
@@ -195,8 +195,8 @@ function runOnce(
 }
 
 /**
- * `--watch` (TR7): TR5 watcher behind the TR6 lock, over both route dirs
- * (PR8). A declined lock exits 0 — another live watcher (usually `next dev`)
+ * `--watch`: the watcher behind the cross-process lock, over both route
+ * dirs. A declined lock exits 0 — another live watcher (usually `next dev`)
  * is the designed dedupe case, and the initial generation already ran.
  * Without an abort signal the returned promise stays pending; the process
  * lives via the FSWatcher refs and dies with the standard signal exits
@@ -222,7 +222,7 @@ function runWatch(
     lock = acquireWatcherLock(watcherLockPath(projectRoot));
   } catch (error) {
     // A corrupt lock location (e.g. a directory at the pidfile path) is an
-    // operational error, not a crash: exit 2 like every other one (TR7).
+    // operational error, not a crash: exit 2 like every other one.
     stderr(`paramour: ${message(error)}`);
     return 2;
   }
@@ -248,15 +248,15 @@ function runWatch(
         generate(inputs);
       } catch (error) {
         if (error instanceof RouteCollisionError) {
-          // PR9's watch exception: a collision mid-watch is usually a file
-          // mid-move — log loudly every time, keep the last good artifact
-          // on disk, keep running (TR5).
+          // The collision watch exception: a collision mid-watch is usually
+          // a file mid-move — log loudly every time, keep the last good
+          // artifact on disk, keep running.
           stderr(
             `paramour: ${message(error)}; keeping the last good artifact and watching for the fix`,
           );
           return;
         }
-        throw error; // routed to onError by the watcher (TR5 non-fatal)
+        throw error; // routed to onError by the watcher — non-fatal
       }
     },
   });

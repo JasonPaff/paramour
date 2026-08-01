@@ -13,16 +13,17 @@ import {
 } from "./search.js";
 
 /**
- * Sync `SafeResult` twins of {@link decodeParams} / {@link decodeSearch}
- * (RL6's stance at the standalone-function layer): the route methods'
- * `safeParse*` surface awaits props, but sync callers — client hooks,
- * middleware, route handlers — already hold a decoded-value-layer source.
- * Same taxonomy as route.ts's `safely`: only a decode failure becomes the
- * `error` arm; source-contract violations, rebranded foreign errors, and
- * async-schema misuse (design-02 D7) stay loud and propagate unchanged.
+ * Sync `SafeResult` twins of {@link decodeParams} / {@link decodeSearch},
+ * carrying the route methods' safe-parse stance down to the
+ * standalone-function layer: `safeParse*` awaits props, but sync callers —
+ * client hooks, middleware, route handlers — already hold a
+ * decoded-value-layer source. Same taxonomy as route.ts's `safely`: only a
+ * decode failure becomes the `error` arm; source-contract violations,
+ * rebranded foreign errors, and async-schema misuse stay loud and propagate
+ * unchanged.
  */
 
-/** Decoded route params as a `SafeResult` (discriminated on `status`, PR12). */
+/** Decoded route params as a `SafeResult` (discriminated on `status`). */
 export function safeDecodeParams<R extends AnyRoute>(
   route: R,
   source: ParamsSource,
@@ -36,13 +37,13 @@ export function safeDecodeParams<R extends AnyRoute>(
   }
 }
 
-/** Decoded search params as a `SafeResult` (discriminated on `status`, PR12). */
+/** Decoded search params as a `SafeResult` (discriminated on `status`). */
 export function safeDecodeSearch<R extends AnyRoute>(
   route: R,
   source: SearchSource,
 ): SafeResult<SearchOutputOf<R["~search"]>> {
   try {
-    // decodeSearch is keyed on SearchOutputOf (design-04 SS6) — the correct
+    // decodeSearch is keyed on SearchOutputOf (SS6) — the correct
     // public type — but AnyRoute erases its SC to `any`, so for a still-
     // generic R the call's value side reduces to `unknown` while the
     // annotation side stays deferred. The cast bridges that inference gap to

@@ -5,8 +5,8 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
 /**
- * The docs site's one button primitive (plan-docs-milestone-5 decision 4):
- * hand-rolled on Tailwind + fumadocs theme tokens, variants via cva.
+ * The docs site's one button primitive: hand-rolled on Tailwind + fumadocs
+ * theme tokens, variants via cva.
  */
 export function Button({
   className,

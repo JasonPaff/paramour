@@ -39,45 +39,44 @@ import {
 export type { SelectOptions } from "./select.js";
 
 /**
- * Pages Router hooks (design-06 PR5/PR6, design-07). Deliberately NO
- * `"use client"` directive on this module: the directive is an App Router
- * (RSC graph) concept, meaningless in a `pages/` bundle (PR2).
+ * Pages Router hooks. Deliberately NO `"use client"` directive on this
+ * module: the directive is an App Router (RSC graph) concept, meaningless in
+ * a `pages/` bundle.
  *
  * `useRouter().query` is one merged bag (route params + search), and on a
  * statically-optimized page it is `{}` until `router.isReady` flips after
  * hydration — a platform fact the result type admits as a third state
- * instead of papering over (PR5). On `getServerSideProps` pages the FIRST
- * render is already `isReady: true` with a populated query (design-06
- * spike 3), so the `pending` arm never surfaces there.
+ * instead of papering over. On `getServerSideProps` pages the FIRST render
+ * is already `isReady: true` with a populated query, so the `pending` arm
+ * never surfaces there.
  *
- * Deliberately NO `OrThrow` variants (PR6): throwing on `pending` would
- * flash the error boundary on every statically-optimized page's first
- * render, and returning `T | undefined` would make the name a lie. The
- * three-state union forcing the check IS the feature — and users who know
- * their page has `getServerSideProps` should be reading typed props from
- * `route.parseContext(ctx)` (PR10) rather than reaching for a client hook.
+ * Deliberately NO `OrThrow` variants: throwing on `pending` would flash the
+ * error boundary on every statically-optimized page's first render, and
+ * returning `T | undefined` would make the name a lie. The three-state union
+ * forcing the check IS the feature — and users who know their page has
+ * `getServerSideProps` should be reading typed props from
+ * `route.parseContext(ctx)` rather than reaching for a client hook.
  *
- * Both hooks are gated to `AnyPagesRoute` (PR3) and share the /app hooks'
- * design-07 layering: raw-slice stabilization keyed on the declared slice of
- * `query` (+ `isReady`), then an optional `{ select }` projection with
+ * Both hooks are gated to `AnyPagesRoute` and share the /app hooks'
+ * layering: raw-slice stabilization keyed on the declared slice of `query`
+ * (+ `isReady`), then an optional `{ select }` projection with
  * result-equality checking — the `pending` arm passes through the selector
- * untouched (SEL2), and `PENDING` itself is one referentially stable object.
+ * untouched, and `PENDING` itself is one referentially stable object.
  *
- * Devtools instrumentation (design-12): each hook reports through the
- * shared emitter in observe.ts — `observe` from inside the `useStableResult`
- * compute callback (DT4 — the fingerprint cache miss IS the decode-change
- * dedup; see app.ts's fuller account), `refresh` after it for pathname
- * moves under an unchanged decode (DT8). The `pending` arm emits as a
- * first-class observation (DT11), keyed by `PENDING_FINGERPRINT` so the
- * pre-`isReady` render reports exactly once. Every emit sits behind
- * `process.env.NODE_ENV !== "production"` (DT6).
+ * Devtools instrumentation: each hook reports through the shared emitter in
+ * observe.ts — `observe` from inside the `useStableResult` compute callback
+ * (the fingerprint cache miss IS the decode-change dedup; see app.ts's
+ * fuller account), `refresh` after it for pathname moves under an unchanged
+ * decode. The `pending` arm emits as a first-class observation, keyed by
+ * `PENDING_FINGERPRINT` so the pre-`isReady` render reports exactly once.
+ * Every emit sits behind `process.env.NODE_ENV !== "production"`.
  */
 
 /**
- * Three-state result for the pages hooks (PR5): core's `SafeResult` plus a
+ * Three-state result for the pages hooks: core's `SafeResult` plus a
  * `pending` member for the pre-`isReady` render of a statically-optimized
- * page. Literally `SafeResult<T> | { status: "pending" }` (PR12), so both
- * routers' results destructure identically.
+ * page. Literally `SafeResult<T> | { status: "pending" }`, so both routers'
+ * results destructure identically.
  */
 export type RouterResult<T> = SafeResult<T> | { status: "pending" };
 
@@ -85,8 +84,8 @@ export type RouterResult<T> = SafeResult<T> | { status: "pending" };
 const PENDING: { readonly status: "pending" } = { status: "pending" };
 
 /**
- * Decoded route params as a {@link RouterResult} (PR5), optionally projected
- * through `options.select` (design-07 SEL1/SEL2).
+ * Decoded route params as a {@link RouterResult}, optionally projected
+ * through `options.select`.
  */
 export function useRouteParams<R extends AnyPagesRoute>(
   route: R,
@@ -139,8 +138,8 @@ export function useRouteParams<R extends AnyPagesRoute, U>(
 }
 
 /**
- * Decoded search params as a {@link RouterResult} (PR5), optionally projected
- * through `options.select` (design-07 SEL1/SEL2).
+ * Decoded search params as a {@link RouterResult}, optionally projected
+ * through `options.select`.
  */
 export function useSearch<R extends AnyPagesRoute>(
   route: R,
@@ -191,16 +190,16 @@ export function useSearch<R extends AnyPagesRoute, U>(
 
 /**
  * `asPath`'s path part: basePath-/locale-relative — exactly what
- * `replace()` expects back — so the panel's search-only string (DT8)
- * resolves without doubling a configured basePath.
+ * `replace()` expects back — so the panel's search-only string resolves
+ * without doubling a configured basePath.
  */
 function asPathPathname(asPath: string): string {
   return asPath.split(/[#?]/)[0] ?? "/";
 }
 
 /**
- * `query` minus the route's own path-param names (PR5) — the client twin of
- * `parseContext`'s server-side subtraction (core route.ts, PR10). Entries →
+ * `query` minus the route's own path-param names — the client twin of
+ * `parseContext`'s server-side subtraction (core route.ts). Entries →
  * fromEntries so a hostile `?__proto__=` key stays an ordinary own property
  * (decodeParams's ethos). Names come from the define-time `~segments` token
  * cache, so nothing re-tokenizes per render.
@@ -219,20 +218,20 @@ function omitPathParams(
 }
 
 /**
- * Real-Next fallback for the adapter seam (design-16 TA3): the /testing
- * provider overrides the read through {@link PagesNavigationContext}; with
+ * Real-Next fallback for the adapter seam: the /testing provider overrides
+ * the read through {@link PagesNavigationContext}; with
  * no provider mounted the context's `null` default resolves here, so
  * production behavior (and this module's `next/router.js`-only bundle
  * graph, per dist.test.ts) is unchanged. The adapter is resolved via an
  * unconditional `useContext` BEFORE the try below, exactly where the direct
  * call previously sat, keeping hook call order identical across renders and
- * across provider presence (TA4).
+ * across provider presence.
  */
 const realPagesAdapter: PagesNavigationAdapter = { useRouter };
 
 /**
- * `useRouter` with the one failure the brand cannot catch translated (PR5):
- * in a hybrid project a component rendered under `app/` can legally hold a
+ * `useRouter` with the one failure the brand cannot catch translated: in a
+ * hybrid project a component rendered under `app/` can legally hold a
  * pages-branded route, but `next/router` has no mount there and throws
  * "NextRouter was not mounted" — a message pointing at the wrong fix
  * (component placement is invisible to the type system). Rethrow a
@@ -250,7 +249,7 @@ function usePagesRouter(): ReturnType<typeof useRouter> {
       error.message.includes("NextRouter was not mounted")
     ) {
       throw new ParamourError(
-        'pages hooks were rendered under the App Router, where next/router is never mounted — import this component\'s hooks from "@paramour-js/next/app" and pass it an app route instead (PR5)',
+        'pages hooks were rendered under the App Router, where next/router is never mounted — import this component\'s hooks from "@paramour-js/next/app" and pass it an app route instead',
         { cause: error },
       );
     }

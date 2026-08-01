@@ -8,7 +8,7 @@ export const productsListSearch = {
   // Tri-state stock filter: absent = "any" — the select's empty choice
   // removes the key rather than inventing a third wire value.
   inStock: p.boolean().optional(),
-  // Value .default(): page=1 never appears in a built URL (D8).
+  // Value .default(): page=1 never appears in a built URL.
   page: p.integer().default(1),
   // Plain p.string, NOT the min-2 searchQuery schema the detail route uses:
   // this key is written on a debounce while the user types, and a 1-char
@@ -17,7 +17,7 @@ export const productsListSearch = {
   // .default("name") elides too — the canonical URL for the default view is
   // bare /products.
   sort: p.enum(["name", "newest", "price"]).default("name"),
-  // Arity-"many": ?tags=a&tags=b ⇄ ["a","b"]; [] ≡ absent (S6), so clearing
+  // Arity-"many": ?tags=a&tags=b ⇄ ["a","b"]; [] ≡ absent, so clearing
   // every checkbox cleans the URL.
   tags: p.array(),
 } satisfies SearchConfig;

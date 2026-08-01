@@ -2,7 +2,7 @@ import { type AnyCodec, type Codec, p, type SearchConfig } from "paramour";
 // parseValue is the sanctioned raw-parse probe for reflection-driven tooling
 // (the same entry the devtools panel uses); the explorer qualifies — it turns
 // descriptor wire strings into typed modifier values through the described
-// codec itself, never a second value syntax (plan-docs-milestone-5 B1).
+// codec itself, never a second value syntax.
 import { parseValue } from "paramour/internal";
 import { z } from "zod";
 
@@ -19,7 +19,7 @@ import {
  * A descriptor that passed the zod schema but cannot become a legal config —
  * duplicate names, empty names, wire strings the codec rejects. Thrown
  * loudly and rendered in the UI as the error it is: a malformed shared link
- * is itself a wire-format demo (plan-docs-milestone-5 B2).
+ * is itself a wire-format demo.
  */
 export class ExplorerConfigError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {

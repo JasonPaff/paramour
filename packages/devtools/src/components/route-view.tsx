@@ -16,10 +16,10 @@ import { RouterBadge, StatusDot } from "./primitives.js";
 import { SearchTable } from "./search-table.js";
 
 /**
- * One session's stacked single-scroll pane (DT15): route-match banner (path
+ * One session's stacked single-scroll pane: route-match banner (path
  * pattern, router kind, status, copy toolbar), params table, search table,
  * then issues — rendered only when present, never behind a tab. A stale
- * (non-current, DT10) session renders its last-known snapshot with editing
+ * (non-current) session renders its last-known snapshot with editing
  * disabled: its `navigate` belongs to a page that is no longer mounted.
  *
  * Sessions are immutable store records, so every derivation here is
@@ -53,8 +53,8 @@ export function RouteView({
     ];
 
     // The blessed-internal search config, needed for editing; `describeRoute`
-    // told us whether it's a codec map (RL6 — sanctioned consumer, same read
-    // the hooks make).
+    // told us whether it's a codec map. Reading the internal slot here is
+    // sanctioned — it is the same read the hooks make.
     const searchSlot = (
       session.route as unknown as {
         "~search": Readonly<Record<string, AnyCodec>>;
@@ -100,7 +100,7 @@ export function RouteView({
         changeStamps={session.changeStamps.search}
         description={derived.description.search}
         // Remounting on a wire change is the drafts-invalidation rule: an
-        // external navigation resets the edit session (DT8).
+        // external navigation resets the edit session.
         key={derived.wireKey}
         // The NEWEST observation's navigate (either half) — the store keeps
         // it session-level so a stale half's closure can never shadow a
@@ -122,8 +122,8 @@ function issuesOf(
 }
 
 /**
- * A stale session's copy-url source (DT9): its snapshot belongs to a page
- * that is NO LONGER the live location, so the URL is rebuilt from the
+ * A stale session's copy-url source: its snapshot belongs to a page that
+ * is NO LONGER the live location, so the URL is rebuilt from the
  * parsed halves through core's `href` — the same serialization the user's
  * own code would run. Unbuildable (errored params, exotic schema throw) →
  * `undefined`, and the toolbar hides the button rather than copying the

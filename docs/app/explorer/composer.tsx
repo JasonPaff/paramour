@@ -21,9 +21,9 @@ type KeyKind = KeyDescriptor["kind"];
 type PresenceChoice = "default" | "optional" | "required";
 
 /**
- * The config composer (plan-docs-milestone-5 B3): add/remove named keys, per
- * key a `p.*` picker, an element sub-picker for `array`/`csv`, and modifier
- * toggles. Illegal combinations are structurally absent from the controls —
+ * The config composer: add/remove named keys, per key a `p.*` picker, an
+ * element sub-picker for `array`/`csv`, and modifier toggles. Illegal
+ * combinations are structurally absent from the controls —
  * an `array` row simply has no presence picker — mirroring the descriptor
  * schema; everything else the builder rejects loudly.
  */

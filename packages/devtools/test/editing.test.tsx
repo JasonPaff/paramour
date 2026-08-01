@@ -45,7 +45,7 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("commit-to-push (DT8)", () => {
+describe("commit-to-push", () => {
   it("Enter serializes the full pair list through buildSearchString and navigates — spaces as %20, never +", () => {
     const navigate = observe([
       ["page", "2"],
@@ -120,10 +120,10 @@ describe("commit-to-push (DT8)", () => {
 });
 
 describe("commit uses the LIVE wire, not the decode-time snapshot", () => {
-  // Undeclared-key churn never re-emits (SEL4 fingerprints declared keys
-  // only), so the observation's wire snapshot can be stale in both
-  // directions; the carried-verbatim pairs must come from the URL as it is
-  // at commit time.
+  // Undeclared-key churn never re-emits (the emit fingerprint covers
+  // declared keys only), so the observation's wire snapshot can be stale
+  // in both directions; the carried-verbatim pairs must come from the URL
+  // as it is at commit time.
   it("does not resurrect an undeclared pair the app removed after the last emit", () => {
     setUrl("/product/42?page=2&utm_source=mail");
     const navigate = observe([
@@ -152,7 +152,7 @@ describe("commit uses the LIVE wire, not the decode-time snapshot", () => {
   });
 });
 
-describe("blur-commit race (DT8)", () => {
+describe("blur-commit race", () => {
   it("mousedown on ⌀ and the raw toggle prevents default so a pending draft is not blur-committed first", () => {
     // In a real browser, mousedown on the button blurs a focused input
     // BEFORE the click handler runs; blur commits the draft and navigates,
@@ -187,7 +187,7 @@ describe("repeated-key wire on a single-line widget", () => {
   });
 });
 
-describe("raw wire mode (DT8)", () => {
+describe("raw wire mode", () => {
   it("a deliberately invalid raw value passes through, percent-encoded at the byte layer only", () => {
     setUrl("/product/42?page=2");
     const navigate = observe([["page", "2"]]);
@@ -200,7 +200,7 @@ describe("raw wire mode (DT8)", () => {
   });
 });
 
-describe("live preview (DT8)", () => {
+describe("live preview", () => {
   it("shows what a valid draft WOULD parse to", () => {
     observe([["page", "2"]]);
     render(<ParamourDevtoolsPanel />);
@@ -218,7 +218,7 @@ describe("live preview (DT8)", () => {
   });
 });
 
-describe("boolean checkbox (DT8)", () => {
+describe("boolean checkbox", () => {
   const flagsRoute = defineAppRoute("/flags", {
     search: {
       flag: p.boolean().default(false),
@@ -255,7 +255,7 @@ describe("boolean checkbox (DT8)", () => {
   });
 });
 
-describe("enum select (DT8)", () => {
+describe("enum select", () => {
   const sortedRoute = defineAppRoute("/sorted", {
     search: {
       order: p.enum(["newest", "oldest"]).default("oldest"),
@@ -293,7 +293,7 @@ describe("enum select (DT8)", () => {
   });
 });
 
-describe("array textarea (DT8)", () => {
+describe("array textarea", () => {
   const tagsRoute = defineAppRoute("/tags", {
     search: { tags: p.array() },
   });
@@ -347,7 +347,7 @@ describe("array textarea (DT8)", () => {
   });
 });
 
-describe("index number input (DT8)", () => {
+describe("index number input", () => {
   it("p.index gets the integer number widget, not a free-text input", () => {
     // p.index shares p.integer's wire grammar (a strict digit string, floor
     // 1), so it must get the same number widget — type "number", step "1" —
@@ -365,7 +365,7 @@ describe("index number input (DT8)", () => {
   });
 });
 
-describe("commit failure containment (DT8)", () => {
+describe("commit failure containment", () => {
   it("a value the byte layer cannot encode marks the draft invalid instead of crashing the panel", () => {
     // A lone surrogate survives p.string()'s parse (and the live preview)
     // but throws in percent-encoding at commit time; the throw must be

@@ -19,14 +19,13 @@ export interface AcquireLockResult {
 const PID_RE = /^\d+$/;
 
 /**
- * Cross-process single-writer guard (TR6): a best-effort pidfile lock. On
- * startup: read lock → liveness-probe the owner → decline if alive,
- * (over)write and acquire if dead or absent. Deliberately best-effort, not
- * correct — TR3's deterministic write-if-changed output means two live
- * watchers produce identical bytes; imperfect locking costs a log line, not
- * corruption. Hence no flock semantics, atomic-rename dances, or PID-reuse
- * paranoia. The in-process singleton (TR6 guard 1) lives at the composition
- * points, not here.
+ * Cross-process single-writer guard: a best-effort pidfile lock. On startup:
+ * read lock → liveness-probe the owner → decline if alive, (over)write and
+ * acquire if dead or absent. Deliberately best-effort, not correct — the
+ * deterministic write-if-changed output means two live watchers produce
+ * identical bytes; imperfect locking costs a log line, not corruption. Hence
+ * no flock semantics, atomic-rename dances, or PID-reuse paranoia. The
+ * in-process singleton guard lives at the composition points, not here.
  */
 export function acquireWatcherLock(lockPath: string): AcquireLockResult {
   const ownerPid = readOwnerPid(lockPath);
@@ -50,8 +49,8 @@ export function acquireWatcherLock(lockPath: string): AcquireLockResult {
         rmSync(lockPath, { force: true });
       }
     } catch {
-      // Best-effort (TR6): a leftover lock self-heals via the liveness
-      // probe on the next startup.
+      // Best-effort: a leftover lock self-heals via the liveness probe on
+      // the next startup.
     }
   };
   const reraise = (signal: NodeJS.Signals): void => {
@@ -73,7 +72,7 @@ export function acquireWatcherLock(lockPath: string): AcquireLockResult {
 }
 
 /**
- * The one canonical pidfile location (TR6): CLI-vs-wrapper dedupe only works
+ * The one canonical pidfile location: CLI-vs-wrapper dedupe only works
  * because both paths compute the lock from the same project root.
  */
 export function watcherLockPath(projectRoot: string): string {
@@ -86,7 +85,7 @@ export function watcherLockPath(projectRoot: string): string {
   );
 }
 
-/** `true` when `pid` is a live process (TR6 liveness probe). */
+/** `true` when `pid` is a live process — the liveness probe. */
 function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);

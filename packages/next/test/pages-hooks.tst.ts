@@ -1,14 +1,14 @@
 /**
- * Type-level tests for the Pages-Router client hooks (design-06 PR3/PR5) —
- * the /pages twin of app-hooks.tst.ts. Pins the compile-time claims in
- * src/pages.ts that the runtime suite (pages.test.tsx) cannot express:
+ * Type-level tests for the Pages-Router client hooks — the /pages twin of
+ * app-hooks.tst.ts. Pins the compile-time claims in src/pages.ts that the
+ * runtime suite (pages.test.tsx) cannot express:
  *
  *  1. The `AnyPagesRoute` gate: both hooks constrain `R extends AnyPagesRoute`,
  *     so an app-branded route (from `defineAppRoute`) at either call site is a
  *     COMPILE ERROR — the mirror of app-hooks' pages-route rejection.
- *  2. The three-state `RouterResult` (PR5): the `pending` arm is in the union
- *     and forces narrowing — no `data` reachable without a status check — and
- *     the alias is literally `SafeResult<T> | { status: "pending" }` (PR12).
+ *  2. The three-state `RouterResult`: the `pending` arm is in the union and
+ *     forces narrowing — no `data` reachable without a status check — and the
+ *     alias is literally `SafeResult<T> | { status: "pending" }`.
  *
  * Plain .ts (not .tsx): hooks are ordinary functions at the type level, no JSX.
  */
@@ -32,12 +32,12 @@ const appRoute = defineAppRoute("/product/[id]", {
   params: { id: p.integer() },
 });
 
-test("AnyPagesRoute gate: an app-branded route is rejected at both call sites (PR3)", () => {
+test("AnyPagesRoute gate: an app-branded route is rejected at both call sites", () => {
   expect(useRouteParams).type.not.toBeCallableWith(appRoute);
   expect(useSearch).type.not.toBeCallableWith(appRoute);
 });
 
-test("pages route is accepted and each hook returns its RouterResult (PR3/PR5)", () => {
+test("pages route is accepted and each hook returns its RouterResult", () => {
   expect(useRouteParams).type.toBeCallableWith(pagesRoute);
   expect(useSearch).type.toBeCallableWith(pagesRoute);
 
@@ -46,7 +46,7 @@ test("pages route is accepted and each hook returns its RouterResult (PR3/PR5)",
     RouterResult<InferRouteParams<typeof pagesRoute>>
   >();
 
-  // Optional codecs keep the key PRESENT and add `| undefined` (design-02 D4).
+  // Optional codecs keep the key PRESENT and add `| undefined` (D4).
   // Mutual assignability pins exact equality, same caveat as app-hooks.tst.ts:
   // tstyche's `toBe` treats the unexpanded InferSearchOutput mapped-type alias
   // as non-identical to the literal.
@@ -59,7 +59,7 @@ test("pages route is accepted and each hook returns its RouterResult (PR3/PR5)",
   >().type.toBeAssignableTo<typeof search>();
 });
 
-test("select overloads project the RouterResult (design-07 SEL1/SEL2)", () => {
+test("select overloads project the RouterResult", () => {
   // U is inferred from the selector; the pending arm stays in the union.
   expect(useSearch(pagesRoute, { select: (search) => search.page })).type.toBe<
     RouterResult<number>
@@ -77,16 +77,16 @@ test("select overloads project the RouterResult (design-07 SEL1/SEL2)", () => {
     },
   });
 
-  // Same equality opt-in as the /app twin (SEL3).
+  // Same equality opt-in as the /app twin.
   expect(useSearch).type.not.toBeCallableWith(pagesRoute, {
     equality: "deep",
     select: (search: { page: number; q: string | undefined }) => search.page,
   });
 });
 
-test("the pending arm is in the union and forces narrowing (PR5/PR6)", () => {
-  // RouterResult<T> is literally SafeResult<T> | { status: "pending" } (PR12),
-  // so both routers' results destructure identically.
+test("the pending arm is in the union and forces narrowing", () => {
+  // RouterResult<T> is literally SafeResult<T> | { status: "pending" }, so
+  // both routers' results destructure identically.
   expect<RouterResult<{ id: number }>>().type.toBe<
     SafeResult<{ id: number }> | { status: "pending" }
   >();

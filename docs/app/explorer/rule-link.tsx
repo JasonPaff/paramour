@@ -5,7 +5,7 @@ import { docsRoute } from "../docs/[[...slug]]/route.def";
 /**
  * An inline link from an explorer annotation to the numbered rule it cites —
  * the spec's stable `#s3`-style anchors are the whole point of publishing
- * rule IDs (plan-docs-milestone-5 B4).
+ * rule IDs.
  */
 export function RuleLink({ id }: { id: string }) {
   const spec = href(docsRoute, {

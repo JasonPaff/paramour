@@ -16,7 +16,7 @@ export const productsRoute = defineAppRoute("/products/[id]", {
     inStock: p.boolean().optional(),
     // p.number — an optional decimal (distinct from integer's grammar).
     minPrice: p.number().optional(),
-    // p.integer with a VALUE .default(): D8 elision drops page=1 from built URLs.
+    // p.integer with a VALUE .default(): elision drops page=1 from built URLs.
     page: p.integer().default(1),
     // p.string refined by a Zod schema (min length 2), optional.
     q: p.string(searchQuery).optional(),

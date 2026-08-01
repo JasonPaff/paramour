@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { CopyButton } from "./primitives.js";
 
 /**
- * DT9's non-invasive copy helpers: the session's URL (absent when a stale
+ * Non-invasive copy helpers: the session's URL (absent when a stale
  * snapshot's URL cannot be rebuilt), the parsed values as JSON (absent when
  * nothing parsed), and the `href()` reproduction snippet.
  */

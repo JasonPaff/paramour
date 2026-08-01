@@ -1,14 +1,13 @@
 // @vitest-environment happy-dom
 /**
- * Provider-specific behavior of `@paramour-js/next/testing` (design-16) —
- * the surface the migrated hook suites (TA7) do not pin: input
- * normalization and defaulting (TA6), the two differentiator states
- * (`params: null`, `mounted: false`), `onReplace` capture through BOTH
- * flavors' devtools navigate capability (DT8), the one-provider hybrid
- * story (TA5), and the TA4 stable-adapter contract under provider prop
- * updates. Every test consumes the provider the way a user would —
- * `withParamourTesting` as testing-library's `wrapper`, or the provider
- * element directly when a test must update its props via rerender.
+ * Provider-specific behavior of `@paramour-js/next/testing` — the surface
+ * the migrated hook suites do not pin: input normalization and defaulting,
+ * the two differentiator states (`params: null`, `mounted: false`),
+ * `onReplace` capture through BOTH flavors' devtools navigate capability,
+ * the one-provider hybrid story, and the stable-adapter contract under
+ * provider prop updates. Every test consumes the provider the way a user
+ * would — `withParamourTesting` as testing-library's `wrapper`, or the
+ * provider element directly when a test must update its props via rerender.
  */
 import { render, renderHook } from "@testing-library/react";
 import {
@@ -69,14 +68,14 @@ function buffer(): readonly ParamourObservation[] {
 }
 
 beforeEach(() => {
-  // The onReplace/defaults tests read seam observations (DT8); start each
-  // test from an empty buffer like the observe suites do.
+  // The onReplace/defaults tests read seam observations; start each test
+  // from an empty buffer like the observe suites do.
   const seam = getParamourSeam();
   seam.buffer.length = 0;
   seam.listeners.clear();
 });
 
-describe("search normalization (TA6)", () => {
+describe("search normalization", () => {
   it('"?page=2", "page=2", and an equivalent URLSearchParams decode identically', () => {
     const inputs = ["?page=2", "page=2", new URLSearchParams("page=2")];
     for (const search of inputs) {
@@ -88,7 +87,7 @@ describe("search normalization (TA6)", () => {
   });
 });
 
-describe("defaults (TA6): no options at all", () => {
+describe("defaults: no options at all", () => {
   it("the app adapter hands the hooks {} — NOT the null a bare mock returns", () => {
     let seen: unknown = "unset";
     function AdapterProbe(): null {
@@ -127,7 +126,7 @@ describe("defaults (TA6): no options at all", () => {
   });
 });
 
-describe("params: null (TA6): the hybrid-app useParams() state", () => {
+describe("params: null — the hybrid-app useParams() state", () => {
   it("the adapter passes null through — it does NOT coerce to {}", () => {
     let seen: unknown = "unset";
     function AdapterProbe(): null {
@@ -160,7 +159,7 @@ describe("params: null (TA6): the hybrid-app useParams() state", () => {
   });
 });
 
-describe("mounted: false (PR5): pages router unmounted under app/", () => {
+describe("mounted: false — pages router unmounted under app/", () => {
   it("pages useRouteParams throws the translated ParamourError naming @paramour-js/next/app", () => {
     const wrapper = withParamourTesting({ mounted: false });
     expect(() =>
@@ -172,7 +171,7 @@ describe("mounted: false (PR5): pages router unmounted under app/", () => {
   });
 });
 
-describe("isReady: false (PR5): the pending arm, flipped by a prop update", () => {
+describe("isReady: false — the pending arm, flipped by a prop update", () => {
   it("pages hooks return pending; rerendering with isReady true yields the decode", () => {
     let paramsResult: unknown;
     let searchResult: unknown;
@@ -208,7 +207,7 @@ describe("isReady: false (PR5): the pending arm, flipped by a prop update", () =
   });
 });
 
-describe("onReplace captures both flavors' devtools navigations (DT8)", () => {
+describe("onReplace captures both flavors' devtools navigations", () => {
   it("app flavor: navigate resolves pathname + search + live hash", () => {
     const captured: string[] = [];
     renderHook(() => useAppSearch(productRoute), {
@@ -243,7 +242,7 @@ describe("onReplace captures both flavors' devtools navigations (DT8)", () => {
   });
 });
 
-describe("one provider feeds both flavors (TA5)", () => {
+describe("one provider feeds both flavors", () => {
   it("an app-route hook and a pages-route hook decode under a SINGLE wrapper", () => {
     let appResult: unknown;
     let pagesResult: unknown;
@@ -266,7 +265,7 @@ describe("one provider feeds both flavors (TA5)", () => {
   });
 });
 
-describe("adapter stability across prop updates (TA4)", () => {
+describe("adapter stability across prop updates", () => {
   it("undeclared-key search churn through rerenders keeps the identical result object", () => {
     let current: unknown;
     let renders = 0;
@@ -295,7 +294,7 @@ describe("adapter stability across prop updates (TA4)", () => {
         <Probe />
       </ParamourTestingProvider>,
     );
-    // The probe re-rendered (no remount — a remount would reset the SEL4 ref
+    // The probe re-rendered (no remount — a remount would reset the ref
     // cache and mint a new result object), yet the result held identity.
     expect(renders).toBeGreaterThan(1);
     expect(current).toBe(first);
@@ -326,14 +325,14 @@ describe("adapter stability across prop updates (TA4)", () => {
         <Probe />
       </ParamourTestingProvider>,
     );
-    // Prop updates mutate what the stable adapter RETURNS (TA4) — the new
-    // value must flow through without a provider remount.
+    // Prop updates mutate what the stable adapter RETURNS — the new value
+    // must flow through without a provider remount.
     expect(current).not.toBe(first);
     expect(current).toEqual({ data: { page: 3 }, status: "success" });
   });
 });
 
-describe("pages query merge (TA6)", () => {
+describe("pages query merge", () => {
   it('repeated search key "tag=a&tag=b" arrives as string[]', () => {
     const { result } = renderHook(() => usePagesSearch(pagesTagsRoute), {
       wrapper: withParamourTesting({
@@ -361,7 +360,7 @@ describe("pages query merge (TA6)", () => {
     expect(result.current).toEqual({ data: { id: 42 }, status: "success" });
   });
 
-  it("the search half never sees the path param (PR5 subtraction intact)", () => {
+  it("the search half never sees the path param (subtraction intact)", () => {
     const { result } = renderHook(() => usePagesSearch(pagesProductRoute), {
       wrapper: withParamourTesting({
         params: { id: "42" },

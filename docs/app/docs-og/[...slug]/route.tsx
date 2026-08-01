@@ -12,8 +12,8 @@ import { source } from "@/lib/source";
 // handler pattern instead: /docs-og/<slugs>/image.png, referenced from the
 // docs page's generateMetadata. A route handler is collision-scanned but
 // never emitted by `paramour generate` — the registry is unchanged, and a
-// route object for an image endpoint would be exactly the artificial
-// dogfooding DS6 says not to force.
+// route object for an image endpoint would be exactly the kind of artificial
+// dogfooding the docs site deliberately avoids.
 export function generateStaticParams() {
   return source
     .generateParams()

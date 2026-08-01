@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 
 import { useState } from "react";
 
-/** Shared leaf components (design-12 DT16/DT18). */
+/** Shared leaf components. */
 
 export type PanelStatus = "error" | "ok" | "pending" | "stale";
 
 /**
- * DT16: colorblind-safe glyph shapes layered ON TOP of the color dots, not
+ * Colorblind-safe glyph shapes layered ON TOP of the color dots, not
  * replacing them — the at-a-glance color read stays, the glyph carries the
  * same information without color.
  */
@@ -19,7 +19,7 @@ const STATUS_GLYPHS: Record<PanelStatus, string> = {
   stale: "∅",
 };
 
-/** Neutral (never a status color) per-key attribution tag (DT16). */
+/** Neutral (never a status color) per-key attribution tag. */
 export function AttributionTag({
   kind,
 }: {
@@ -29,7 +29,7 @@ export function AttributionTag({
 }
 
 /**
- * DT18: inline micro-feedback — the label swaps to a checkmark briefly; no
+ * Inline micro-feedback — the label swaps to a checkmark briefly; no
  * toasts. Clipboard failure (denied permission, no focus) is silently
  * tolerated: a copy button that sometimes needs a second click beats a
  * crashing panel.
@@ -64,7 +64,7 @@ export function CopyButton({
 }
 
 /**
- * DT18: the pre-observation state is EXPECTED, not a problem — styled as
+ * The pre-observation state is EXPECTED, not a problem — styled as
  * informational, never as an error.
  */
 export function EmptyState(): ReactNode {
@@ -102,9 +102,9 @@ export function StatusDot({
 }
 
 /**
- * Monospace value cell (DT17). The React `key` carries the store's
- * change-stamp, so a parsed-value change remounts the span and restarts the
- * DT18 flash animation; stamp 0 (first appearance) doesn't flash.
+ * Monospace value cell. The React `key` carries the store's change-stamp,
+ * so a parsed-value change remounts the span and restarts the flash
+ * animation; stamp 0 (first appearance) doesn't flash.
  */
 export function ValueCell({
   children,

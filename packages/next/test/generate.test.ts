@@ -28,7 +28,7 @@ function makeInputs(entries: readonly string[]): GenerateInputs {
   };
 }
 
-describe("generate (TR9 shared engine)", () => {
+describe("generate (shared engine)", () => {
   it("scans a hybrid project, writes the artifact, and reports both unions", () => {
     const inputs = makeInputs([
       "app/page.tsx",
@@ -72,14 +72,14 @@ describe("generate (TR9 shared engine)", () => {
     expect(statSync(inputs.artifactPath).mtimeMs).toBe(before);
   });
 
-  it("propagates an app/pages collision instead of writing (PR9)", () => {
+  it("propagates an app/pages collision instead of writing", () => {
     const inputs = makeInputs(["app/about/page.tsx", "pages/about.tsx"]);
     expect(() => generate(inputs)).toThrow(/collision/);
     expect(() => readFileSync(inputs.artifactPath, "utf8")).toThrow(/ENOENT/);
   });
 });
 
-describe("checkArtifact (TR7 --check)", () => {
+describe("checkArtifact (--check)", () => {
   it("reports up to date for a fresh artifact", () => {
     const inputs = makeInputs(["app/page.tsx", "pages/legacy.tsx"]);
     generate(inputs);
@@ -118,7 +118,7 @@ describe("checkArtifact (TR7 --check)", () => {
     expect(result.app.disappeared).toEqual(["/old"]);
     expect(result.pages.appeared).toEqual(["/fresh"]);
     expect(result.pages.disappeared).toEqual(["/gone"]);
-    // --check never writes (TR7).
+    // --check never writes.
     expect(readFileSync(inputs.artifactPath, "utf8")).toBe(stale);
   });
 
@@ -140,7 +140,7 @@ describe("checkArtifact (TR7 --check)", () => {
 
   it("does not cross-attribute drift between routers (a moved route names both)", () => {
     // The same URL path migrating app → pages must show as disappeared(app)
-    // AND appeared(pages) — the report names which router moved (PR9).
+    // AND appeared(pages) — the report names which router moved.
     const inputs = makeInputs(["pages/about.tsx"]);
     writeFileSync(
       inputs.artifactPath,

@@ -1,8 +1,8 @@
 /**
- * Type-level tests for `@paramour-js/next/testing`'s options bag (design-16
- * TA5/TA6). Pins the compile-time claims the runtime suite
- * (testing.test.tsx) cannot express, under the repo's real compiler
- * settings — `exactOptionalPropertyTypes` is the one that bites:
+ * Type-level tests for `@paramour-js/next/testing`'s options bag. Pins the
+ * compile-time claims the runtime suite (testing.test.tsx) cannot express,
+ * under the repo's real compiler settings — `exactOptionalPropertyTypes` is
+ * the one that bites:
  *
  *  1. Every field is optional: `{}` is accepted and the whole argument to
  *     `withParamourTesting` is omittable; each field is independently
@@ -31,13 +31,13 @@ import {
   withParamourTesting,
 } from "../src/testing.js";
 
-test("{} is assignable and the whole argument is omittable (TA6)", () => {
+test("{} is assignable and the whole argument is omittable", () => {
   expect({}).type.toBeAssignableTo<ParamourTestingOptions>();
   expect(withParamourTesting).type.toBeCallableWith();
   expect(withParamourTesting).type.toBeCallableWith({});
 });
 
-test("each field is individually assignable (TA6)", () => {
+test("each field is individually assignable", () => {
   expect({ isReady: false }).type.toBeAssignableTo<ParamourTestingOptions>();
   expect({ mounted: false }).type.toBeAssignableTo<ParamourTestingOptions>();
   expect({
@@ -52,7 +52,7 @@ test("each field is individually assignable (TA6)", () => {
   expect({ search: "page=2" }).type.toBeAssignableTo<ParamourTestingOptions>();
 });
 
-test("params accepts null AND a ParamsSource AND omission (TA6)", () => {
+test("params accepts null AND a ParamsSource AND omission", () => {
   expect({ params: null }).type.toBeAssignableTo<ParamourTestingOptions>();
   expect({
     params: { id: "42", slug: ["a", "b"] },
@@ -62,7 +62,7 @@ test("params accepts null AND a ParamsSource AND omission (TA6)", () => {
   expect(withParamourTesting).type.toBeCallableWith({ params: null });
 });
 
-test("search accepts a string AND a URLSearchParams (TA6)", () => {
+test("search accepts a string AND a URLSearchParams", () => {
   expect({ search: "?page=2" }).type.toBeAssignableTo<ParamourTestingOptions>();
   expect({ search: "page=2" }).type.toBeAssignableTo<ParamourTestingOptions>();
   expect({
@@ -98,7 +98,7 @@ test("explicit undefined is rejected for every field (exactOptionalPropertyTypes
   });
 });
 
-test("withParamourTesting returns a testing-library-shaped wrapper (TA5)", () => {
+test("withParamourTesting returns a testing-library-shaped wrapper", () => {
   expect(withParamourTesting()).type.toBe<
     (props: { children?: ReactNode }) => ReactElement
   >();
@@ -107,7 +107,7 @@ test("withParamourTesting returns a testing-library-shaped wrapper (TA5)", () =>
   >();
 });
 
-test("provider props accept children alongside every option (TA5)", () => {
+test("provider props accept children alongside every option", () => {
   expect(ParamourTestingProvider).type.toBeCallableWith({});
   expect(ParamourTestingProvider).type.toBeCallableWith({ children: "child" });
   expect(ParamourTestingProvider).type.toBeCallableWith({

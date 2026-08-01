@@ -1,5 +1,5 @@
 /**
- * Wire-format conformance suite — one test per case in wire-format spec §7.
+ * Wire-format conformance suite — one test per wire-format spec case.
  */
 import { parse as parseQuerystring } from "node:querystring";
 import { runInNewContext } from "node:vm";
@@ -141,7 +141,7 @@ describe("arrays (repeated keys)", () => {
   });
 });
 
-describe("typed repeated-key arrays (design-13 PP1)", () => {
+describe("typed repeated-key arrays (PP1)", () => {
   it("typed elements round-trip through repeated keys", () => {
     const config = { ids: p.array(p.integer()) };
     expect(searchToString(config, { ids: [1, 2] })).toBe("?ids=1&ids=2");
@@ -172,7 +172,7 @@ describe("typed repeated-key arrays (design-13 PP1)", () => {
   });
 });
 
-describe("p.index (design-13 PP5)", () => {
+describe("p.index (PP5)", () => {
   it("?page=1 decodes to index 0; index 0 encodes to ?page=1", () => {
     expect(decodeSearch({ page: p.index() }, { page: "1" })).toEqual({
       page: 0,
@@ -197,7 +197,7 @@ describe("p.index (design-13 PP5)", () => {
   });
 });
 
-describe("csv lists (design-11)", () => {
+describe("csv lists", () => {
   it("CV3: tags=a,b decodes to a two-element list", () => {
     expect(decodeSearch({ tags: p.csv() }, { tags: "a,b" })).toEqual({
       tags: ["a", "b"],
@@ -330,9 +330,9 @@ describe("byte-layer serialization", () => {
 });
 
 /**
- * The `+` character (P2 / design-06 §7). Empirical result: Next's two query
- * layers AGREE — the Pages Router's `router.query` (node `querystring.parse`
- * server-side) and `URLSearchParams` (client-side, and the App Router's
+ * The `+` character (P2). Empirical result: Next's two query layers AGREE —
+ * the Pages Router's `router.query` (node `querystring.parse` server-side)
+ * and `URLSearchParams` (client-side, and the App Router's
  * `useSearchParams`) both decode `+` as a space. There is no
  * router-vs-platform divergence; the layer that does NOT translate is plain
  * `decodeURIComponent`, which is why paramour emits `%20`/`%2B` and never
@@ -341,7 +341,7 @@ describe("byte-layer serialization", () => {
  * literal `+` — the same wire text yields different values depending on
  * which layer already decoded it.
  */
-describe("the + character (P2 / design-06 §7)", () => {
+describe("the + character (P2)", () => {
   it("C21: hand-typed q=a+b decodes as a space through both of Next's layers", () => {
     // Client layer (URLSearchParams — what decodeSearch consumes directly).
     expect(
@@ -1053,7 +1053,7 @@ describe("href emission (S9/S10)", () => {
   });
 });
 
-describe("rawSearch over the wire (design-04)", () => {
+describe("rawSearch over the wire", () => {
   it("SS3: the schema receives every key, collapsed to Next's searchParams shape", () => {
     const schema = z.object({ q: z.string(), tags: z.array(z.string()) });
     expect(

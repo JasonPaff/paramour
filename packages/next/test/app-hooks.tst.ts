@@ -1,7 +1,7 @@
 /**
- * Type-level tests for the App-Router client hooks (design-06 PR3). Pins two
- * documented compile-time claims in src/app.ts that the runtime suite
- * (app.test.tsx) cannot express:
+ * Type-level tests for the App-Router client hooks. Pins two documented
+ * compile-time claims in src/app.ts that the runtime suite (app.test.tsx)
+ * cannot express:
  *
  *  1. The `AnyAppRoute` gate: every hook constrains `R extends AnyAppRoute`, so
  *     a pages-branded route (from `definePagesRoute`) at any of the four call
@@ -45,14 +45,14 @@ const rawSchema = z.object({
 });
 const rawRoute = defineAppRoute("/raw", { search: rawSearch(rawSchema) });
 
-test("AnyAppRoute gate: a pages-branded route is rejected at every call site (PR3)", () => {
+test("AnyAppRoute gate: a pages-branded route is rejected at every call site", () => {
   expect(useRouteParams).type.not.toBeCallableWith(pagesRoute);
   expect(useRouteParamsOrThrow).type.not.toBeCallableWith(pagesRoute);
   expect(useSearch).type.not.toBeCallableWith(pagesRoute);
   expect(useSearchOrThrow).type.not.toBeCallableWith(pagesRoute);
 });
 
-test("app route is accepted and each hook returns its exact type (PR3/PR12)", () => {
+test("app route is accepted and each hook returns its exact type", () => {
   expect(useRouteParams).type.toBeCallableWith(appRoute);
   expect(useRouteParamsOrThrow).type.toBeCallableWith(appRoute);
   expect(useSearch).type.toBeCallableWith(appRoute);
@@ -66,7 +66,7 @@ test("app route is accepted and each hook returns its exact type (PR3/PR12)", ()
   expect(useRouteParamsOrThrow(appRoute)).type.toBe<{ id: number }>();
 
   // useSearch → SafeResult<SearchOutputOf<...>>; OrThrow → the plain object.
-  // Optional codecs keep the key PRESENT and add `| undefined` (design-02 D4),
+  // Optional codecs keep the key PRESENT and add `| undefined` (D4),
   // so it is `q: string | undefined`, not `q?: string`. Mutual assignability
   // pins exact equality: tstyche's `toBe` treats the unexpanded
   // InferSearchOutput mapped-type alias as non-identical to the literal, but
@@ -91,7 +91,7 @@ test("app route is accepted and each hook returns its exact type (PR3/PR12)", ()
   }>().type.toBeAssignableTo<typeof searchOrThrow>();
 });
 
-test("select overloads project the result type (design-07 SEL1/SEL2)", () => {
+test("select overloads project the result type", () => {
   // Safe hooks: SafeResult<U>, with U inferred from the selector's return.
   expect(useSearch(appRoute, { select: (search) => search.page })).type.toBe<
     SafeResult<number>
@@ -117,13 +117,13 @@ test("select overloads project the result type (design-07 SEL1/SEL2)", () => {
     },
   });
 
-  // A rawSearch route's selector receives the SCHEMA output (design-04 SS6).
+  // A rawSearch route's selector receives the SCHEMA output (SS6).
   expect(useSearch(rawRoute, { select: (search) => search.q })).type.toBe<
     SafeResult<string>
   >();
 });
 
-test('equality is the literal "shallow" opt-in only (design-07 SEL3)', () => {
+test('equality is the literal "shallow" opt-in only', () => {
   expect(useSearch).type.toBeCallableWith(appRoute, {
     equality: "shallow",
     select: (search: { page: number; q: string | undefined }) => search.page,

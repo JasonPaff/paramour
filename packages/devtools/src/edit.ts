@@ -7,8 +7,8 @@ import type { ParamourSearchWire } from "./seam.js";
 import { previewDecode } from "./inference.js";
 
 /**
- * Pure commit-flow assembly (design-12 DT8): merge the user's per-key
- * drafts into the observed wire pairs, preserving everything untouched.
+ * Pure commit-flow assembly: merge the user's per-key drafts into the
+ * observed wire pairs, preserving everything untouched.
  */
 
 export type CommitResult =
@@ -26,7 +26,7 @@ export type DraftValue =
   | { readonly kind: "text"; readonly text: string };
 
 /**
- * DT8's commit semantics:
+ * The commit semantics:
  * - Untouched keys (declared, unknown, even invalid/caught wire) carry
  *   VERBATIM in original wire order — never re-serialized.
  * - A codec-mode draft validates through the single-key decode; any failure

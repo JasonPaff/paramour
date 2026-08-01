@@ -38,8 +38,8 @@ export default tseslint.config(
     },
   },
 
-  // The docs site is a first-class workspace (design-14 DS2): same
-  // type-checked bar as the packages.
+  // The docs site is a first-class workspace: same type-checked bar as the
+  // packages.
   {
     extends: [
       tseslint.configs.strictTypeChecked,
@@ -54,10 +54,10 @@ export default tseslint.config(
     },
   },
 
-  // Tailwind class hygiene for the docs site (plan-docs-milestone-5
-  // decision 4): classes are checked against the real Tailwind 4 entry css,
-  // so unknown/conflicting/duplicate utilities are errors; the stylistic
-  // rules (class order, whitespace) stay warnings with autofix.
+  // Tailwind class hygiene for the docs site: classes are checked against
+  // the real Tailwind 4 entry css, so unknown/conflicting/duplicate
+  // utilities are errors; the stylistic rules (class order, whitespace) stay
+  // warnings with autofix.
   {
     extends: [betterTailwindcss.configs["recommended-warn"]],
     files: ["docs/**/*.{ts,tsx}"],

@@ -16,7 +16,7 @@ import {
 import { runStandardSchemaSync } from "./schema.js";
 
 /**
- * href-input side (design-02 D4): required presence stays required;
+ * href-input side (D4): required presence stays required;
  * optional and defaulted keys may be omitted. Array (arity-"many") keys may
  * also be omitted: absent and [] are the same wire state (S6/P6), so
  * requiring `tags: []` ceremony would be pure noise. Omittable keys also
@@ -33,7 +33,7 @@ export type InferSearchInput<S extends SearchConfig> = {
 };
 
 /**
- * Parse-output side (design-02 D4): every declared key is PRESENT on the
+ * Parse-output side (D4): every declared key is PRESENT on the
  * object; optional presence contributes `| undefined` to the value type.
  */
 export type InferSearchOutput<S extends SearchConfig> = {
@@ -43,7 +43,7 @@ export type InferSearchOutput<S extends SearchConfig> = {
 };
 
 /**
- * The whole-object search escape hatch (design-04 SS1/SS2): wraps a bare
+ * The whole-object search escape hatch (SS1/SS2): wraps a bare
  * Standard Schema in a branded marker so `search:` config discrimination is
  * unambiguous at both the type and runtime level. `~`-prefixed members are
  * reserved (codec convention) — a codec map never carries them at the top
@@ -58,7 +58,7 @@ export interface RawSearch<S extends StandardSchemaV1> {
 export type SearchConfig = Record<string, AnyCodec>;
 
 /**
- * href / encode side of a `search:` config (design-04 SS6): a `RawSearch`
+ * href / encode side of a `search:` config (SS6): a `RawSearch`
  * route accepts the raw wire record (SS5 — the schema never runs on encode,
  * so there's no encode-side type to infer from it); a codec map keeps its
  * existing `InferSearchInput` behavior. Module-exported for route.ts/href.ts,
@@ -72,7 +72,7 @@ export type SearchInputOf<SC> =
       : never;
 
 /**
- * Parse-output side of a `search:` config (design-04 SS6): a `RawSearch`
+ * Parse-output side of a `search:` config (SS6): a `RawSearch`
  * route's output is the schema's own inferred output; a codec map keeps its
  * existing `InferSearchOutput` behavior. Module-exported for
  * route.ts/href.ts, not barrel-exported.
@@ -85,7 +85,7 @@ export type SearchOutputOf<SC> =
       : never;
 
 /**
- * The `search:` config slot's full type (design-04 SS2): a codec map (the
+ * The `search:` config slot's full type (SS2): a codec map (the
  * main road) or a `RawSearch` marker (the escape hatch). Internal — not
  * barrel-exported; `Route`/`RouteConfig`/`HrefArgs` consume it as their `SC`
  * bound.
@@ -93,9 +93,9 @@ export type SearchOutputOf<SC> =
 export type SearchSlot = RawSearch<StandardSchemaV1> | SearchConfig;
 
 /**
- * Decoded value-layer sources (wire spec §1): Next's server `searchParams`
- * shape or the client's `URLSearchParams`. Both are already percent-decoded
- * by the platform.
+ * Decoded value-layer sources: Next's server `searchParams` shape or the
+ * client's `URLSearchParams`. Both are already percent-decoded by the
+ * platform.
  */
 export type SearchSource =
   Record<string, string | string[] | undefined> | URLSearchParams;
@@ -129,7 +129,7 @@ export function buildSearchString(
  * under keys paramour doesn't own can never fail a decode.
  * Throws {@link SearchDecodeError} carrying one issue per failed key.
  *
- * A `RawSearch` config (design-04 SS2) branches to the whole-object schema
+ * A `RawSearch` config (SS2) branches to the whole-object schema
  * path instead: every source key reaches the schema (P8 does not apply
  * there — the schema owns stripping or passing through extras).
  */
@@ -233,7 +233,7 @@ export function decodeSearch<S extends SearchSlot>(
 /**
  * encodeURIComponent throws a raw URIError on lone surrogates; wrap it so
  * the documented "every error is a ParamourError" contract holds (S7).
- * Exported for path.ts (the byte-layer chokepoint is shared with RL5's
+ * Exported for path.ts (the byte-layer chokepoint is shared with path
  * segment encoding), not from the package barrel.
  */
 export function encodeComponent(text: string): string {
@@ -253,7 +253,7 @@ export function encodeComponent(text: string): string {
  * Caveat: JS property enumeration puts integer-like keys ("0", "42") first
  * in ascending numeric order regardless of declaration — declaration order
  * is unrecoverable for those, so they sort numerically before all others.
- * Params equal to their `.default()` are elided (design-02 D8), compared by
+ * Params equal to their `.default()` are elided (D8), compared by
  * serialized wire form against the live default (re-serialized per encode —
  * a build-time snapshot would go stale if a reference-typed default were
  * mutated, silently dropping explicit values that then decode differently).
@@ -261,9 +261,9 @@ export function encodeComponent(text: string): string {
  * time-varying factory would elide an explicit value that later decodes as
  * a different one.
  *
- * A `RawSearch` config (design-04 SS5) branches to a raw pass-through
- * instead: no serializer exists for a whole-object schema, so the caller's
- * record goes straight to the byte layer and the schema never runs on encode.
+ * A `RawSearch` config (SS5) branches to a raw pass-through instead: no
+ * serializer exists for a whole-object schema, so the caller's record goes
+ * straight to the byte layer and the schema never runs on encode.
  */
 export function encodeSearch<S extends SearchSlot>(
   config: S,
@@ -339,7 +339,7 @@ export function encodeSearch<S extends SearchSlot>(
 }
 
 /**
- * Runtime discriminant for the `search:` slot (design-04 SS2): probes the
+ * Runtime discriminant for the `search:` slot (SS2): probes the
  * `~kind` marker's VALUE, which is unambiguous against a codec map — a map
  * key literally named "~kind" would hold a codec object, never the marker
  * string. Exported from the package barrel so derived surfaces
@@ -358,10 +358,10 @@ export function isRawSearch(
  * the codec's `.catch()` recovery applied (decodeSearch always recovers a
  * caught failure, so a probe through it cannot tell "parsed cleanly" from
  * "failed and was caught"). Exists for reflection-driven tooling — the
- * devtools panel's catch-attribution probe (design-12 DT7) — and any other
- * derived surface that must observe the raw parse outcome. A parse failure
- * throws the codec's own {@link ParseError}; foreign throws from a custom
- * codec propagate unwrapped, matching decodeSearch's taxonomy. For
+ * devtools panel's catch-attribution probe — and any other derived surface
+ * that must observe the raw parse outcome. A parse failure throws the
+ * codec's own {@link ParseError}; foreign throws from a custom codec
+ * propagate unwrapped, matching decodeSearch's taxonomy. For
  * arity-"many" codecs this parses ONE element of the repeated-key array,
  * not the whole array (the same contract as `~parseElement` itself).
  */
@@ -370,13 +370,13 @@ export function parseValue(codec: AnyCodec, raw: string): unknown {
 }
 
 /**
- * The whole-object search escape hatch (design-04 SS1, maintainer ruling):
- * an explicit, greppable wrapper around a bare Standard Schema so a route's
- * `search:` slot never falls into the degraded raw mode by accident — a
- * bare `search: schema` could be confused for a codec map, but `rawSearch`
- * is a conscious act. Per-key defaults/`.catch()` and round-trip encoding
- * are deliberately unavailable here (SS7); reach for `p.custom` if you need
- * bidirectional per-key transforms instead.
+ * The whole-object search escape hatch (SS1): an explicit, greppable wrapper
+ * around a bare Standard Schema so a route's `search:` slot never falls into
+ * the degraded raw mode by accident — a bare `search: schema` could be
+ * confused for a codec map, but `rawSearch` is a conscious act. Per-key
+ * defaults/`.catch()` and round-trip encoding are deliberately unavailable
+ * here (SS7); reach for `p.custom` if you need bidirectional per-key
+ * transforms instead.
  */
 export function rawSearch<S extends StandardSchemaV1>(schema: S): RawSearch<S> {
   return { "~kind": "raw-search", "~schema": schema };
@@ -465,15 +465,15 @@ export function serializeValue(
 }
 
 /**
- * The `RawSearch` decode path (design-04 SS3/SS4). The schema receives EVERY
+ * The `RawSearch` decode path (SS3/SS4). The schema receives EVERY
  * source key, normalized to Next's own `searchParams` shape — P8's
  * declared-keys-only stance doesn't apply to a whole-object schema, which
- * owns stripping or passing through extras itself. Sync only, per D7 (the
- * shared runner throws on an async `validate`). A validator that THROWS
+ * owns stripping or passing through extras itself. Sync only — the shared
+ * runner throws on an async `validate`. A validator that THROWS
  * (rather than returning issues) is rebranded at this chokepoint — the
- * shared runner deliberately stays throw-preserving (plan-04 step 1) so this
- * call site owns the wrap, mirroring how a foreign throw is branded
- * elsewhere in the package.
+ * shared runner deliberately stays throw-preserving so this call site owns
+ * the wrap, mirroring how a foreign throw is branded elsewhere in the
+ * package.
  */
 function decodeRawSearch(
   config: RawSearch<StandardSchemaV1>,
@@ -513,7 +513,7 @@ function decodeRawSearch(
 }
 
 /**
- * The `RawSearch` encode path (design-04 SS5): no serializer exists for a
+ * The `RawSearch` encode path (SS5): no serializer exists for a
  * whole-object schema, so the caller's already-wire-shaped record is pushed
  * straight to the byte layer — one pair per string value, one repeated pair
  * per array element — and the schema never runs on encode.
@@ -546,10 +546,10 @@ function encodeRawSearch(input: unknown): [string, string][] {
  * whole-object schema's `validate`) runs — sibling of
  * {@link readDeclaredValues} that reads all keys instead of declared-only
  * ones (SS3: a whole-object schema has no declared keys of its own).
- * Collapses each key's values by occurrence count (plan-04 point 2): one
- * value → `string`, multiple → `string[]`, uniformly for both
- * `URLSearchParams` and Next-record sources, so the schema author writes one
- * mental model regardless of which source it came from.
+ * Collapses each key's values by occurrence count: one value → `string`,
+ * multiple → `string[]`, uniformly for both `URLSearchParams` and
+ * Next-record sources, so the schema author writes one mental model
+ * regardless of which source it came from.
  */
 function readAllValues(
   source: SearchSource,

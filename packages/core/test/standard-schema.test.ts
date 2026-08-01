@@ -1,6 +1,6 @@
 /**
  * Runtime tests for `standardSearchSchema`, the Standard Schema generate-OUT
- * adapter (design-08 STD1–STD9).
+ * adapter.
  */
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
@@ -46,7 +46,7 @@ function expectSuccess<Out>(result: StandardSchemaV1.Result<Out>): Out {
   return result.value;
 }
 
-/** The exported schema is sync by contract (D7); unwrap for assertions. */
+/** The exported schema is sync by contract; unwrap for assertions. */
 function validateSync<Out>(
   schema: StandardSchemaV1<unknown, Out>,
   input: unknown,
@@ -58,7 +58,7 @@ function validateSync<Out>(
   return result;
 }
 
-describe("standardSearchSchema spec surface (STD1)", () => {
+describe("standardSearchSchema spec surface", () => {
   it("returns a v1 schema with the paramour vendor and a validate function", () => {
     const schema = standardSearchSchema(mixedRoute);
     expect(schema["~standard"].version).toBe(1);
@@ -89,7 +89,7 @@ describe("standardSearchSchema spec surface (STD1)", () => {
   });
 });
 
-describe("byte-identical decode semantics (STD6)", () => {
+describe("byte-identical decode semantics", () => {
   it("full parity with decodeSearch on a mixed source", () => {
     const schema = standardSearchSchema(mixedRoute);
     const source = { flag: "true", page: "2", q: "hi", tags: ["a", "b"] };
@@ -172,7 +172,7 @@ describe("byte-identical decode semantics (STD6)", () => {
   });
 });
 
-describe("contract violations soften to issues (STD7)", () => {
+describe("contract violations soften to issues", () => {
   it.each([
     ["a number", 42],
     ["null", null],
@@ -190,7 +190,7 @@ describe("contract violations soften to issues (STD7)", () => {
     },
   );
 
-  it("a decoded-value payload ({ page: 2 }) is a keyed issue — no coercion, ever (STD2)", () => {
+  it("a decoded-value payload ({ page: 2 }) is a keyed issue — no coercion, ever", () => {
     const schema = standardSearchSchema(mixedRoute);
     const issues = expectIssues(validateSync(schema, { page: 2 }));
     expect(issues).toEqual([
@@ -228,7 +228,7 @@ describe("contract violations soften to issues (STD7)", () => {
     ]);
   });
 
-  it("an async rawSearch schema stays a loud ParamourError (D7)", () => {
+  it("an async rawSearch schema stays a loud ParamourError", () => {
     const asyncSchema: StandardSchemaV1<unknown, unknown> = {
       "~standard": {
         validate: (value) => Promise.resolve({ value }),
@@ -269,7 +269,7 @@ describe("contract violations soften to issues (STD7)", () => {
   });
 });
 
-describe("URLSearchParams accepted at runtime (STD3)", () => {
+describe("URLSearchParams accepted at runtime", () => {
   it("decodes a genuine URLSearchParams, repeated pairs feeding an array codec", () => {
     const schema = standardSearchSchema(mixedRoute);
     const value = expectSuccess(
@@ -287,7 +287,7 @@ describe("URLSearchParams accepted at runtime (STD3)", () => {
   });
 });
 
-describe("rawSearch routes (STD8)", () => {
+describe("rawSearch routes", () => {
   it("success returns the inner schema's own output (a real zod transform)", () => {
     const route = defineAppRoute("/raw", {
       search: rawSearch(z.object({ page: z.coerce.number(), q: z.string() })),

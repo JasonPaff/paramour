@@ -58,7 +58,7 @@ describe("describeCodec", () => {
     ).toBe("integer");
   });
 
-  it("CV6: csv carries a nested element description", () => {
+  it("csv carries a nested element description", () => {
     expect(describeCodec(p.csv(p.integer())).element).toEqual({
       arity: "single",
       caught: false,
@@ -72,7 +72,7 @@ describe("describeCodec", () => {
     ).toEqual(["a", "b"]);
   });
 
-  it("CV6: element survives modifiers; value defaults reflect the list wire form", () => {
+  it("element survives modifiers; value defaults reflect the list wire form", () => {
     const modified = p.csv(p.integer()).default([1, 2]).catch([]);
     const description = describeCodec(modified);
     expect(description.element?.kind).toBe("integer");

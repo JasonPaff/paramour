@@ -1,6 +1,6 @@
 /**
  * Pins `packages/next/src/types/next-router.d.ts` against real Next — the
- * /pages twin of `navigation.ts` (design-06 PR13).
+ * /pages twin of `navigation.ts`.
  *
  * `@paramour-js/next` is hermetic: it declares `next` as a peer only and
  * typechecks against a hand-authored `declare module "next/router"`. That
@@ -46,10 +46,10 @@ export const _isReadyIsBoolean: boolean = realRouter.isReady;
 export const _queryFeedsDecoder: ParamsSource = realRouter.query;
 
 /**
- * The ambient's devtools claim (design-12 DT8): real
- * `replace(url, as?, options?): Promise<boolean>` stays call-compatible with
- * the 1-arity `(url: string) => Promise<boolean>` view `pages.ts` consumes
- * for `navigate`.
+ * The ambient's devtools claim: real `replace(url, as?, options?):
+ * Promise<boolean>` stays call-compatible with the 1-arity
+ * `(url: string) => Promise<boolean>` view `pages.ts` consumes for
+ * `navigate`.
  */
 export const _replaceIsCallable: (url: string) => Promise<boolean> = (url) =>
   realRouter.replace(url);

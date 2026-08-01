@@ -7,9 +7,9 @@ import { formatShape, formatWire, jsLiteral } from "../format.js";
 import { ValueCell } from "./primitives.js";
 
 /**
- * The params half of the inspector (DT7). Read-only in v1 (DT8): editing a
- * path param navigates to a different RESOURCE — a bigger action than
- * tweaking a filter, deferred behind `href()`.
+ * The params half of the inspector. Read-only in v1: editing a path param
+ * navigates to a different RESOURCE — a bigger action than tweaking a
+ * filter, deferred behind `href()`.
  */
 export function ParamsTable({
   changeStamps,

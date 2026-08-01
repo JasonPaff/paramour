@@ -44,11 +44,11 @@ const rawRoute = defineAppRoute("/raw", {
   ),
 });
 
-// TA7 dogfooding: the suite drives the hooks through the public testing
-// provider, not a module mock of the framework hooks. `current` is
+// Dogfooding the public testing provider: the suite drives the hooks
+// through it, not a module mock of the framework hooks. `current` is
 // reassigned mid-test and the next rerender() makes the provider's ONE
 // stable adapter pair answer with the new props — every mid-test URL
-// change below is an exercise of the TA4 stability contract.
+// change below is an exercise of the adapter stability contract.
 let current: ParamourTestingOptions = {};
 
 const wrapper = ({ children }: { children: ReactNode }) => (
@@ -150,7 +150,7 @@ describe("*OrThrow variants throw to the error boundary", () => {
   });
 });
 
-describe("raw-slice stabilization (design-07 SEL4)", () => {
+describe("raw-slice stabilization", () => {
   it("returns the identical result object across rerenders with the same URLSearchParams", () => {
     current = { ...current, search: new URLSearchParams("page=2") };
     const { rerender, result } = renderHook(() => useSearch(productRoute), {
@@ -309,8 +309,8 @@ describe("raw-slice stabilization (design-07 SEL4)", () => {
   });
 });
 
-describe("selectors (design-07 SEL1–SEL6)", () => {
-  it("useSearch projects the success arm through select (SEL2)", () => {
+describe("selectors", () => {
+  it("useSearch projects the success arm through select", () => {
     current = { ...current, search: new URLSearchParams("page=2&q=hi") };
     const { result } = renderHook(
       () => useSearch(productRoute, { select: (search) => search.page }),
@@ -329,8 +329,8 @@ describe("selectors (design-07 SEL1–SEL6)", () => {
     current = { ...current, search: new URLSearchParams("page=2&q=bye") };
     rerender();
     // The decode re-ran (q changed), but the selected slice is Object.is-equal
-    // — the WRAPPER object comes back by identity (SEL2/SEL3). Inline-arrow
-    // selector identity churn across renders is irrelevant (SEL6).
+    // — the WRAPPER object comes back by identity. Inline-arrow selector
+    // identity churn across renders is irrelevant.
     expect(result.current).toBe(first);
   });
 
@@ -347,7 +347,7 @@ describe("selectors (design-07 SEL1–SEL6)", () => {
     expect(result.current).toEqual({ data: 3, status: "success" });
   });
 
-  it("the error arm passes through the selector untouched (SEL2)", () => {
+  it("the error arm passes through the selector untouched", () => {
     current = { ...current, search: new URLSearchParams("page=abc") };
     const { result } = renderHook(
       () => useSearch(productRoute, { select: (search) => search.page }),
@@ -358,7 +358,7 @@ describe("selectors (design-07 SEL1–SEL6)", () => {
     expect(result.current.error).toBeInstanceOf(SearchDecodeError);
   });
 
-  it('an object selection churns under Object.is but holds with equality: "shallow" (SEL3)', () => {
+  it('an object selection churns under Object.is but holds with equality: "shallow"', () => {
     current = { ...current, search: new URLSearchParams("page=2&q=hi") };
     const plain = renderHook(
       () =>
@@ -387,7 +387,7 @@ describe("selectors (design-07 SEL1–SEL6)", () => {
     expect(shallow.result.current).toBe(firstShallow);
   });
 
-  it("a selector throw propagates to the error boundary, never the error arm (SEL5)", () => {
+  it("a selector throw propagates to the error boundary, never the error arm", () => {
     current = { ...current, search: new URLSearchParams("page=2") };
     expect(() =>
       renderHook(
@@ -414,7 +414,7 @@ describe("selectors (design-07 SEL1–SEL6)", () => {
     expect(result.current).toBe(2);
   });
 
-  it("useRouteParams and useRouteParamsOrThrow take the same selector surface (SEL1)", () => {
+  it("useRouteParams and useRouteParamsOrThrow take the same selector surface", () => {
     current = { ...current, params: { id: "42" } };
     const safe = renderHook(
       () => useRouteParams(productRoute, { select: (params) => params.id }),

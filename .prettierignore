@@ -3,7 +3,8 @@ CHANGELOG.md
 .claude/
 
 # Generated files are not format-enforced: prettier would collapse the
-# artifact's TR3 multi-line union into permanent drift against strict builds.
+# generated artifact's multi-line union into permanent drift against strict
+# builds.
 **/next-env.d.ts
 **/paramour-env.d.ts
 

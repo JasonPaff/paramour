@@ -162,7 +162,7 @@ export function CodecInput({
 }
 
 /**
- * DT8's kind → widget dispatch. The draft currency is always the WIRE
+ * The kind → widget dispatch. The draft currency is always the WIRE
  * string (`draftText`): structured widgets (toggle, select, date) convert
  * their widget value to wire before reporting, so the live preview always
  * reflects the true wire round-trip. Raw mode swaps in a mono text input

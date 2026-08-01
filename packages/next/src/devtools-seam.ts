@@ -1,7 +1,7 @@
 import type { AnyRoute, ParamsSource, RouterKind, SafeResult } from "paramour";
 
 /**
- * The devtools observation seam (design-12 DT5): a dependency-free global
+ * The devtools observation seam: a dependency-free global
  * slot the hooks push decode observations into and the devtools panel
  * (`@paramour-js/devtools`) reads out of. This module's JSDoc is the
  * CONTRACT OF RECORD for the slot — the panel never imports runtime code
@@ -11,7 +11,7 @@ import type { AnyRoute, ParamsSource, RouterKind, SafeResult } from "paramour";
  *
  * - Slot key: `Symbol.for("paramour.devtools.seam")` — the realm-global
  *   symbol registry, the same cross-copy identity idiom as core's error
- *   brands (RL6): a second physical copy of this module (dual-package
+ *   brands: a second physical copy of this module (dual-package
  *   hazard, bundler duplication) mints the SAME symbol and lands on the
  *   same slot. Either side — hooks or panel — may create the slot; both
  *   sides are create-if-absent.
@@ -25,7 +25,7 @@ import type { AnyRoute, ParamsSource, RouterKind, SafeResult } from "paramour";
  *   `add` — same JS thread, so nothing can be emitted between the read and
  *   the add. Emitters push to `buffer` (FIFO-capped at
  *   {@link OBSERVATION_BUFFER_CAP}) and then invoke every listener.
- * - Production (DT6): every emit call site sits behind
+ * - Production: every emit call site sits behind
  *   `process.env.NODE_ENV !== "production"`, which Next's compilers
  *   constant-fold; with the package's `sideEffects: false` the then-dead
  *   import of this module is dropped entirely. The emitted JS here imports
@@ -33,7 +33,7 @@ import type { AnyRoute, ParamsSource, RouterKind, SafeResult } from "paramour";
  *   that erasure.
  */
 
-/** The `Symbol.for("paramour.devtools.seam")` slot shape — the DT5 contract. */
+/** The `Symbol.for("paramour.devtools.seam")` slot shape — the seam contract. */
 export interface ParamourDevtoolsSeam {
   /** Capped FIFO; oldest dropped past the cap. Replay = read it. */
   readonly buffer: ParamourObservation[];
@@ -46,7 +46,7 @@ export interface ParamourDevtoolsSeam {
   readonly version: 1;
 }
 
-/** Discriminant naming which hook reported (design-12 DT4). */
+/** Discriminant naming which hook reported. */
 export type ParamourHookId =
   | "app.useRouteParams"
   | "app.useRouteParamsOrThrow"
@@ -56,9 +56,9 @@ export type ParamourHookId =
   | "pages.useSearch";
 
 /**
- * Navigation capability captured from the EMITTING hook's router (design-12
- * DT8): the panel commits URL edits through this, so it never guesses which
- * router is live and never imports Next. The panel passes ONLY the
+ * Navigation capability captured from the EMITTING hook's router: the panel
+ * commits URL edits through this, so it never guesses which router is live
+ * and never imports Next. The panel passes ONLY the
  * serialized search string (`""` or `"?…"`); the hook resolves it against
  * its OWN current pathname — `usePathname()` (App) / `asPath`'s path part
  * (Pages), both basePath-/locale-relative, which is what `replace()`
@@ -71,7 +71,7 @@ export type ParamourHookId =
 export type ParamourNavigate = (search: string) => void;
 
 /**
- * One hook decode, reported on decode CHANGE (design-12 DT4) — and
+ * One hook decode, reported on decode CHANGE — and
  * re-reported when the hook's resolution base moves under an unchanged
  * decode (a layout surviving `/product/1?q=a` → `/product/2?q=a`), so the
  * captured `navigate`/`pathname` never go stale while the hook is mounted.
@@ -80,11 +80,11 @@ export type ParamourObservation =
   ParamourParamsObservation | ParamourSearchObservation;
 
 /**
- * Pre-`select` decode result (design-12 DT12): the hook's full `SafeResult`
- * — the error arm carries the LIVE `ParamsDecodeError`/`SearchDecodeError`
- * with its `issues` — never the user's `select` projection. `pending` is
- * the Pages-only third state (DT11). Generic-erased on purpose: the panel
- * treats `data` structurally.
+ * Pre-`select` decode result: the hook's full `SafeResult` — the error arm
+ * carries the LIVE `ParamsDecodeError`/`SearchDecodeError` with its
+ * `issues` — never the user's `select` projection. `pending` is the
+ * Pages-only third state. Generic-erased on purpose: the panel treats
+ * `data` structurally.
  */
 export type ParamourObservationResult =
   SafeResult<unknown> | { readonly status: "pending" };
@@ -98,7 +98,7 @@ export interface ParamourParamsObservation extends ParamourObservationBase {
 /**
  * Search decode: wire is decode-time `[key, value]` pairs in wire order —
  * order is load-bearing for repeated keys (P5/S5), and pairs round-trip
- * losslessly into the panel's raw-wire editing (DT8).
+ * losslessly into the panel's raw-wire editing.
  */
 export interface ParamourSearchObservation extends ParamourObservationBase {
   readonly kind: "search";
@@ -122,7 +122,7 @@ interface ParamourObservationBase {
   readonly pathname: string;
   readonly result: ParamourObservationResult;
   /**
-   * The LIVE route object (DT5: same JS context, no serialization) — the
+   * The LIVE route object (same JS context, no serialization) — the
    * panel calls `describeRoute`, the route's own codecs, and
    * `buildSearchString` on it directly.
    */
@@ -132,7 +132,7 @@ interface ParamourObservationBase {
 
 /**
  * 128: replay only needs the pre-panel-mount window. One observation per
- * decode CHANGE per hook (DT4) means even a long pre-open session is dozens
+ * decode CHANGE per hook means even a long pre-open session is dozens
  * of entries, not thousands; the panel keys on route, so depth beyond
  * "every route seen recently" adds nothing — the cap mostly bounds how many
  * live route/result references the buffer retains.
@@ -148,8 +148,8 @@ const globalSlots = globalThis as Record<
 
 /**
  * Pushes one observation and notifies listeners. The internal production
- * early-return is belt-and-suspenders under DT6 (every call site is ALSO
- * guarded, which is what the bundler erases); it makes the guard directly
+ * early-return is belt-and-suspenders (every call site is ALSO guarded,
+ * which is what the bundler erases); it makes the guard directly
  * unit-testable and keeps a future unguarded call site failing safe.
  */
 export function emitObservation(observation: ParamourObservation): void {

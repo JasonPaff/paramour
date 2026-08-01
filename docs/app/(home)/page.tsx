@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 // The hero tells the whole story in one block: define a route, build a typed
 // href (the `^?` query renders the inferred type inline), and show the
 // library's selling point — what fails to compile. The declared `@errors`
-// code is validated by twoslash, so this sample cannot drift (DS8/DS14).
+// code is validated by twoslash, so this sample cannot drift.
 const heroSample = `// @errors: 2769
 import { defineAppRoute, href, p } from "paramour";
 

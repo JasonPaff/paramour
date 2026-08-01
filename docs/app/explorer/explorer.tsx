@@ -20,11 +20,11 @@ import { explorerRoute } from "./route.def";
 type Pane = "decode" | "encode";
 
 /**
- * The explorer's client root (plan-docs-milestone-5 B3): ALL state lives in
- * the URL through the route's own search params — read with `useSearch`
- * (the safe hook: a hand-edited shared link renders its decode error, never
- * a crash), written with debounced `router.replace(href(...))`. The devtools
- * seam observes every decode for free.
+ * The explorer's client root: ALL state lives in the URL through the route's
+ * own search params — read with `useSearch` (the safe hook: a hand-edited
+ * shared link renders its decode error, never a crash), written with
+ * debounced `router.replace(href(...))`. The devtools seam observes every
+ * decode for free.
  */
 export function Explorer() {
   const search = useSearch(explorerRoute);

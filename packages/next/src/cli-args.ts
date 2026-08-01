@@ -13,10 +13,10 @@ type ParsedValues<T extends ParseArgsOptionsConfig> = ReturnType<
 >["values"];
 
 /**
- * The shared command prologue (TR7): parse flags, print usage on a parse
- * error (exit 2) or `--help` (exit 0), and reject positionals — no command
- * takes one. Callers branch on `"exit" in result`; anything past the
- * prologue (mode merging, flag exclusivity) stays per-command.
+ * The shared command prologue: parse flags, print usage on a parse error
+ * (exit 2) or `--help` (exit 0), and reject positionals — no command takes
+ * one. Callers branch on `"exit" in result`; anything past the prologue
+ * (mode merging, flag exclusivity) stays per-command.
  */
 export function parseCommandFlags<
   const T extends HelpOption & ParseArgsOptionsConfig,

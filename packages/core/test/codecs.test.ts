@@ -48,14 +48,14 @@ describe("p.integer", () => {
     expect(() => serialize(p.integer(), null)).toThrow(SerializeError);
   });
 
-  it("accepts leading zeros and -0 on parse (grammar latitude, §4)", () => {
+  it("accepts leading zeros and -0 on parse (grammar latitude)", () => {
     expect(parse(p.integer(), "007")).toBe(7);
     expect(Object.is(parse(p.integer(), "-0"), -0)).toBe(true);
   });
 
   it("a normalizing schema whose output is not a safe integer fails serialize", () => {
     // StandardSchemaV1<number, number> by type, but returns a non-integer —
-    // the post-refinement safe-integer check must still fire (N9).
+    // the post-refinement safe-integer check must still fire.
     const halving: StandardSchemaV1<number, number> = {
       "~standard": {
         validate: (value) => ({ value: (value as number) / 2 }),
@@ -108,7 +108,7 @@ describe("p.number", () => {
     }
   });
 
-  it("accepts trailing zeros and leading zeros on parse (grammar latitude, §4)", () => {
+  it("accepts trailing zeros and leading zeros on parse (grammar latitude)", () => {
     expect(parse(p.number(), "1.50")).toBe(1.5);
     expect(parse(p.number(), "007")).toBe(7);
   });
@@ -570,7 +570,7 @@ describe("p.csv", () => {
   });
 });
 
-describe("p.array (design-13 PP1)", () => {
+describe("p.array (PP1)", () => {
   it("composes the element codec per repeated wire value", () => {
     expect(parse(p.array(), "x")).toBe("x");
     expect(parse(p.array(p.integer()), "7")).toBe(7);
@@ -604,7 +604,7 @@ describe("p.array (design-13 PP1)", () => {
   });
 });
 
-describe("p.index (design-13 PP5)", () => {
+describe("p.index (PP5)", () => {
   it("shifts the 1-based wire form to a 0-based in-memory index and back", () => {
     expect(parse(p.index(), "1")).toBe(0);
     expect(parse(p.index(), "5")).toBe(4);
@@ -724,7 +724,7 @@ describe("parseValue", () => {
     expect(parseValue(p.boolean(), "true")).toBe(true);
   });
 
-  it("throws ParseError WITHOUT applying .catch() (design-12 DT7)", () => {
+  it("throws ParseError WITHOUT applying .catch()", () => {
     // The whole reason this exists: decodeSearch would recover this failure
     // to 0, making "parsed cleanly" and "failed but caught" indistinguishable.
     const caught = p.integer().catch(0);

@@ -23,9 +23,9 @@ type Outcome =
   | { kind: "ok"; pairs: [string, string][]; url: string };
 
 /**
- * The encode pane (plan-docs-milestone-5 B3): per-key wire-form inputs are
- * parsed through the real codec into typed values, then serialized with the
- * shipped `searchToString` pipeline. Elision (D8), empty-vs-absent (S3), and
+ * The encode pane: per-key wire-form inputs are parsed through the real
+ * codec into typed values, then serialized with the shipped
+ * `searchToString` pipeline. Elision (D8), empty-vs-absent (S3), and
  * `SerializeError`s all render exactly as the library produced them.
  */
 export function EncodePane({

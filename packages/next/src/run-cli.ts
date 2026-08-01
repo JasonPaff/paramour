@@ -31,7 +31,7 @@ const USAGE = [
 ].join("\n");
 
 /**
- * @internal The CLI dispatcher (TR7), in-process testable: returns the exit
+ * @internal The CLI dispatcher, in-process testable: returns the exit
  * code instead of exiting. The exit-code contract holds across every
  * command: 0 success, 1 "the thing you asked me to verify is not true"
  * (`check`/`generate --check` drift, `doctor` failures) ONLY, 2

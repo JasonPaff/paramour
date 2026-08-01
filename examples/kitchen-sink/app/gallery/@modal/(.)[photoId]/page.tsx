@@ -9,7 +9,7 @@ import { PhotoModal } from "./photo-modal";
 // inside the gallery renders this into the @modal slot instead of swapping
 // the page. The URL is identical to the full page's, so the SAME route def
 // decodes it — interception changes where the UI renders, never what the
-// params are. The scanner sees neither folder (@ skip, then (.) skip, TR2);
+// params are. The scanner sees neither folder (@ skip, then (.) skip);
 // /gallery/[photoId] is in the artifact once, via the real page.
 export default async function InterceptedPhotoPage(props: RouteProps) {
   const { photoId } = await galleryPhotoRoute.parseParams(props);

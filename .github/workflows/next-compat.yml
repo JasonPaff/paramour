@@ -1,4 +1,4 @@
-# DESIGN §12: "Next: latest two majors. Verified in CI matrix."
+# Support policy: Next's latest two majors, verified in this CI matrix.
 #
 # Reusable (workflow_call) on purpose (CI-M2): ci.yml runs it as the PR/main
 # gate, and release.yml runs it as a pre-publish gate (CI-B3). The Version

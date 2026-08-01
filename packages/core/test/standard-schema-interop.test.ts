@@ -1,6 +1,6 @@
 /**
- * Cross-validator Standard Schema interop (DESIGN §12: "any Standard Schema v1
- * implementation; zod/valibot/arktype smoke-tested in CI").
+ * Cross-validator Standard Schema interop: any Standard Schema v1
+ * implementation is supported, with zod/valibot/arktype smoke-tested in CI.
  *
  * Every other suite reaches for zod. The library's premise is bring-your-own
  * validator, so the vendor-specific shapes the code actually depends on get
@@ -14,7 +14,7 @@
  * - Root-level issues. Zod and ArkType emit `path: []`; Valibot omits `path`
  *   entirely. Both must collapse to the `<search>` sentinel.
  * - Async `validate`. Returning a Promise is spec-legal and paramour must
- *   reject it (design-02 D7), since URL parsing is synchronous.
+ *   reject it, since URL parsing is synchronous.
  */
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
@@ -219,7 +219,7 @@ describe("vendor-owned arrays are never mapped in place", () => {
   });
 });
 
-describe("async Standard Schema validation is rejected (design-02 D7)", () => {
+describe("async Standard Schema validation is rejected", () => {
   it("rejects a real async zod schema", () => {
     const schema = z.object({
       q: z.string().refine(() => Promise.resolve(true)),

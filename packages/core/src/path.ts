@@ -35,11 +35,11 @@ export interface DecodeParamsOptions {
 }
 
 /**
- * Encode-input side of a route's params (RL3's href-input column): `[id]` →
+ * Encode-input side of a route's params (the href-input column): `[id]` →
  * `Out` (required), `[...slug]` → `Out[]` (required — `[]` is an R3
- * serialization error), `[[...slug]]` → `Out[]` with an OPTIONAL key, per
- * the spike-01 follow-up under exactOptionalPropertyTypes. Module-level
- * export only; Block 3's `InferHrefInput` builds on it.
+ * serialization error), `[[...slug]]` → `Out[]` with an OPTIONAL key under
+ * exactOptionalPropertyTypes. Module-level export only; `InferHrefInput`
+ * builds on it.
  */
 export type InferParamsInput<R extends AnyRoute> = {
   [K in CatchAllNames<R["path"]>]: ParamOutput<R["~params"], K>[];
@@ -64,7 +64,7 @@ export type InferStaticParams<R extends AnyRoute> = Partial<
   Record<SingleParamNames<R["path"]>, string>;
 
 /**
- * Value-layer params source (wire spec §1, R5): the shape of Next's `params`
+ * Value-layer params source (R5): the shape of Next's `params`
  * prop and `useParams()` return. Contrary to the byte-layer's usual "platform
  * already decoded it" stance, Next hands the App-Router surfaces percent-ENCODED
  * values (Next issues #48058/#64952 — only route.ts handlers decode), so core
@@ -83,9 +83,9 @@ export type PathSegment =
     }
   | { readonly kind: "static"; readonly raw: string };
 
-// Anchored per the wire-format spec's regex ethos; name charset excludes
-// brackets so nesting can't smuggle through. Match order mirrors the type
-// grammar: `[[...` before `[...` before `[`.
+// Anchored, like the wire-value grammars; the name charset excludes brackets
+// so nesting can't smuggle through. Match order mirrors the type grammar:
+// `[[...` before `[...` before `[`.
 const OPTIONAL_CATCHALL_TOKEN = /^\[\[\.\.\.([^\][]+)\]\]$/;
 const CATCHALL_TOKEN = /^\[\.\.\.([^\][]+)\]$/;
 const SINGLE_TOKEN = /^\[([^\][]+)\]$/;
@@ -98,7 +98,7 @@ type SerializedSegment =
   | { readonly kind: "one"; readonly value: string };
 
 /**
- * Builds the path portion of an href (RL5): `/` plus the encoded segments
+ * Builds the path portion of an href: `/` plus the encoded segments
  * joined with `/`. R2's element joining falls out of the same join as
  * everything else; a fully-elided path (an optional catch-all at the root)
  * yields "/".
@@ -111,7 +111,7 @@ export function buildPath<R extends AnyRoute>(
 }
 
 /**
- * Decodes a params source against a route's codecs (RL7), the sync twin of
+ * Decodes a params source against a route's codecs, the sync twin of
  * `route.parseParams` — mirrors decodeSearch: per-key {@link Issue}
  * aggregation into {@link ParamsDecodeError}. Shape validation is strict:
  * `[id]` given an array, a catch-all given a string, a missing required key,
@@ -160,7 +160,7 @@ export function decodeParams<R extends AnyRoute>(
           message: "required route param is missing",
         });
       } else if (typeof value !== "string") {
-        // RL7: shape mismatches are recorded issues, never ParseErrors —
+        // Shape mismatches are recorded issues, never ParseErrors —
         // .catch() cannot recover them.
         issues.push({
           key: segment.name,
@@ -211,7 +211,7 @@ export function decodeParams<R extends AnyRoute>(
       continue;
     }
     if (segment.kind === "catchall" && value.length === 0) {
-      // RL7: no URL produces a present-but-empty required catch-all; only
+      // No URL produces a present-but-empty required catch-all; only
       // hand-built props can — mirrors R3's encode-side stance.
       issues.push({
         key: segment.name,
@@ -241,7 +241,7 @@ export function decodeParams<R extends AnyRoute>(
       try {
         parsed.push(codec["~parseElement"](decoded));
       } catch (error) {
-        // Element-wise recovery (RL7, forced by D6): the codec describes ONE
+        // Element-wise recovery (forced by D6): the codec describes ONE
         // element, so a .catch() fallback is element-typed — each failing
         // element recovers independently ("1","x","3" → 1, fallback, 3).
         if (error instanceof ParseError && codec["~catchValue"] !== undefined) {
@@ -268,11 +268,11 @@ export function decodeParams<R extends AnyRoute>(
 
 /**
  * Encodes a params input into ordered, already-percent-encoded URL segment
- * strings (RL5) — ONE entry per emitted URL segment: a static segment is
- * emitted verbatim, a single param contributes one entry (R1), a catch-all
- * one per element (R2), an elided optional catch-all none (R3). Codec
- * serialize errors and schema-refinement failures (N9) propagate unchanged,
- * already branded at their own chokepoints.
+ * strings — ONE entry per emitted URL segment: a static segment is emitted
+ * verbatim, a single param contributes one entry (R1), a catch-all one per
+ * element (R2), an elided optional catch-all none (R3). Codec serialize
+ * errors and schema-refinement failures propagate unchanged, already branded
+ * at their own chokepoints.
  */
 export function encodeParams<R extends AnyRoute>(
   route: R,
@@ -293,8 +293,8 @@ export function encodeParams<R extends AnyRoute>(
 
   for (const segment of routeSegments(route)) {
     if (segment.kind === "static") {
-      // RL2/RL5: the literal is URL-shaped and emitted as-is — static
-      // segments are never re-encoded.
+      // The path literal is URL-shaped and emitted as-is — static segments
+      // are never re-encoded.
       segments.push(segment.raw);
       continue;
     }
@@ -324,17 +324,17 @@ export function encodeParams<R extends AnyRoute>(
 /**
  * Encodes a params input into the per-param wire-value record the static
  * generation surfaces expect: App Router `generateStaticParams` entries and
- * Pages Router `getStaticPaths` `{ params }` objects (PR10's static story).
- * Same codec serialization and R1–R4 validation as {@link encodeParams},
- * with two deliberate differences: static segments are skipped (Next wants
- * only the dynamic params, keyed by name), and values are NOT percent-encoded
- * — Next percent-encodes static-params values itself when it materializes
- * the concrete URLs, so pre-encoding here would double-encode (the
- * encode-side mirror of R5's decode asymmetry). That also means the S7
- * lone-surrogate brand stays an encodeParams concern: strings are handed to
- * Next verbatim. An elided optional catch-all (R3) OMITS its key — an absent
- * key is the base-path variant on both routers (Pages also accepts
- * undefined/[]; omission is the one spelling valid on both).
+ * Pages Router `getStaticPaths` `{ params }` objects. Same codec
+ * serialization and R1–R4 validation as {@link encodeParams}, with two
+ * deliberate differences: static segments are skipped (Next wants only the
+ * dynamic params, keyed by name), and values are NOT percent-encoded — Next
+ * percent-encodes static-params values itself when it materializes the
+ * concrete URLs, so pre-encoding here would double-encode (the encode-side
+ * mirror of R5's decode asymmetry). That also means the S7 lone-surrogate
+ * brand stays an encodeParams concern: strings are handed to Next verbatim.
+ * An elided optional catch-all (R3) OMITS its key — an absent key is the
+ * base-path variant on both routers (Pages also accepts undefined/[];
+ * omission is the one spelling valid on both).
  */
 export function encodeStaticParams<R extends AnyRoute>(
   route: R,
@@ -375,12 +375,12 @@ export function encodeStaticParams<R extends AnyRoute>(
 
 /**
  * Tokenizes a path literal into segments, throwing ParamourError on every
- * RL1 rejection. Shared by the route constructors (define-time validation)
- * and the R-rule runtime here, so encode/decode never re-derive segment
- * kinds.
+ * rejected literal. Shared by the route constructors (define-time
+ * validation) and the R-rule runtime here, so encode/decode never re-derive
+ * segment kinds.
  */
 export function tokenizePath(path: string): PathSegment[] {
-  // RL1: either would corrupt href's fixed path–query–fragment assembly (RL4).
+  // Either would corrupt href's fixed path–query–fragment assembly.
   if (path.includes("?")) {
     throw new ParamourError(
       `route path must not contain "?": "${path}" (declare search params in the search config)`,
@@ -407,8 +407,8 @@ export function tokenizePath(path: string): PathSegment[] {
         `route path contains an empty segment: "${path}"`,
       );
     }
-    // RL2: path literals are URL-shaped, so group/slot spellings are
-    // filesystem paths by definition — the most likely migration mistake.
+    // Path literals are URL-shaped, so group/slot spellings are filesystem
+    // paths by definition — the most likely migration mistake.
     if (GROUP_SEGMENT.test(raw)) {
       throw new ParamourError(
         `route paths are URL-shaped: "${raw}" in "${path}" is a route-group folder name; use the URL path without it`,
@@ -421,7 +421,7 @@ export function tokenizePath(path: string): PathSegment[] {
     }
     const segment = tokenizeSegment(raw, path);
     if (segment.kind !== "static") {
-      // RL1: not expressible as a compile error — the mapped type silently
+      // Not expressible as a compile error — the mapped type silently
       // collapses duplicate keys.
       if (seen.has(segment.name)) {
         throw new ParamourError(
@@ -434,7 +434,7 @@ export function tokenizePath(path: string): PathSegment[] {
   }
 
   segments.forEach((segment, index) => {
-    // RL1: Next itself requires catch-alls to be final.
+    // Next itself requires catch-alls to be final.
     if (
       (segment.kind === "catchall" || segment.kind === "optional-catchall") &&
       index < segments.length - 1
@@ -547,9 +547,8 @@ function serializeDynamicSegment(
   // R2: each element is serialized independently; on the path surface an
   // element containing "/" becomes %2F and round-trips as a single element —
   // core's decodeParams restores it via percentDecodeSegment (R5), since Next
-  // hands the encoded value straight back on the params surface (wire-spec
-  // open item 1). The static surface passes the array whole, so "/" needs no
-  // escaping there.
+  // hands the encoded value straight back on the params surface. The static
+  // surface passes the array whole, so "/" needs no escaping there.
   return {
     kind: "many",
     values: (value as unknown[]).map((element) =>
@@ -597,7 +596,7 @@ function tokenizeSegment(raw: string, path: string): PathSegment {
   if (!raw.startsWith("[...") && single?.[1] !== undefined) {
     return { kind: "single", name: single[1], raw };
   }
-  // RL1: the type layer lets these fall through as static text (RL3), and
+  // The type layer lets these fall through as static text, and
   // pre-generation there is no registry to catch them; href would otherwise
   // emit the token verbatim.
   if (raw.includes("[") || raw.includes("]")) {

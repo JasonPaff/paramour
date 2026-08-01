@@ -2,18 +2,18 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Shape of `paramour.config.{ts,mjs,json}` (§7.2 / TR7) — the CLI's config
- * file. Every field is optional; the CLI's precedence is flags → this file →
- * inference. `.ts`/`.mjs` files default-export this object.
+ * Shape of `paramour.config.{ts,mjs,json}` — the CLI's config file. Every
+ * field is optional; the CLI's precedence is flags → this file → inference.
+ * `.ts`/`.mjs` files default-export this object.
  */
 export interface ParamourConfig {
-  /** App dir, relative to the project root; default: joint discovery (PR8). */
+  /** App dir, relative to the project root; default: joint discovery. */
   appDir?: string;
-  /** Artifact path, relative to the project root (TR3 escape hatch). */
+  /** Artifact path, relative to the project root — the escape hatch. */
   outFile?: string;
   /** Page extensions, no leading dot; default: Next's four. */
   pageExtensions?: string[];
-  /** Pages dir, relative to the project root; default: joint discovery (PR8). */
+  /** Pages dir, relative to the project root; default: joint discovery. */
   pagesDir?: string;
   /**
    * Globs (relative to the project root) of modules exporting route
@@ -24,7 +24,7 @@ export interface ParamourConfig {
   routeFiles?: string[];
 }
 
-/** @internal Discovery order at the project root (TR7) — first match wins. */
+/** @internal Discovery order at the project root — first match wins. */
 export const CONFIG_FILE_NAMES = [
   "paramour.config.ts",
   "paramour.config.mjs",
@@ -34,9 +34,9 @@ export const CONFIG_FILE_NAMES = [
 /**
  * @internal Load and validate the project's config file, or `undefined`
  * when none exists. No upward traversal — the documented contract is three
- * filenames at the project root (TR7). jiti (the §7.2 loader carry-over) is
- * imported dynamically so only CLI runs that actually have a `.ts`/`.mjs`
- * config pay for it; `withTypedRoutes` users never execute it.
+ * filenames at the project root. jiti is imported dynamically so only CLI
+ * runs that actually have a `.ts`/`.mjs` config pay for it;
+ * `withTypedRoutes` users never execute it.
  */
 export async function loadConfigFile(
   projectRoot: string,

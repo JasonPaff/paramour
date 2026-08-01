@@ -22,10 +22,11 @@ const stringList = z
 
 /**
  * The whole-object schema behind /find's rawSearch escape hatch. Unlike a
- * codec map, the schema owns EVERY key (P8 does not apply): `page` arrives as a
- * string and is coerced, `tags` normalizes to an array, and unknown keys are
- * stripped by Zod. There is no per-key .default()/.catch() and no round-trip
- * encoding here — that is the rawSearch trade-off (SS7).
+ * codec map, the schema owns EVERY key — the "ignore undeclared keys" rule
+ * does not apply here: `page` arrives as a string and is coerced, `tags`
+ * normalizes to an array, and unknown keys are stripped by Zod. There is no
+ * per-key .default()/.catch() and no round-trip encoding here — that is the
+ * rawSearch trade-off.
  */
 export const findSchema = z.object({
   page: z.coerce.number().int().positive().optional(),

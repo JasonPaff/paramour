@@ -3,45 +3,45 @@ import type { AnyRoute, ParamsSource, SafeResult } from "paramour";
 import { useRef } from "react";
 
 /**
- * Shared internals of the read hooks' selector surface (design-07): the
- * raw-slice stabilization layer (SEL4) and the selector layer (SEL2/SEL3).
- * Deliberately NO `"use client"` directive: app.ts (which carries one) and
- * pages.ts (which must not carry one, design-06 PR2) both import from here,
- * and the directive belongs on the entry modules, not a shared leaf.
+ * Shared internals of the read hooks' selector surface: the raw-slice
+ * stabilization layer and the selector layer. Deliberately NO `"use client"`
+ * directive: app.ts (which carries one) and pages.ts (which must not carry
+ * one) both import from here, and the directive belongs on the entry
+ * modules, not a shared leaf.
  *
- * Both layers are `useRef` caches mutated during render (SEL8) — the
- * Redux/TanStack selector pattern, and the one sanctioned departure from the
- * hooks' pure-`useMemo` discipline: result equality needs memory across
- * renders, which no pure memo can provide. Every cache is cleared BEFORE a
- * compute that can throw, so a throwing decode or selector never strands a
- * stale entry.
+ * Both layers are `useRef` caches mutated during render — the Redux/TanStack
+ * selector pattern, and the one sanctioned departure from the hooks'
+ * pure-`useMemo` discipline: result equality needs memory across renders,
+ * which no pure memo can provide. Every cache is cleared BEFORE a compute
+ * that can throw, so a throwing decode or selector never strands a stale
+ * entry.
  */
 
 /**
- * Options bag accepted by every read hook (design-07 SEL1).
+ * Options bag accepted by every read hook.
  */
 export interface SelectOptions<T, U> {
   /**
-   * Result-equality mode for the selected value (SEL3): `Object.is` by
-   * default — free and correct for primitive selections — with one-level
-   * `"shallow"` as the opt-in for tuple/object selections.
+   * Result-equality mode for the selected value: `Object.is` by default —
+   * free and correct for primitive selections — with one-level `"shallow"`
+   * as the opt-in for tuple/object selections.
    */
   readonly equality?: "shallow";
   /**
-   * Pure projection of the decoded value; runs only on the success arm
-   * (SEL2). Identity is never compared, so inline arrows are fine — and when
-   * the underlying result is reference-stable the selector is NOT re-run
-   * (SEL6), so it must not read changing outside state. A throw propagates to
-   * the nearest error boundary (SEL5): a selector bug is a code bug, never
-   * the `SafeResult` error arm, which is reserved for URL data problems.
+   * Pure projection of the decoded value; runs only on the success arm.
+   * Identity is never compared, so inline arrows are fine — and when the
+   * underlying result is reference-stable the selector is NOT re-run, so it
+   * must not read changing outside state. A throw propagates to the nearest
+   * error boundary: a selector bug is a code bug, never the `SafeResult`
+   * error arm, which is reserved for URL data problems.
    */
   readonly select: (value: T) => U;
 }
 
 /**
- * Fingerprint of the pages hooks' pre-`isReady` state (design-06 PR5). Every
- * real fingerprint is a `JSON.stringify`'d array (starts with `[`), so this
- * can never collide with one.
+ * Fingerprint of the pages hooks' pre-`isReady` state. Every real
+ * fingerprint is a `JSON.stringify`'d array (starts with `[`), so this can
+ * never collide with one.
  */
 export const PENDING_FINGERPRINT = "pending";
 
@@ -51,11 +51,11 @@ interface SelectedResultCache<T, U> {
 }
 
 /**
- * Both arms of a compute are cacheable (SEL8): a THROWING decode is as much
- * a function of `(route, fingerprint)` as a success is, so the same invalid
+ * Both arms of a compute are cacheable: a THROWING decode is as much a
+ * function of `(route, fingerprint)` as a success is, so the same invalid
  * URL rethrows the SAME error without recomputing — which also keeps the
  * OrThrow hooks' error observation from re-emitting on every re-render
- * while the URL stays invalid (DT4).
+ * while the URL stays invalid.
  */
 type StableOutcome<T> =
   | { readonly status: "thrown"; readonly thrown: unknown }
@@ -68,8 +68,8 @@ interface StableResultCache<T> {
 }
 
 /**
- * Raw slice of a params source (SEL4): the route's dynamic segment names'
- * raw values, from the define-time `~segments` token cache. Unknown keys —
+ * Raw slice of a params source: the route's dynamic segment names' raw
+ * values, from the define-time `~segments` token cache. Unknown keys —
  * e.g. a parallel route's params in the same `useParams()` bag — never bust
  * the fingerprint, because the decode never reads them.
  */
@@ -81,13 +81,13 @@ export function paramsFingerprint(
 }
 
 /**
- * Raw slice of a pages `router.query` bag for the search half (SEL4). A
- * codec-map route reads exactly its declared keys (query junk and the
- * route's own path params are invisible to the decode, PR9 disjointness); a
+ * Raw slice of a pages `router.query` bag for the search half. A codec-map
+ * route reads exactly its declared keys (query junk and the route's own path
+ * params are invisible to the decode — the two namespaces are disjoint); a
  * `rawSearch` route has no enumerable declared-key set — the schema sees
- * every key except the route's path params (design-06 PR5 subtraction), so
- * exactly that slice is fingerprinted, in sorted-key order for record-order
- * independence.
+ * every key except the route's path params (by subtracting them from the
+ * bag), so exactly that slice is fingerprinted, in sorted-key order for
+ * record-order independence.
  */
 export function queryFingerprint(route: AnyRoute, query: ParamsSource): string {
   const declared = declaredSearchKeys(route);
@@ -99,7 +99,7 @@ export function queryFingerprint(route: AnyRoute, query: ParamsSource): string {
   return recordFingerprint(keys, query);
 }
 /**
- * Raw slice of an app `useSearchParams()` source (SEL4): the declared keys'
+ * Raw slice of an app `useSearchParams()` source: the declared keys'
  * `[key, value]` pairs in wire order — order is load-bearing for repeated
  * keys (array codecs decode in wire order, P5/S5), and iterating the live
  * pairs preserves the relative order of declared entries while `?utm_*`
@@ -119,8 +119,8 @@ export function searchParamsFingerprint(
   return JSON.stringify(pairs);
 }
 /**
- * The selector layer for the safe hooks (SEL2): projects the success arm and
- * reference-stabilizes the projected WRAPPER by result equality (SEL3) — a
+ * The selector layer for the safe hooks: projects the success arm and
+ * reference-stabilizes the projected WRAPPER by result equality — a
  * stable `data` inside a fresh wrapper would still churn every consumer.
  * Error and pending arms pass through untouched; they are already
  * reference-stabilized by {@link useStableResult}'s raw-slice layer.
@@ -146,17 +146,17 @@ export function useSelectedResult<T, U>(
   if (result.status !== "success") return result;
   const previous = cache.current;
   if (previous !== null && Object.is(previous.input, result.data)) {
-    // Reference-stable input ⇒ equal output by selector purity (SEL6); the
-    // selector is deliberately not re-run.
+    // Reference-stable input ⇒ equal output by selector purity; the selector
+    // is deliberately not re-run.
     return previous.wrapped;
   }
-  const selected = options.select(result.data); // a throw propagates (SEL5)
+  const selected = options.select(result.data); // a throw propagates
   if (
     previous !== null &&
     selectedEquals(options.equality, previous.wrapped.data, selected)
   ) {
-    // Same selection out of a new decode: keep the previous wrapper (SEL2)
-    // and re-key the cache so the next render takes the reference fast path.
+    // Same selection out of a new decode: keep the previous wrapper and
+    // re-key the cache so the next render takes the reference fast path.
     previous.input = result.data;
     return previous.wrapped;
   }
@@ -169,8 +169,8 @@ export function useSelectedResult<T, U>(
 }
 
 /**
- * {@link useSelectedResult}'s twin for the `*OrThrow` hooks (SEL2): same
- * layering, no wrapper — the hook's return IS the (selected) value.
+ * {@link useSelectedResult}'s twin for the `*OrThrow` hooks: same layering,
+ * no wrapper — the hook's return IS the (selected) value.
  */
 export function useSelectedValue<T, U>(
   value: T,
@@ -180,9 +180,9 @@ export function useSelectedValue<T, U>(
   if (options === undefined) return value;
   const previous = cache.current;
   if (previous !== null && Object.is(previous.input, value)) {
-    return previous.selected; // SEL6: selector purity, not re-run
+    return previous.selected; // selector purity: not re-run
   }
-  const selected = options.select(value); // a throw propagates (SEL5)
+  const selected = options.select(value); // a throw propagates
   if (
     previous !== null &&
     selectedEquals(options.equality, previous.selected, selected)
@@ -195,12 +195,12 @@ export function useSelectedValue<T, U>(
 }
 
 /**
- * The raw-slice stabilization layer (SEL4): while `route` and `fingerprint`
- * are unchanged from the previous render, the previous result — success OR
+ * The raw-slice stabilization layer: while `route` and `fingerprint` are
+ * unchanged from the previous render, the previous result — success OR
  * error arm — is returned without recomputing, so a fresh `useSearchParams()`
  * / `query` object whose DECLARED slice is unchanged (`?utm_source=` churn)
  * costs neither a decode nor anyone's referential equality. This replaces
- * the pre-design-07 "memo keyed on Next's object reference" behavior.
+ * the earlier "memo keyed on Next's object reference" behavior.
  */
 export function useStableResult<T>(
   route: AnyRoute,
@@ -217,7 +217,7 @@ export function useStableResult<T>(
     if (cached.outcome.status === "thrown") throw cached.outcome.thrown;
     return cached.outcome.value;
   }
-  // Cleared BEFORE computing (SEL8): no half-computed state may survive a
+  // Cleared BEFORE computing: no half-computed state may survive a
   // throw, and a NEW fingerprint always recomputes — an error boundary
   // reset after the URL is fixed can never be served a stale entry.
   cache.current = null;
@@ -249,7 +249,7 @@ export function useStableResult<T>(
  * Declared search keys of a route's `~search` slot, or `null` for a
  * `rawSearch` route (whose schema owns every key, so no declared subset
  * exists). The `~kind` marker is unambiguous against a codec map, which
- * never carries a top-level `~`-prefixed key (design-04 SS2).
+ * never carries a top-level `~`-prefixed key (SS2).
  */
 function declaredSearchKeys(route: AnyRoute): null | string[] {
   const config: unknown = route["~search"];
@@ -287,7 +287,7 @@ function recordFingerprint(
   );
 }
 
-/** SEL3: `Object.is`, widened one level by the `"shallow"` opt-in. */
+/** Result equality: `Object.is`, widened one level by `"shallow"`. */
 function selectedEquals(
   equality: "shallow" | undefined,
   a: unknown,
@@ -298,9 +298,9 @@ function selectedEquals(
 }
 
 /**
- * One-level equality for the `"shallow"` opt-in (SEL3): arrays element-wise,
- * plain objects by own enumerable keys — `Object.is` at each leaf, nothing
- * recursive (deep comparison in a render path is a non-goal, design-07).
+ * One-level equality for the `"shallow"` opt-in: arrays element-wise, plain
+ * objects by own enumerable keys — `Object.is` at each leaf, nothing
+ * recursive (deep comparison in a render path is a non-goal).
  */
 function shallowEqual(a: unknown, b: unknown): boolean {
   if (

@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 /**
- * Emission behavior of the App-Router hooks (design-12 DT4/DT6/DT12): one
- * observation per decode CHANGE (the fingerprint cache miss), none on a
- * same-fingerprint re-render or StrictMode's dev double render, error
- * observations reported BEFORE the OrThrow rethrow, full pre-`select`
- * payloads, a working `navigate`, and the production no-emit guard.
+ * Emission behavior of the App-Router hooks: one observation per decode
+ * CHANGE (the fingerprint cache miss), none on a same-fingerprint re-render
+ * or StrictMode's dev double render, error observations reported BEFORE the
+ * OrThrow rethrow, full pre-`select` payloads, a working `navigate`, and the
+ * production no-emit guard.
  */
 import type { ReactNode } from "react";
 
@@ -38,10 +38,10 @@ function buffer(): readonly ParamourObservation[] {
   return getParamourSeam().buffer;
 }
 
-// TA7 dogfooding: URL state and replace-capture are provider props, not a
-// framework-hook module mock. Mid-test reassignments of `current` take
-// effect on the next rerender() through the provider's stable adapter
-// pair (TA4).
+// Dogfooding the public testing provider: URL state and replace-capture are
+// provider props, not a framework-hook module mock. Mid-test reassignments
+// of `current` take effect on the next rerender() through the provider's
+// stable adapter pair.
 let current: ParamourTestingOptions = {};
 let replaceCalls: string[] = [];
 
@@ -76,7 +76,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("one observation per decode change (DT4)", () => {
+describe("one observation per decode change", () => {
   it("emits exactly once on mount with the full payload", () => {
     const { result } = renderHook(() => useSearch(productRoute), { wrapper });
     expect(buffer()).toHaveLength(1);
@@ -127,7 +127,7 @@ describe("one observation per decode change (DT4)", () => {
   });
 });
 
-describe("OrThrow hooks report before throwing (DT4)", () => {
+describe("OrThrow hooks report before throwing", () => {
   it("emits the error observation carrying the LIVE error, then rethrows", () => {
     current = { ...current, search: new URLSearchParams("page=abc") };
     let thrown: unknown;
@@ -139,7 +139,7 @@ describe("OrThrow hooks report before throwing (DT4)", () => {
     expect(thrown).toBeInstanceOf(SearchDecodeError);
     // React's dev behavior replays a throwing MOUNT (to build the error's
     // component stack), and a mount that throws discards its work-in-
-    // progress hooks — the SEL8 thrown-outcome cache cannot survive it, so
+    // progress hooks — the thrown-outcome cache cannot survive it, so
     // the replay re-emits. Pinned here rather than papered over; UPDATE
     // renders do keep the cache and emit once (see the re-render test
     // below). Every emission is the error observation, and the LAST one
@@ -167,16 +167,16 @@ describe("OrThrow hooks report before throwing (DT4)", () => {
 
   it("a persisting decode error is served from cache, not recomputed per re-render", () => {
     // A mounted page whose URL turns invalid: the thrown outcome must be
-    // cached under its fingerprint like a success is (SEL8), or every
-    // re-render is a cache miss that re-runs the decode — and since the
-    // OrThrow hooks emit INSIDE the compute, each rerun re-emits a
-    // duplicate error observation until the 128-entry buffer is all
-    // duplicates. `useStableResult` is the compute's dedup layer, so its
-    // single-compute guarantee IS the single-emit guarantee (DT4). The
-    // harness catches inside render (an error boundary would remount and
-    // reset the per-instance ref cache) and drives useStableResult
-    // directly — catching around the full hook would skip the selector
-    // hook's slot and trip React's hook-count invariant.
+    // cached under its fingerprint like a success is, or every re-render is
+    // a cache miss that re-runs the decode — and since the OrThrow hooks
+    // emit INSIDE the compute, each rerun re-emits a duplicate error
+    // observation until the 128-entry buffer is all duplicates.
+    // `useStableResult` is the compute's dedup layer, so its single-compute
+    // guarantee IS the single-emit guarantee. The harness catches inside
+    // render (an error boundary would remount and reset the per-instance ref
+    // cache) and drives useStableResult directly — catching around the full
+    // hook would skip the selector hook's slot and trip React's hook-count
+    // invariant.
     let computeCount = 0;
     const { rerender, result } = renderHook(
       () => {
@@ -204,7 +204,7 @@ describe("OrThrow hooks report before throwing (DT4)", () => {
   });
 });
 
-describe("observations are pre-select (DT12)", () => {
+describe("observations are pre-select", () => {
   it("carries the full decoded result, not the projection", () => {
     const { result } = renderHook(
       () => useSearch(productRoute, { select: (search) => search.page }),
@@ -219,7 +219,7 @@ describe("observations are pre-select (DT12)", () => {
   });
 });
 
-describe("navigate capability (DT8)", () => {
+describe("navigate capability", () => {
   it("resolves the panel's search-only string against the hook's own pathname", () => {
     // The panel sends ONLY the serialized search string: `usePathname()` is
     // basePath-/locale-relative, so the hook-side join is what keeps a
@@ -235,12 +235,12 @@ describe("navigate capability (DT8)", () => {
   });
 });
 
-describe("pathname re-emission (DT8)", () => {
+describe("pathname re-emission", () => {
   it("re-emits with a fresh navigate when the pathname moves under an unchanged decode", () => {
     // A layout-surviving component on /product/42?q=… → /product/43?q=…:
     // the declared search slice is unchanged, so the decode cache hits and
-    // the SEL4 layer stays silent — but the previously emitted navigate is
-    // bound to /product/42. Committing an edit through it would silently
+    // the stability layer stays silent — but the previously emitted navigate
+    // is bound to /product/42. Committing an edit through it would silently
     // navigate BACK to the old resource, so the seam must re-emit with the
     // new resolution base.
     const { rerender } = renderHook(() => useSearch(productRoute), { wrapper });
@@ -250,7 +250,7 @@ describe("pathname re-emission (DT8)", () => {
     expect(buffer()).toHaveLength(2);
     expect(buffer()[1]?.pathname).toBe("/product/43");
     // The decode itself was NOT recomputed: the re-emission carries the
-    // cached result by identity (SEL4 stability is untouched).
+    // cached result by identity (stability is untouched).
     expect(buffer()[1]?.result).toBe(buffer()[0]?.result);
     buffer()[1]?.navigate("?page=9");
     expect(replaceCalls).toEqual(["/product/43?page=9"]);
@@ -264,7 +264,7 @@ describe("pathname re-emission (DT8)", () => {
   });
 });
 
-describe("production guard (DT6)", () => {
+describe("production guard", () => {
   it("safe hooks decode normally and emit nothing", () => {
     vi.stubEnv("NODE_ENV", "production");
     const { result } = renderHook(() => useSearch(productRoute), { wrapper });

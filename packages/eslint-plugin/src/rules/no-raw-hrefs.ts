@@ -61,7 +61,7 @@ function getImportBinding(
 /**
  * Extracts the string value of a static path expression: a string literal or
  * an expression-free template literal. Dynamic strings return null — out of
- * scope for v1 (LP3).
+ * scope for v1.
  */
 function getStaticPath(node: TSESTree.Node): null | string {
   if (node.type === AST_NODE_TYPES.Literal && typeof node.value === "string") {
@@ -92,7 +92,7 @@ function isIgnored(path: string, ignorePaths: readonly string[]): boolean {
 }
 
 /**
- * LP5: flag any literal starting with "/"; everything else (external URLs,
+ * Flags any literal starting with "/"; everything else (external URLs,
  * "#hash", "mailto:", relative paths, "") is exempt by not starting with "/".
  * "//host/path" is protocol-relative — an external URL, so also exempt.
  */
@@ -194,7 +194,7 @@ export const noRawHrefs = createRule<Options, MessageIds>({
           // Surface 2: router.push/replace/prefetch on a variable initialized
           // from useRouter(). A router passed across function boundaries or
           // through props escapes detection — accepted cost of staying
-          // syntactic (LP4).
+          // syntactic.
           if (!ROUTER_METHODS.has(method)) return;
           if (def?.node.type !== AST_NODE_TYPES.VariableDeclarator) return;
           if (def.node.id.type !== AST_NODE_TYPES.Identifier) return;

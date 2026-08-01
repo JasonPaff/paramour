@@ -49,11 +49,11 @@ const strictRoute = definePagesRoute("/strict/[id]", {
   search: rawSearch(z.strictObject({ q: z.string() })),
 });
 
-// The stub-era `__set*` choreography is now ordinary provider props (TA7):
+// The stub-era `__set*` choreography is now ordinary provider props:
 // path-param keys go in `params`, everything else in `search` (the provider
 // merges them into the one `query` bag real Next hands the pages router).
 // Mid-test URL changes reassign `current` and rerender — which also proves
-// the TA4 stable-adapter contract.
+// the stable-adapter contract.
 let current: ParamourTestingOptions = {};
 
 const wrapper = ({ children }: { children: ReactNode }) => (
@@ -64,7 +64,7 @@ beforeEach(() => {
   current = {};
 });
 
-describe("three-state RouterResult (PR5): pending until isReady", () => {
+describe("three-state RouterResult: pending until isReady", () => {
   it("useRouteParams: pending pre-isReady, success after the flip", () => {
     current = { isReady: false };
     const { rerender, result } = renderHook(
@@ -104,7 +104,7 @@ describe("three-state RouterResult (PR5): pending until isReady", () => {
   });
 });
 
-describe("useSearch subtracts the route's path params from router.query (PR5)", () => {
+describe("useSearch subtracts the route's path params from router.query", () => {
   it("a strict raw schema succeeds because `id` never reaches it", () => {
     current = { params: { id: "7" }, search: "q=hi" };
     const { result } = renderHook(() => useSearch(strictRoute), { wrapper });
@@ -179,7 +179,7 @@ describe("query values arrive already percent-decoded (R5, no double-decode)", (
   });
 });
 
-describe("query value shapes (PR11 §4)", () => {
+describe("query value shapes", () => {
   it("catch-all param arrives as string[]", () => {
     current = { params: { slug: ["a", "b"] } };
     const { result } = renderHook(() => useRouteParams(filesRoute), {
@@ -221,7 +221,7 @@ describe("query value shapes (PR11 §4)", () => {
   });
 });
 
-describe("decode failure is the error arm, never a throw (PR5/PR6)", () => {
+describe("decode failure is the error arm, never a throw", () => {
   it("useRouteParams: malformed param", () => {
     current = { params: { id: "nope" } };
     const { result } = renderHook(() => useRouteParams(productRoute), {
@@ -252,7 +252,7 @@ describe("decode failure is the error arm, never a throw (PR5/PR6)", () => {
   });
 });
 
-describe("unmounted next/router (App Router placement, PR5)", () => {
+describe("unmounted next/router (App Router placement)", () => {
   it("useRouteParams rethrows a ParamourError naming the /app-vs-/pages mistake", () => {
     current = { mounted: false };
     expect(() =>
@@ -272,9 +272,9 @@ describe("unmounted next/router (App Router placement, PR5)", () => {
 });
 
 // A FOREIGN useRouter failure is a state the public provider deliberately
-// does not model (it only reproduces the unmounted throw, PR5) — these tests
-// pin pages.ts's passthrough internals, so they bypass the provider and
-// render a hand-built adapter through the internal seam directly.
+// does not model (it only reproduces the unmounted throw) — these tests pin
+// pages.ts's passthrough internals, so they bypass the provider and render a
+// hand-built adapter through the internal seam directly.
 function throwingWrapper(
   boom: unknown,
 ): (props: { children: ReactNode }) => ReactElement {
@@ -294,7 +294,7 @@ function throwingWrapper(
   };
 }
 
-describe("foreign useRouter failures propagate untranslated (PR5)", () => {
+describe("foreign useRouter failures propagate untranslated", () => {
   it("an unrelated Error is rethrown by identity, never wrapped in ParamourError", () => {
     const boom = new Error("router exploded for an unrelated reason");
     let caught: unknown;
@@ -322,7 +322,7 @@ describe("foreign useRouter failures propagate untranslated (PR5)", () => {
   });
 });
 
-describe("raw-slice stabilization (design-07 SEL4)", () => {
+describe("raw-slice stabilization", () => {
   it("returns the identical result object across rerenders with the same query", () => {
     current = { params: { id: "42" } };
     const { rerender, result } = renderHook(
@@ -389,8 +389,8 @@ describe("raw-slice stabilization (design-07 SEL4)", () => {
   it("a rawSearch route's slice is every non-param key: unknown-key churn re-decodes", () => {
     // strictRoute's schema rejects unknown keys, so the second decode landing
     // in the ERROR arm proves the changed unknown key actually re-decoded —
-    // the path param `id` alone stays outside the fingerprint (PR5
-    // subtraction).
+    // the path param `id` alone stays outside the fingerprint, having been
+    // subtracted first.
     current = { params: { id: "7" }, search: "q=hi" };
     const { rerender, result } = renderHook(() => useSearch(strictRoute), {
       wrapper,
@@ -409,8 +409,8 @@ describe("raw-slice stabilization (design-07 SEL4)", () => {
   });
 });
 
-describe("selectors (design-07 SEL1–SEL6)", () => {
-  it("useSearch projects the success arm through select (SEL2)", () => {
+describe("selectors", () => {
+  it("useSearch projects the success arm through select", () => {
     current = { params: { id: "42" }, search: "page=2" };
     const { result } = renderHook(
       () => useSearch(productRoute, { select: (search) => search.page }),
@@ -419,7 +419,7 @@ describe("selectors (design-07 SEL1–SEL6)", () => {
     expect(result.current).toEqual({ data: 2, status: "success" });
   });
 
-  it("the pending arm passes through the selector untouched (SEL2)", () => {
+  it("the pending arm passes through the selector untouched", () => {
     current = { isReady: false };
     const { result } = renderHook(
       () => useSearch(productRoute, { select: (search) => search.page }),
@@ -440,7 +440,7 @@ describe("selectors (design-07 SEL1–SEL6)", () => {
     expect(result.current).toBe(first);
   });
 
-  it("the error arm passes through the selector untouched (SEL2)", () => {
+  it("the error arm passes through the selector untouched", () => {
     current = { params: { id: "42" }, search: "page=abc" };
     const { result } = renderHook(
       () => useSearch(productRoute, { select: (search) => search.page }),
@@ -451,7 +451,7 @@ describe("selectors (design-07 SEL1–SEL6)", () => {
     expect(result.current.error).toBeInstanceOf(SearchDecodeError);
   });
 
-  it("useRouteParams takes the same selector surface (SEL1)", () => {
+  it("useRouteParams takes the same selector surface", () => {
     current = { params: { id: "42" } };
     const { result } = renderHook(
       () => useRouteParams(productRoute, { select: (params) => params.id }),
@@ -460,7 +460,7 @@ describe("selectors (design-07 SEL1–SEL6)", () => {
     expect(result.current).toEqual({ data: 42, status: "success" });
   });
 
-  it("a selector throw propagates, never becoming an arm (SEL5)", () => {
+  it("a selector throw propagates, never becoming an arm", () => {
     current = { params: { id: "42" }, search: "page=2" };
     expect(() =>
       renderHook(

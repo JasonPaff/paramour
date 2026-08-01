@@ -10,7 +10,7 @@ const route = defineAppRoute("/home", {});
 
 afterEach(cleanup);
 
-describe("empty state (DT18)", () => {
+describe("empty state", () => {
   it("shows the quiet informational copy before any observation, and clears on the first", async () => {
     setUrl("/home");
     const seam = freshSeam();

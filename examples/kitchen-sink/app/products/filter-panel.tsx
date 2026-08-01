@@ -92,7 +92,7 @@ function Filters({ data }: { data: FilterOutput }) {
 
   // Any filter edit resets paging: deleting `page` from the draft means
   // "absent", which decodes back to the default 1 — and never appears on the
-  // wire at all (D8). sort=name vanishes the same way.
+  // wire at all. sort=name vanishes the same way.
   function apply(mutate: (draft: FilterInput) => void) {
     const draft = toInput(data);
     delete draft.page;
@@ -104,7 +104,7 @@ function Filters({ data }: { data: FilterOutput }) {
 
   function applyPage(page: number) {
     const draft = toInput(data);
-    draft.page = page; // 1 elides (D8); anything else serializes
+    draft.page = page; // 1 elides; anything else serializes
     router.replace(href(productsListRoute, { search: draft }), {
       scroll: false,
     });
@@ -131,7 +131,7 @@ function Filters({ data }: { data: FilterOutput }) {
             />
           </label>
           <label className="field">
-            <span>sort — .default(&quot;name&quot;) elides (D8)</span>
+            <span>sort — .default(&quot;name&quot;) elides</span>
             <select
               onChange={(event) => {
                 apply((draft) => {
@@ -170,7 +170,7 @@ function Filters({ data }: { data: FilterOutput }) {
                   checked={data.tags.includes(tag)}
                   onChange={(event) => {
                     apply((draft) => {
-                      // S6: unchecking the last tag makes this [], and [] ≡
+                      // Unchecking the last tag makes this [], and [] ≡
                       // absent — `tags` vanishes from the URL entirely.
                       draft.tags = event.target.checked
                         ? [...data.tags, tag]
@@ -247,8 +247,8 @@ function Filters({ data }: { data: FilterOutput }) {
       </div>
       <p className="hint">
         Watch the URL bar: page=1, sort=name, and an empty tags list never
-        appear — value-form defaults elide (D8) and [] ≡ absent (S6). Filter
-        edits use replace (no history spam); Open uses push.
+        appear — value-form defaults elide and [] means absent. Filter edits use
+        replace (no history spam); Open uses push.
       </p>
     </section>
   );
@@ -256,7 +256,7 @@ function Filters({ data }: { data: FilterOutput }) {
 
 // Decode output flows into href input wholesale: optional keys admit an
 // explicit undefined (a second spelling of absence — the key is omitted on
-// encode, S3), so a spread is the whole bridge. The copy exists only because
+// encode), so a spread is the whole bridge. The copy exists only because
 // apply()/applyPage() mutate their draft.
 function toInput(data: FilterOutput): FilterInput {
   return { ...data };

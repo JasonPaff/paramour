@@ -58,7 +58,7 @@ export async function runDoctorChecks(
     });
   }
 
-  // 2. Route directories resolve (PR8 discovery, config dirs honored).
+  // 2. Route directories resolve (joint discovery, config dirs honored).
   let inputs: GenerateInputs | undefined;
   try {
     inputs = await resolveInputs({}, projectRoot, config);

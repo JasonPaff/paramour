@@ -1,6 +1,5 @@
 /**
- * Runtime tests for the `rawSearch` whole-object search escape hatch
- * (design-04, plan-04 step 6).
+ * Runtime tests for the `rawSearch` whole-object search escape hatch.
  */
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
@@ -34,7 +33,7 @@ function echoSchema(): StandardSchemaV1<
   };
 }
 
-describe("rawSearch decode (design-04 SS3/SS4)", () => {
+describe("rawSearch decode (SS3/SS4)", () => {
   it("a successful validate returns the schema's own output", () => {
     const schema = z.object({
       page: z.coerce.number().optional(),
@@ -119,7 +118,7 @@ describe("rawSearch decode (design-04 SS3/SS4)", () => {
     }
   });
 
-  it("an async validate throws a clear ParamourError (D7/SS4)", () => {
+  it("an async validate throws a clear ParamourError (SS4)", () => {
     const asyncSchema: StandardSchemaV1<unknown, unknown> = {
       "~standard": {
         validate: (value) => Promise.resolve({ value }),
@@ -268,7 +267,7 @@ describe("rawSearch decode (design-04 SS3/SS4)", () => {
   });
 });
 
-describe("rawSearch encode / href (design-04 SS5)", () => {
+describe("rawSearch encode / href (SS5)", () => {
   it("emits a raw pass-through wire and never runs the schema on encode", () => {
     let validateCalls = 0;
     const countingSchema: StandardSchemaV1<unknown, unknown> = {

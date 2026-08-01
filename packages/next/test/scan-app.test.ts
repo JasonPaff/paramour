@@ -18,7 +18,7 @@ function scanTree(
     : scanAppRoutes(root, pageExtensions);
 }
 
-describe("scanAppRoutes: page detection (TR2)", () => {
+describe("scanAppRoutes: page detection", () => {
   it("emits '/' for a root page", () => {
     expect(scanTree(["page.tsx"])).toEqual(["/"]);
   });
@@ -66,7 +66,7 @@ describe("scanAppRoutes: page detection (TR2)", () => {
     expect(scanTree(["x/page.mdx", "y/page.tsx"], ["mdx"])).toEqual(["/x"]);
   });
 
-  it("does not emit a route.ts handler alone (TR2/§14)", () => {
+  it("does not emit a route.ts handler alone", () => {
     expect(scanTree(["api/route.ts"])).toEqual([]);
   });
 
@@ -82,7 +82,7 @@ describe("scanAppRoutes: page detection (TR2)", () => {
   });
 });
 
-describe("scanAppRoutes: dynamic segments verbatim (TR2/RL2)", () => {
+describe("scanAppRoutes: dynamic segments verbatim", () => {
   it("preserves [id]", () => {
     expect(scanTree(["product/[id]/page.tsx"])).toEqual(["/product/[id]"]);
   });
@@ -98,7 +98,7 @@ describe("scanAppRoutes: dynamic segments verbatim (TR2/RL2)", () => {
   });
 });
 
-describe("scanAppRoutes: route groups (TR2)", () => {
+describe("scanAppRoutes: route groups", () => {
   it("strips (group) from the emitted path", () => {
     expect(scanTree(["(marketing)/about/page.tsx"])).toEqual(["/about"]);
   });
@@ -111,7 +111,7 @@ describe("scanAppRoutes: route groups (TR2)", () => {
     expect(scanTree(["(a)/(b)/x/page.tsx"])).toEqual(["/x"]);
   });
 
-  it("errors on a group collision instead of deduping (PR4/PR9 alignment)", () => {
+  it("errors on a group collision instead of deduping", () => {
     // (a)/x + (b)/x is Next's own build error; the old Set-dedupe silently
     // masked exactly the state Next refuses to build.
     expect(() => scanTree(["(a)/x/page.tsx", "(b)/x/page.tsx"])).toThrow(
@@ -129,7 +129,7 @@ describe("scanAppRoutes: route groups (TR2)", () => {
   });
 });
 
-describe("scanAppRoutes: structural collisions (PR9)", () => {
+describe("scanAppRoutes: structural collisions", () => {
   it("errors on different slug names at one level", () => {
     expect(() => scanTree(["x/[id]/page.tsx", "x/[slug]/page.tsx"])).toThrow(
       RouteCollisionError,
@@ -196,7 +196,7 @@ describe("scanAppRoutes: structural collisions (PR9)", () => {
   });
 });
 
-describe("scanAppRoutes: skipped subtrees (TR2)", () => {
+describe("scanAppRoutes: skipped subtrees", () => {
   it("skips @slot subtrees entirely, pages at any depth included", () => {
     expect(scanTree(["@modal/page.tsx", "@modal/deep/page.tsx"])).toEqual([]);
   });
@@ -223,14 +223,14 @@ describe("scanAppRoutes: skipped subtrees (TR2)", () => {
   });
 });
 
-describe("scanAppRoutes: error and traversal edges (TR2)", () => {
+describe("scanAppRoutes: error and traversal edges", () => {
   it("throws on a missing app dir (the caller-side guard is resolveAppDir)", () => {
     const missing = join(makeTempDir(), "does-not-exist");
     expect(() => scanAppRoutes(missing)).toThrow(/ENOENT/);
   });
 
   it.skipIf(process.platform === "win32")(
-    "does not follow a symlinked directory (TR2 v1 stance)",
+    "does not follow a symlinked directory (v1 stance)",
     () => {
       const root = makeTempDir();
       makeTree(root, ["app/", "outside/linked/page.tsx"]);
@@ -274,7 +274,7 @@ describe("scanAppRoutes: error and traversal edges (TR2)", () => {
   });
 });
 
-describe("scanAppRoutes: page/route-handler conflicts (PR9, Bug 5)", () => {
+describe("scanAppRoutes: page/route-handler conflicts (Bug 5)", () => {
   it("throws when a page and a route handler share a directory", () => {
     expect(() => scanTree(["api/page.tsx", "api/route.ts"])).toThrow(
       RouteCollisionError,
@@ -295,7 +295,7 @@ describe("scanAppRoutes: page/route-handler conflicts (PR9, Bug 5)", () => {
 
   it("throws when two route handlers collide across route groups", () => {
     // Next also refuses (a)/x/route.ts + (b)/x/route.ts; consistent with the
-    // PR9 invariant even though no page is involved.
+    // cross-group collision invariant even though no page is involved.
     expect(() => scanTree(["(a)/x/route.ts", "(b)/x/route.ts"])).toThrow(
       RouteCollisionError,
     );
@@ -315,7 +315,7 @@ describe("scanAppRoutes: page/route-handler conflicts (PR9, Bug 5)", () => {
   });
 });
 
-describe("scanAppRoutes: %5F escaped-underscore folders (Bug 8, TR2)", () => {
+describe("scanAppRoutes: %5F escaped-underscore folders (Bug 8)", () => {
   it("decodes a leading %5F folder to a /_name segment", () => {
     expect(scanTree(["%5Fsettings/page.tsx"])).toEqual(["/_settings"]);
   });
@@ -353,7 +353,7 @@ describe("scanAppRoutes: %5F escaped-underscore folders (Bug 8, TR2)", () => {
  * exactly what `^\(.*\)$` (group: stripped) vs `^\(\.{1,3}\)` (interception:
  * skipped) produce today, guarding future regex refactors.
  */
-describe("scanAppRoutes: group/interception regex edge pins (TR2)", () => {
+describe("scanAppRoutes: group/interception regex edge pins", () => {
   it("(a)(b) matches the group regex and is stripped", () => {
     expect(scanTree(["(a)(b)/x/page.tsx"])).toEqual(["/x"]);
   });

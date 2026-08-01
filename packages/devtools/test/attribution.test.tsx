@@ -28,7 +28,7 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("attribution inference (DT7/DT16)", () => {
+describe("attribution inference", () => {
   it("wire absent + defaulted → the neutral default tag", () => {
     observeWire([]);
     render(<ParamourDevtoolsPanel />);
