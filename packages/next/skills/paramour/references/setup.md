@@ -21,6 +21,7 @@ Requirements: `next >= 15`, `react >= 18.2`, Node `>= 22.13` for the CLI. ESM-on
 3. Add `"paramour": "paramour generate"` to `package.json` scripts.
 4. Run the first generate (skipped with a warning if no `app/` or `pages/` directory exists yet).
 5. Install the paramour agent skill files into detected agent tool directories (`.claude/`, `.cursor/`, etc.); skip with `--no-skills`.
+6. Append a marker-delimited (`<!-- paramour:start -->` … `<!-- paramour:end -->`) paramour section to an existing `AGENTS.md` (or, failing that, `CLAUDE.md`) pointing agents at the installed skill and the verify loop. Never creates the file; re-runs refresh the section in place; skip with `--no-agents-md`.
 
 Then a `setup:` detect-and-verify summary (route dirs found, both packages declared, tsconfig `include` covers the artifact) — these are warn-level and never change the exit code — and a final reminder to commit the artifact.
 
@@ -31,7 +32,7 @@ Output marks to recognize:
 - `→ could not transform ... — apply this yourself:` followed by an indented snippet — apply the printed snippet manually, then continue; exit is still 0.
 - `⚠ no route directory yet — skipped generate` — create `app/` or `pages/`, then run `paramour generate`.
 
-Flags: `--dry-run` (report every step, write nothing), `--force` (overwrite an existing paramour.config), `--no-config`, `--no-generate`, `--no-script`, `--no-wrap`, `--no-skills`, `--help`/`-h`.
+Flags: `--dry-run` (report every step, write nothing), `--force` (overwrite an existing paramour.config), `--no-config`, `--no-generate`, `--no-script`, `--no-wrap`, `--no-skills`, `--no-agents-md`, `--help`/`-h`.
 
 ## 3. Manual equivalent (when init cannot be used)
 

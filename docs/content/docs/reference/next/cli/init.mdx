@@ -1,6 +1,6 @@
 ---
 title: paramour init
-description: Non-interactive project setup — config scaffold, next.config wrap, package script, first generate, agent skills.
+description: Non-interactive project setup — config scaffold, next.config wrap, package script, first generate, agent skills, AGENTS.md snippet.
 ---
 
 Sets up paramour in a project, non-interactively: it runs straight through
@@ -26,7 +26,7 @@ setup:
 Commit the generated artifact — `paramour check` verifies it stays current in CI.
 ```
 
-## The five steps
+## The six steps
 
 1. **Scaffold `paramour.config.ts`** — every field in the scaffold is a
    commented-out default, so the file is a no-op until you edit it. An
@@ -48,6 +48,16 @@ Commit the generated artifact — `paramour check` verifies it stays current in 
    bundled skill is installed for each detected tool. Without any of those
    signals the step is skipped — init never invents an install location;
    `paramour skills` handles that with its portable-location fallback.
+6. **Add a paramour section to `AGENTS.md`/`CLAUDE.md`** — a
+   marker-delimited (`<!-- paramour:start -->` … `<!-- paramour:end -->`)
+   section pointing agents at the installed skill and the
+   generate/check/list verify loop. Append-only: the section goes into an
+   existing `AGENTS.md` (or, failing that, `CLAUDE.md`) and the file is
+   never created — a root `AGENTS.md` is a skills-detection signal, so init
+   inventing one would change what step 5 sees on the next run. Re-runs
+   refresh the content between the markers in place (everything outside
+   them is never touched); a start marker without an end marker is left
+   alone with a warning.
 
 It finishes with a warn-level setup summary (route directories, declared
 dependencies, tsconfig coverage of the artifact, agent-skills state when
@@ -64,6 +74,7 @@ tooling is present) that never affects the exit code.
 | `--no-script`   | off     | Skip adding the `package.json` script.                      |
 | `--no-generate` | off     | Skip the first generate.                                    |
 | `--no-skills`   | off     | Skip installing agent skills.                               |
+| `--no-agents-md` | off    | Skip the `AGENTS.md`/`CLAUDE.md` paramour section.          |
 | `--help`, `-h`  | —       | Show usage.                                                 |
 
 <Callout title="--force replaces non-TS configs too">

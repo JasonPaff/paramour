@@ -9,6 +9,11 @@ import {
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
+import {
+  AGENTS_MARKER_END,
+  AGENTS_MARKER_START,
+  agentsSnippet,
+} from "../src/init/agents-md.js";
 import { runCli } from "../src/run-cli.js";
 import {
   hashContent,
@@ -432,5 +437,149 @@ describe("paramour init", () => {
     );
     expect(existsSync(join(skillDir, "legacy.md"))).toBe(true);
     expect(readSkillManifest(skillDir)?.files).toHaveProperty("legacy.md");
+  });
+
+  const AGENTS_MD = "# Project notes\n\nHouse rules live here.\n";
+
+  it("appends the paramour section to an existing AGENTS.md", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "AGENTS.md": AGENTS_MD,
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init(["--no-wrap"]);
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toContain(
+      "✔ appended paramour section to AGENTS.md",
+    );
+    const text = readFileSync(join(root, "AGENTS.md"), "utf8");
+    expect(text.startsWith(AGENTS_MD)).toBe(true);
+    expect(text).toContain(AGENTS_MARKER_START);
+    expect(text).toContain(AGENTS_MARKER_END);
+    expect(text).toContain("## paramour");
+  });
+
+  it("skips the snippet and creates nothing when no instructions file exists", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init(["--no-wrap"]);
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toContain(
+      "• no AGENTS.md or CLAUDE.md — skipped agents snippet",
+    );
+    expect(existsSync(join(root, "AGENTS.md"))).toBe(false);
+    expect(existsSync(join(root, "CLAUDE.md"))).toBe(false);
+  });
+
+  it("falls back to CLAUDE.md when there is no AGENTS.md", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "CLAUDE.md": AGENTS_MD,
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init(["--no-wrap"]);
+    expect(run.out.join("\n")).toContain(
+      "✔ appended paramour section to CLAUDE.md",
+    );
+    expect(readFileSync(join(root, "CLAUDE.md"), "utf8")).toContain(
+      AGENTS_MARKER_START,
+    );
+  });
+
+  it("writes only AGENTS.md when both instruction files exist", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "AGENTS.md": AGENTS_MD,
+      "CLAUDE.md": AGENTS_MD,
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init(["--no-wrap"]);
+    expect(run.out.join("\n")).toContain(
+      "✔ appended paramour section to AGENTS.md",
+    );
+    expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toContain(
+      AGENTS_MARKER_START,
+    );
+    expect(readFileSync(join(root, "CLAUDE.md"), "utf8")).toBe(AGENTS_MD);
+  });
+
+  it("a second run leaves the section untouched and says so", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "AGENTS.md": AGENTS_MD,
+      "package.json": PACKAGE_JSON,
+    });
+    await init(["--no-wrap"]);
+    const before = readFileSync(join(root, "AGENTS.md"), "utf8");
+    const rerun = await init(["--no-wrap"]);
+    expect(rerun.out.join("\n")).toContain(
+      "• AGENTS.md paramour section already up to date — skipped",
+    );
+    expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toBe(before);
+  });
+
+  it("refreshes an edited section in place, preserving outside prose", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "AGENTS.md": AGENTS_MD,
+      "package.json": PACKAGE_JSON,
+    });
+    await init(["--no-wrap"]);
+    const installed = readFileSync(join(root, "AGENTS.md"), "utf8");
+    const mangled = `${installed.replace("## paramour", "## paramour (edited)")}\nTrailing user prose.\n`;
+    writeFileSync(join(root, "AGENTS.md"), mangled);
+    const run = await init(["--no-wrap"]);
+    expect(run.out.join("\n")).toContain(
+      "✔ updated paramour section in AGENTS.md",
+    );
+    const text = readFileSync(join(root, "AGENTS.md"), "utf8");
+    expect(text.startsWith(AGENTS_MD)).toBe(true);
+    expect(text).toContain(agentsSnippet());
+    expect(text).not.toContain("(edited)");
+    expect(text).toContain("Trailing user prose.");
+  });
+
+  it("leaves an unterminated marker alone with a warning (exit 0)", async () => {
+    const broken = `${AGENTS_MD}\n${AGENTS_MARKER_START}\n\nhand-rolled\n`;
+    const root = makeProject(["app/page.tsx"], {
+      "AGENTS.md": broken,
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init(["--no-wrap"]);
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toContain(
+      "⚠ AGENTS.md has an unterminated paramour marker — left as-is",
+    );
+    expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toBe(broken);
+  });
+
+  it("--no-agents-md skips the snippet step", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "AGENTS.md": AGENTS_MD,
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init(["--no-agents-md", "--no-wrap"]);
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).not.toContain("paramour section");
+    expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toBe(AGENTS_MD);
+  });
+
+  it("--dry-run reports the snippet without writing", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "AGENTS.md": AGENTS_MD,
+      "package.json": PACKAGE_JSON,
+    });
+    const before = snapshotTree(root);
+    const run = await init(["--dry-run", "--no-wrap"]);
+    expect(run.out.join("\n")).toContain(
+      "✔ would append paramour section to AGENTS.md",
+    );
+    expect(snapshotTree(root)).toEqual(before);
+  });
+
+  it("starts the section on its own line when the file lacks a trailing newline", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "AGENTS.md": "# Notes without newline",
+      "package.json": PACKAGE_JSON,
+    });
+    await init(["--no-wrap"]);
+    const text = readFileSync(join(root, "AGENTS.md"), "utf8");
+    expect(text).toContain(`# Notes without newline\n\n${AGENTS_MARKER_START}`);
   });
 });

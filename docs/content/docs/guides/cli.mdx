@@ -72,7 +72,9 @@ drift into a `next build` failure — this docs site does both. Details:
 
 Sets up a project non-interactively: scaffold `paramour.config.ts`, wrap
 `next.config` with `withTypedRoutes`, add the `"paramour"` package script,
-run the first generate. Every step is idempotent and individually
+run the first generate, install [agent skills](#skills) for detected agent
+tools, and add a marker-delimited paramour section to an existing
+`AGENTS.md`/`CLAUDE.md`. Every step is idempotent and individually
 skippable:
 
 ```bash
@@ -81,9 +83,10 @@ npx paramour init
 
 Flags: `--dry-run` (report every step, write nothing), `--force` (overwrite
 an existing config with the scaffold), and `--no-config` / `--no-wrap` /
-`--no-script` / `--no-generate` to skip steps. If the `next.config` can't be
-transformed safely, init prints the wrap snippet for you to apply by hand
-and still exits `0` — a printed instruction is a successful outcome.
+`--no-script` / `--no-generate` / `--no-skills` / `--no-agents-md` to skip
+steps. If the `next.config` can't be transformed safely, init prints the
+wrap snippet for you to apply by hand and still exits `0` — a printed
+instruction is a successful outcome.
 
 The [Getting Started tutorial](/docs/getting-started#initialize) shows a
 full init run and explains each change; the
