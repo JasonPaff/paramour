@@ -1,5 +1,12 @@
 # @paramour-js/devtools
 
+## 4.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`7528564`](https://github.com/JasonPaff/paramour/commit/7528564aa50bd961cc62222b6bc50477d3ba20ae)]:
+  - @paramour-js/next@0.4.0
+
 ## 3.0.1
 
 ### Patch Changes

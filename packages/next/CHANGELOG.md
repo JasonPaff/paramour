@@ -1,5 +1,11 @@
 # @paramour-js/next
 
+## 0.4.0
+
+### Minor Changes
+
+- [#32](https://github.com/JasonPaff/paramour/pull/32) [`7528564`](https://github.com/JasonPaff/paramour/commit/7528564aa50bd961cc62222b6bc50477d3ba20ae) Thanks [@JasonPaff](https://github.com/JasonPaff)! - New `@paramour-js/next/testing` entry: `ParamourTestingProvider` and `withParamourTesting` let component tests drive the paramour hooks through a React-context adapter seam instead of module mocks — runner-agnostic, no `vi.mock`/`jest.mock` needed. The hooks now resolve their Next.js reads (params, pathname, search params, router) through the seam with real-Next fallbacks, and the testing adapter can model `params: null` and the pages-router unmounted/pending states.
+
 ## 0.3.1
 
 ### Patch Changes
