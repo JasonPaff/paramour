@@ -1,5 +1,13 @@
 # example-pages-router
 
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [[`9cf5a70`](https://github.com/JasonPaff/paramour/commit/9cf5a70ac249e6b28c997b8aa5f6d364e174ec01)]:
+  - paramour@0.6.0
+  - @paramour-js/next@0.4.1
+
 ## 0.0.8
 
 ### Patch Changes
