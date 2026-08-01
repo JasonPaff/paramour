@@ -24,6 +24,20 @@ export interface ParamourConfig {
   routeFiles?: string[];
 }
 
+/**
+ * @internal Every ParamourConfig key — the skill-drift test's source of
+ * truth. `satisfies Record<keyof ParamourConfig, true>` rejects a missing
+ * AND an extra key at compile time, so this roster cannot drift from the
+ * interface.
+ */
+export const PARAMOUR_CONFIG_KEYS: readonly string[] = Object.keys({
+  appDir: true,
+  outFile: true,
+  pageExtensions: true,
+  pagesDir: true,
+  routeFiles: true,
+} satisfies Record<keyof ParamourConfig, true>);
+
 /** @internal Discovery order at the project root — first match wins. */
 export const CONFIG_FILE_NAMES = [
   "paramour.config.ts",

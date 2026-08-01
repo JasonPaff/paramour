@@ -35,6 +35,16 @@ const SHARED_OPTIONS = {
   "pages-dir": { type: "string" },
 } as const;
 
+/** @internal `paramour check` flags — skill-drift test's source of truth. */
+export const CHECK_OPTIONS = SHARED_OPTIONS;
+
+/** @internal `paramour generate` flags — skill-drift test's source of truth. */
+export const GENERATE_OPTIONS = {
+  ...SHARED_OPTIONS,
+  check: { default: false, type: "boolean" },
+  watch: { default: false, type: "boolean" },
+} as const;
+
 const SHARED_OPTION_LINES = [
   "  --app-dir <dir>           app directory (default: discovered app/ or src/app/)",
   "  --help, -h                show this help",
@@ -82,22 +92,16 @@ export async function runGenerate(
 
   let flags: GenerateFlags;
   if (mode === "generate") {
-    const parsed = parseCommandFlags(
-      argv,
-      {
-        ...SHARED_OPTIONS,
-        check: { default: false, type: "boolean" },
-        watch: { default: false, type: "boolean" },
-      },
-      usage,
-      { stderr, stdout },
-    );
+    const parsed = parseCommandFlags(argv, GENERATE_OPTIONS, usage, {
+      stderr,
+      stdout,
+    });
     if ("exit" in parsed) return parsed.exit;
     flags = parsed.values;
   } else {
     // `check` omits --check/--watch entirely: `paramour check --watch`
     // fails as an unknown option, which is the right message for it.
-    const parsed = parseCommandFlags(argv, SHARED_OPTIONS, usage, {
+    const parsed = parseCommandFlags(argv, CHECK_OPTIONS, usage, {
       stderr,
       stdout,
     });

@@ -19,6 +19,12 @@ const USAGE = [
   "  --json      machine-readable output",
 ].join("\n");
 
+/** @internal `paramour doctor` flags — skill-drift test's source of truth. */
+export const DOCTOR_OPTIONS = {
+  help: { default: false, short: "h", type: "boolean" },
+  json: { default: false, type: "boolean" },
+} as const;
+
 /**
  * @internal `paramour doctor` — a verification, so its exit codes follow
  * `check`'s class: 0 pass/warn, 1 any fail, 2 only when doctor itself
@@ -29,15 +35,10 @@ export async function runDoctor(
   io: CliIo,
 ): Promise<number> {
   const { stderr, stdout } = resolveIo(io);
-  const parsed = parseCommandFlags(
-    argv,
-    {
-      help: { default: false, short: "h", type: "boolean" },
-      json: { default: false, type: "boolean" },
-    },
-    USAGE,
-    { stderr, stdout },
-  );
+  const parsed = parseCommandFlags(argv, DOCTOR_OPTIONS, USAGE, {
+    stderr,
+    stdout,
+  });
   if ("exit" in parsed) return parsed.exit;
   const flags = parsed.values;
 

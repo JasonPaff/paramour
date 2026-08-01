@@ -35,6 +35,16 @@ const USAGE = [
   "               (repeatable or comma-separated; overrides detection)",
 ].join("\n");
 
+/** @internal `paramour skills` flags — skill-drift test's source of truth. */
+export const SKILLS_OPTIONS = {
+  check: { default: false, type: "boolean" },
+  "dry-run": { default: false, type: "boolean" },
+  force: { default: false, type: "boolean" },
+  help: { default: false, short: "h", type: "boolean" },
+  json: { default: false, type: "boolean" },
+  tool: { multiple: true, type: "string" },
+} as const;
+
 /**
  * @internal Per-orphan reporting for a sync: removals (deletions are the one
  * thing a sync does that must never happen silently) and kept locally-modified
@@ -67,19 +77,10 @@ export function reportOrphans(
  */
 export function runSkills(argv: readonly string[], io: CliIo): number {
   const { stderr, stdout } = resolveIo(io);
-  const parsed = parseCommandFlags(
-    argv,
-    {
-      check: { default: false, type: "boolean" },
-      "dry-run": { default: false, type: "boolean" },
-      force: { default: false, type: "boolean" },
-      help: { default: false, short: "h", type: "boolean" },
-      json: { default: false, type: "boolean" },
-      tool: { multiple: true, type: "string" },
-    },
-    USAGE,
-    { stderr, stdout },
-  );
+  const parsed = parseCommandFlags(argv, SKILLS_OPTIONS, USAGE, {
+    stderr,
+    stdout,
+  });
   if ("exit" in parsed) return parsed.exit;
   const flags = parsed.values;
 

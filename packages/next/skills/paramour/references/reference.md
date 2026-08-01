@@ -1,5 +1,13 @@
 # Reference: exports, CLI, config, wire format
 
+<!--
+  The tables and the "Key types" list in this file are drift-checked against
+  the package source by packages/next/test/skill-drift.test.ts. Keep each
+  cited export a single backtick token (`name` or `name(...)`) in the listed
+  column, flags spelled `--flag` in the Flags column, and wire-rule IDs in
+  their published S/P/D/CV/R/PP spelling.
+-->
+
 ## `paramour` barrel exports
 
 Runtime values:
@@ -41,14 +49,14 @@ Key types: `Codec`, `AnyCodec`, `OutputOf`, `ParamCodec`, `Presence`, `PresenceO
 
 Exit-code contract for every command: `0` success; `1` ONLY a failed verification (`check` drift, `doctor` fail, `skills --check` missing/stale); `2` usage/config/operational errors.
 
-| Command    | Purpose                                                                                              | Flags                                                                                                                                                                                                              |
-| ---------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `generate` | Write `paramour-env.d.ts` from route dirs                                                            | `--app-dir <dir>`, `--pages-dir <dir>`, `--out-file <file>`, `--page-extensions <list>`, `--check`, `--watch`                                                                                                      |
-| `check`    | Verify the artifact is current; exit 1 on drift or missing; never writes                             | `--app-dir`, `--pages-dir`, `--out-file`, `--page-extensions`                                                                                                                                                      |
-| `init`     | Set up paramour: scaffold config, wrap next.config, add script, first generate, install agent skills | `--dry-run`, `--force`, `--no-config`, `--no-generate`, `--no-script`, `--no-wrap`, `--no-skills`                                                                                                                  |
-| `list`     | Print every filesystem route with its params/search shape (evaluates route-definition modules)       | `--json`, `--app-dir`, `--pages-dir`, `--page-extensions`                                                                                                                                                          |
-| `doctor`   | Diagnose setup: config validity, artifact freshness, next.config wrapping, versions, tsconfig        | `--json`; exit 1 on any failing check, warnings exit 0                                                                                                                                                             |
-| `skills`   | Install/sync this agent skill into detected tool dirs (`.claude/`, `.cursor/`, …)                    | `--check` (verify only; exit 1 on missing/stale), `--dry-run`, `--force` (overwrite user-edited files), `--json`, `--tool <t>` (agents, claude, codex, cursor; repeatable or comma-separated, overrides detection) |
+| Command    | Purpose                                                                                                          | Flags                                                                                                                                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `generate` | Write `paramour-env.d.ts` from route dirs                                                                        | `--app-dir <dir>`, `--pages-dir <dir>`, `--out-file <file>`, `--page-extensions <list>`, `--check`, `--watch`                                                                                                      |
+| `check`    | Verify the artifact is current; exit 1 on drift or missing; never writes                                         | `--app-dir`, `--pages-dir`, `--out-file`, `--page-extensions`                                                                                                                                                      |
+| `init`     | Set up paramour: scaffold config, wrap next.config, add script, first generate, agent skills + AGENTS.md snippet | `--dry-run`, `--force`, `--no-config`, `--no-generate`, `--no-script`, `--no-wrap`, `--no-skills`, `--no-agents-md`                                                                                                |
+| `list`     | Print every filesystem route with its params/search shape (evaluates route-definition modules)                   | `--json`, `--app-dir`, `--pages-dir`, `--page-extensions`                                                                                                                                                          |
+| `doctor`   | Diagnose setup: config validity, artifact freshness, next.config wrapping, versions, tsconfig                    | `--json`; exit 1 on any failing check, warnings exit 0                                                                                                                                                             |
+| `skills`   | Install/sync this agent skill into detected tool dirs (`.claude/`, `.cursor/`, …)                                | `--check` (verify only; exit 1 on missing/stale), `--dry-run`, `--force` (overwrite user-edited files), `--json`, `--tool <t>` (agents, claude, codex, cursor; repeatable or comma-separated, overrides detection) |
 
 All commands accept `--help`/`-h` and run against `process.cwd()` as the project root.
 

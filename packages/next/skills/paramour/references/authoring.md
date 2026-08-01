@@ -4,6 +4,12 @@
 
 Wire grammars are strict and anchored — no `Number()` coercion, no whitespace, no hex, no `1e3` for integers. Every parse failure is a `ParseError` (recoverable per-key with `.catch()`); every serialize failure is a `SerializeError` at link-build time.
 
+<!--
+  The Builder column below is drift-checked against Object.keys(p) by
+  packages/next/test/skill-drift.test.ts — keep each row's first cell a
+  single `p.name(...)` backtick token.
+-->
+
 | Builder              | Decoded type     | Wire behavior                                                                                                                                                                                                                                  | Options                                                                                             |
 | -------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `p.string(schema?)`  | `string`         | Verbatim text. Empty string is a real value (`key=`), not absence.                                                                                                                                                                             | Optional Standard Schema `<string, string>` refinement (runs on parse AND serialize)                |

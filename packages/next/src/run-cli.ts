@@ -9,8 +9,9 @@ export { type CliIo } from "./cli-io.js";
 
 type Command = (argv: readonly string[], io: CliIo) => Promise<number>;
 
-// Alphabetical; the unknown-command message derives from these keys.
-const COMMANDS: Record<string, Command> = {
+// Alphabetical; the unknown-command message derives from these keys, and the
+// skill-drift test pins them against the skill's CLI table.
+export const COMMANDS: Record<string, Command> = {
   check: (argv, io) => runGenerate(argv, io, "check"),
   doctor: runDoctor,
   generate: (argv, io) => runGenerate(argv, io, "generate"),
