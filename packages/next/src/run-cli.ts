@@ -3,6 +3,7 @@ import { runDoctor } from "./commands/doctor.js";
 import { runGenerate } from "./commands/generate.js";
 import { runInit } from "./commands/init.js";
 import { runList } from "./commands/list.js";
+import { runSkills } from "./commands/skills.js";
 
 export { type CliIo } from "./cli-io.js";
 
@@ -15,6 +16,7 @@ const COMMANDS: Record<string, Command> = {
   generate: (argv, io) => runGenerate(argv, io, "generate"),
   init: runInit,
   list: runList,
+  skills: (argv, io) => Promise.resolve(runSkills(argv, io)),
 };
 
 const USAGE = [
@@ -26,6 +28,7 @@ const USAGE = [
   "  generate  generate paramour-env.d.ts from the app and pages directories",
   "  init      set up paramour in this project",
   "  list      print every route with its params/search shape",
+  "  skills    install or verify the bundled agent skill for detected agent tools",
   "",
   "Run `paramour <command> --help` for that command's options.",
 ].join("\n");

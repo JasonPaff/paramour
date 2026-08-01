@@ -10,6 +10,12 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runCli } from "../src/run-cli.js";
+import {
+  hashContent,
+  MANIFEST_FILENAME,
+  readSkillManifest,
+  renderManifest,
+} from "../src/skills/manifest.js";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 const originalCwd = process.cwd();
@@ -66,6 +72,30 @@ function makeProject(
   }
   process.chdir(root);
   return root;
+}
+
+/**
+ * Install the skill into .claude/ via a first init, then plant a managed
+ * orphan: a file the manifest tracks whose recorded hash still matches its
+ * on-disk bytes, exactly what a previous release's install leaves behind
+ * once the packaged skill stops shipping that file.
+ */
+async function plantManagedOrphan(root: string): Promise<string> {
+  await init();
+  const skillDir = join(root, ".claude", "skills", "paramour");
+  const manifest = readSkillManifest(skillDir);
+  if (manifest === undefined) throw new Error("expected an install manifest");
+  const content = "legacy\n";
+  writeFileSync(join(skillDir, "legacy.md"), content);
+  writeFileSync(
+    join(skillDir, MANIFEST_FILENAME),
+    renderManifest({
+      files: { ...manifest.files, "legacy.md": hashContent(content) },
+      skill: "paramour",
+      version: manifest.version,
+    }),
+  );
+  return skillDir;
 }
 
 /** Every file under root as path → content, for byte-identical assertions. */
@@ -310,5 +340,97 @@ describe("paramour init", () => {
     expect(run.out.join("\n")).toContain(
       "tsconfig.json includes paramour-env.d.ts",
     );
+  });
+
+  it("installs agent skills when tooling is detected, with a summary line", async () => {
+    const root = makeProject(["app/page.tsx", ".claude/"], {
+      "next.config.ts": NEXT_CONFIG_TS,
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init();
+    expect(run.code).toBe(0);
+    const text = run.out.join("\n");
+    expect(text).toContain(
+      "✔ installed agent skills → .claude/skills/paramour",
+    );
+    expect(text).toContain("agent skills: .claude/skills/paramour up to date");
+    expect(
+      existsSync(join(root, ".claude", "skills", "paramour", "SKILL.md")),
+    ).toBe(true);
+    const rerun = await init();
+    expect(rerun.out.join("\n")).toContain(
+      "• agent skills already up to date in .claude/skills/paramour",
+    );
+  });
+
+  it("--no-skills skips the skills step", async () => {
+    const root = makeProject(["app/page.tsx", ".claude/"], {
+      "next.config.ts": NEXT_CONFIG_TS,
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init(["--no-skills"]);
+    expect(run.code).toBe(0);
+    const text = run.out.join("\n");
+    expect(text).not.toContain("installed agent skills");
+    // The detect-and-verify summary still reports the (skipped) state.
+    expect(text).toContain("agent skills: not installed");
+    expect(existsSync(join(root, ".claude", "skills"))).toBe(false);
+  });
+
+  it("without agent tooling, skips skills and never invents .agents/", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "next.config.ts": NEXT_CONFIG_TS,
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init();
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toContain(
+      "• no agent tooling detected — skipped agent skills",
+    );
+    expect(existsSync(join(root, ".agents"))).toBe(false);
+  });
+
+  it("--dry-run reports the skills install without writing", async () => {
+    const root = makeProject(["app/page.tsx", ".claude/"], {
+      "next.config.ts": NEXT_CONFIG_TS,
+      "package.json": PACKAGE_JSON,
+    });
+    const before = snapshotTree(root);
+    const run = await init(["--dry-run"]);
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toContain(
+      "✔ would install agent skills → .claude/skills/paramour",
+    );
+    expect(snapshotTree(root)).toEqual(before);
+  });
+
+  it("removes a managed orphan from a prior skill install and reports it", async () => {
+    const root = makeProject(["app/page.tsx", ".claude/"], {
+      "next.config.ts": NEXT_CONFIG_TS,
+      "package.json": PACKAGE_JSON,
+    });
+    const skillDir = await plantManagedOrphan(root);
+    const run = await init();
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toContain(
+      "removed legacy.md — no longer part of the skill",
+    );
+    expect(existsSync(join(skillDir, "legacy.md"))).toBe(false);
+    expect(readSkillManifest(skillDir)?.files).not.toHaveProperty("legacy.md");
+  });
+
+  it("--dry-run announces an orphan removal without deleting anything", async () => {
+    const root = makeProject(["app/page.tsx", ".claude/"], {
+      "next.config.ts": NEXT_CONFIG_TS,
+      "package.json": PACKAGE_JSON,
+    });
+    const skillDir = await plantManagedOrphan(root);
+    const run = await init(["--dry-run"]);
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toContain(
+      "would remove legacy.md — no longer part of the skill",
+    );
+    expect(existsSync(join(skillDir, "legacy.md"))).toBe(true);
+    expect(readSkillManifest(skillDir)?.files).toHaveProperty("legacy.md");
   });
 });

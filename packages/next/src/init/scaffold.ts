@@ -2,6 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { resolveRouteDirs } from "../scan.js";
+import { loadPackagedSkill } from "../skills/packaged.js";
+import { auditTarget, isOutdated } from "../skills/sync.js";
+import { detectTargets } from "../skills/targets.js";
 
 /** One line of init's detect-and-verify summary; `ok: false` renders ⚠. */
 export interface SetupCheck {
@@ -76,6 +79,7 @@ export function checkSetup(
   }
   checks.push(dependenciesCheck(projectRoot));
   checks.push(tsconfigCheck(projectRoot, artifactPath));
+  checks.push(...skillsSetupCheck(projectRoot));
   return checks;
 }
 
@@ -246,6 +250,57 @@ function dependenciesCheck(projectRoot: string): SetupCheck {
         label: `missing dependencies: ${missing.join(", ")}`,
         ok: false,
       };
+}
+
+/**
+ * Agent-skills summary line — only for projects with agent tooling; an
+ * agent-free project gets no line at all, keeping the summary signal-dense.
+ */
+function skillsSetupCheck(projectRoot: string): SetupCheck[] {
+  try {
+    const detected = detectTargets(projectRoot);
+    if (detected.length === 0) return [];
+    const packaged = loadPackagedSkill();
+    const audits = detected
+      .map((target) => auditTarget(target, packaged))
+      .filter((audit) => audit.manifest !== undefined);
+    if (audits.length === 0) {
+      return [
+        {
+          detail: "run `paramour skills`",
+          label: "agent skills: not installed",
+          ok: false,
+        },
+      ];
+    }
+    // Local edits are legitimate tailoring, not drift — only missing/stale
+    // content makes the line a warning.
+    const outdated = audits.filter((audit) =>
+      audit.files.some((file) => isOutdated(file.status)),
+    );
+    if (outdated.length > 0) {
+      return [
+        {
+          detail: "run `paramour skills` to re-sync",
+          label: `agent skills: ${outdated
+            .map((audit) => audit.target.rel)
+            .join(", ")} out of date`,
+          ok: false,
+        },
+      ];
+    }
+    return [
+      {
+        label: `agent skills: ${audits
+          .map((audit) => audit.target.rel)
+          .join(", ")} up to date`,
+        ok: true,
+      },
+    ];
+  } catch {
+    // A broken skills probe must not break the warn-level summary.
+    return [];
+  }
 }
 
 /**

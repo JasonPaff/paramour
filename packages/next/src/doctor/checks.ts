@@ -16,6 +16,7 @@ import {
   routeKey,
 } from "../list/discover-route-defs.js";
 import { scanRoutes, type ScanRoutesResult } from "../scan.js";
+import { skillsDoctorChecks } from "../skills/doctor.js";
 
 /**
  * One `paramour doctor` finding. `fail` means a verification the user cares
@@ -161,7 +162,11 @@ export async function runDoctorChecks(
   // 5. Version alignment between the two packages.
   checks.push(versionCheck(projectRoot));
 
-  // 6. tsconfig covers the artifact (init's warn-level heuristic).
+  // 6. Installed agent skills reflect this package's bundled content —
+  // upgrade-adjacent like the version check, hence its neighbor.
+  checks.push(...skillsDoctorChecks(projectRoot));
+
+  // 7. tsconfig covers the artifact (init's warn-level heuristic).
   // resolve, not join — an absolute outFile must win, as it does in
   // resolveInputs.
   const artifactPath =
@@ -174,7 +179,7 @@ export async function runDoctorChecks(
     status: coverage.ok ? "pass" : "warn",
   });
 
-  // 7. Route-definition discovery health (list's engine).
+  // 8. Route-definition discovery health (list's engine).
   checks.push(await discoveryCheck(projectRoot, config, routes));
 
   return checks;

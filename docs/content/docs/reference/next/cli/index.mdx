@@ -1,10 +1,10 @@
 ---
 title: paramour CLI
-description: Invocation, configuration precedence, and the exit-code contract shared by all five commands.
+description: Invocation, configuration precedence, and the exit-code contract shared by all six commands.
 ---
 
 Installing `@paramour-js/next` puts a `paramour` binary on your path with
-five commands. Run it through your package manager — a `package.json` script
+six commands. Run it through your package manager — a `package.json` script
 (the `"paramour"` script that [init](/docs/reference/next/cli/init) adds),
 `pnpm exec paramour`, or `npx paramour`:
 
@@ -19,6 +19,7 @@ npx paramour <command> [options]
 | [`init`](/docs/reference/next/cli/init)         | Set up paramour in this project, non-interactively.                   |
 | [`list`](/docs/reference/next/cli/list)         | Print every route with its params/search shape.                       |
 | [`doctor`](/docs/reference/next/cli/doctor)     | Diagnose the project's paramour setup.                                |
+| [`skills`](/docs/reference/next/cli/skills)     | Install or verify the bundled agent skill for detected agent tools.   |
 
 `paramour --help` (or `-h`, or bare `paramour help`) prints the command
 list; every command takes its own `--help` for its options. Running with no
@@ -32,7 +33,7 @@ guess:
 | Code | Meaning                                                                                                          |
 | ---- | ---------------------------------------------------------------------------------------------------------------- |
 | `0`  | Success. Warnings still exit `0` (`doctor` warnings, `list` coverage warnings, `init`'s manual-fallback prints).  |
-| `1`  | The thing you asked to verify is not true — `check` / `generate --check` drift, any failed `doctor` check. Nothing else. |
+| `1`  | The thing you asked to verify is not true — `check` / `generate --check` drift, any failed `doctor` check, `skills --check` on missing or stale installed skills. Nothing else. |
 | `2`  | Usage, configuration, or operational error: unknown flags, an invalid `paramour.config`, missing route directories, route collisions, I/O failures. |
 
 ## Configuration

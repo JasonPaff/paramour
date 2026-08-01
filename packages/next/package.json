@@ -81,7 +81,8 @@
   },
   "files": [
     "bin",
-    "dist"
+    "dist",
+    "skills"
   ],
   "publishConfig": {
     "access": "public",

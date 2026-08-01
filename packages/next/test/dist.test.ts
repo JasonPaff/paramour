@@ -157,3 +157,52 @@ describe.skipIf(!existsSync(distTestingJs))(
     });
   },
 );
+
+describe("bundled skills content (packaging)", () => {
+  // Nothing in check:publish notices a missing `files` entry or a deleted
+  // skill file — the failure would surface only at runtime in a consumer.
+  // Pin both here. No dist gate: the skill ships as committed source.
+  const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+
+  it("ships the five skill files at the package root", () => {
+    for (const relPath of [
+      "skills/paramour/SKILL.md",
+      "skills/paramour/references/authoring.md",
+      "skills/paramour/references/migration.md",
+      "skills/paramour/references/reference.md",
+      "skills/paramour/references/setup.md",
+    ]) {
+      expect(
+        existsSync(resolve(packageRoot, ...relPath.split("/"))),
+        relPath,
+      ).toBe(true);
+    }
+  });
+
+  it('package.json "files" includes the skills directory', () => {
+    const manifest = JSON.parse(
+      readFileSync(resolve(packageRoot, "package.json"), "utf8"),
+    ) as { files: string[] };
+    expect(manifest.files).toContain("skills");
+  });
+
+  it("SKILL.md frontmatter honors the Agent Skills spec constraints", () => {
+    const content = readFileSync(
+      resolve(packageRoot, "skills", "paramour", "SKILL.md"),
+      "utf8",
+    );
+    const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(content)?.[1] ?? "";
+    expect(frontmatter).toMatch(/^name: paramour$/m);
+    expect(frontmatter).toMatch(/^description:/m);
+    // The spec caps description at 1024 characters — it is the trigger
+    // agents index, and over-cap descriptions get truncated or rejected.
+    // The frontmatter holds exactly name + description, so everything but
+    // the name line is the description (its key and folding syntax counted
+    // toward the cap is the conservative direction).
+    const description = frontmatter
+      .split("\n")
+      .filter((line) => !line.startsWith("name:"))
+      .join("\n");
+    expect(description.length).toBeLessThanOrEqual(1024);
+  });
+});

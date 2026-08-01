@@ -1,6 +1,6 @@
 ---
 title: paramour doctor
-description: Diagnose the project's paramour setup — seven checks, one report.
+description: Diagnose the project's paramour setup — one pass, one report.
 ---
 
 Diagnoses the whole setup in one pass. When something about a project feels
@@ -17,19 +17,28 @@ npx paramour doctor
   ✔ artifact: paramour-env.d.ts is up to date
   ✔ next.config: next.config.ts wraps withTypedRoutes
   ✔ versions: paramour 0.4.0 satisfies @paramour-js/next 0.2.1's declared dependency
+  ✔ skills: .claude/skills/paramour is up to date
   ✔ tsconfig: tsconfig.json includes paramour-env.d.ts
   ✔ route definitions: 3 found in 3 modules
       3 of 3 filesystem routes have definitions
 
-doctor: 7 checks — 0 failed, 0 warnings
+doctor: 8 checks — 0 failed, 0 warnings
 ```
+
+(The sample shows a project with skills installed in one tool directory;
+each additional installed skills target adds its own `skills` line to the
+count.)
 
 Each check degrades independently — doctor exists to diagnose broken
 setups, so a probe that itself throws becomes a finding, never a crash.
 
 ## The checks
 
-Seven, in report order. `fail` means a verification you care about is
+Seven fixed checks plus one `skills` check per installed skills target,
+in report order — so eight is the floor, not the total: a project that
+never installed skills (or has no agent tooling) still gets a single
+summary `skills` line, while one with copies in both `.claude/` and
+`.cursor/` reports nine. `fail` means a verification you care about is
 untrue; `warn` is advisory and never affects the exit code.
 
 | Check                 | Verifies                                                                                             | Can fail? |
@@ -39,6 +48,7 @@ untrue; `warn` is advisory and never affects the exit code.
 | `artifact`            | The artifact exists and is byte-current — the [`check`](/docs/reference/next/cli/check) engine; drift details name the routes. | fail      |
 | `next.config`         | The config file wraps `withTypedRoutes`. Warn-level only: CLI-only workflows (generate in a script, check in CI) are legitimate. | warn only |
 | `versions`            | `paramour` and `@paramour-js/next` resolve in `node_modules` (fail if not), and the installed `paramour` matches the exact version `@paramour-js/next` declares as its dependency (warn on mismatch — the two packages version independently, so their own versions are never compared to each other). | fail      |
+| `skills`              | Installed [agent skills](/docs/reference/next/cli/skills) match this package's bundled content — one check line per installed target. Warn-level only: stale guidance degrades agent output but breaks nothing, and the deliberate CI gate is `skills --check`. Projects without agent tooling (or that never installed skills) get a pass line, not a nag. | warn only |
 | `tsconfig`            | The tsconfig covers the artifact file, so the registry augmentation is actually in your program.       | warn only |
 | `route definitions`   | Route-definition discovery is healthy — how many definitions found, how many filesystem routes they cover, plus load failures and duplicates. Evaluates matched modules, like [`list`](/docs/reference/next/cli/list). | warn only |
 

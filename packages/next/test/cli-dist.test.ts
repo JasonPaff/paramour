@@ -64,9 +64,37 @@ describe.skipIf(!existsSync(distCli))("dist/cli.js (bin)", () => {
       encoding: "utf8",
     });
     expect(help.status).toBe(0);
-    for (const command of ["check", "doctor", "generate", "init", "list"]) {
+    for (const command of [
+      "check",
+      "doctor",
+      "generate",
+      "init",
+      "list",
+      "skills",
+    ]) {
       expect(help.stdout).toContain(command);
     }
+  });
+
+  it("installs the bundled agent skill through the built bin", () => {
+    // Proves the dist layout resolves `../../skills/` from dist/skills/ —
+    // the packaging seam the in-process suite cannot see.
+    const root = makeTempDir();
+    makeTree(root, [".claude/"]);
+    const result = spawnSync(process.execPath, [distCli, "skills"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("✔ .claude/skills/paramour — installed");
+    expect(
+      existsSync(join(root, ".claude", "skills", "paramour", "SKILL.md")),
+    ).toBe(true);
+    expect(
+      existsSync(
+        join(root, ".claude", "skills", "paramour", ".paramour-skills.json"),
+      ),
+    ).toBe(true);
   });
 
   it("loads a paramour.config.ts through jiti from the built bin", () => {
