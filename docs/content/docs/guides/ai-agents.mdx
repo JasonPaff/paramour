@@ -1,0 +1,104 @@
+---
+title: AI Agents
+description: The bundled agent skill, the AGENTS.md snippet, and llms.txt — how coding agents learn paramour.
+---
+
+Paramour is too new to be in any model's training data. Ask a coding agent
+to "make my routes type-safe with paramour" cold and you get guesswork —
+plausible-looking API calls that don't exist. So the library ships its own
+agent-facing knowledge: an [Agent Skills](https://agentskills.io)–format
+skill bundled inside `@paramour-js/next`, installed into your project by
+one command, and read by Claude Code, Cursor, Codex, and every other
+skills-reading tool.
+
+Because the skill lives in the npm package, its content always matches the
+installed API version. Upgrade the package and the skill upgrades with it —
+stale training data cannot recur as stale skill data.
+
+## What the skill contains
+
+One `paramour` skill: a compact `SKILL.md` carrying the core non-negotiable
+rules (import from the barrels, the codec modifier type-state rules,
+verify with `paramour check`) plus a task router into four reference files
+loaded on demand:
+
+| Reference                 | Covers                                                                    |
+| ------------------------- | ------------------------------------------------------------------------- |
+| `references/setup.md`     | Greenfield install: config, `withTypedRoutes`, first route, generate/check wiring. |
+| `references/migration.md` | Converting raw `params`/`searchParams` usage — one route per pass, verified after each. |
+| `references/authoring.md` | Day-to-day: `p.*` builders, modifier chains, search params, links, hooks. |
+| `references/reference.md` | The API surface and a wire-format summary, for lookups.                   |
+
+This shape matches how skills-reading tools work (progressive disclosure:
+agents see only the name and description until the skill looks relevant,
+then load `SKILL.md`, then a reference file when the task calls for it), so
+the skill costs your agent almost no context until it's actually needed.
+
+The skill also teaches the CLI as a verification loop —
+`paramour list` to see routes as the library sees them, `paramour check`
+after every route change — so agent work is self-checking rather than
+fire-and-forget. A CI drift test in the paramour repo pins the skill's
+load-bearing facts (exports, CLI flags, wire rules) to the source they
+describe, so shipped skill content cannot silently rot.
+
+## Installing it
+
+**New project** — [`paramour init`](/docs/reference/next/cli/init) does it
+during setup: it detects agent tooling at the project root (`.agents/`,
+`.claude/`, `.codex/`, `.cursor/`, or a root `AGENTS.md`) and installs the
+skill for every detected tool (`--no-skills` opts out).
+
+**Existing project** — run the installer directly:
+
+```bash
+npx paramour skills
+```
+
+```txt
+paramour skills
+  ✔ .claude/skills/paramour — installed (5 files)
+  ✔ .cursor/skills/paramour — installed (5 files)
+```
+
+With no agent tooling detected it installs to the portable
+`.agents/skills/` location, which newer tool versions read directly.
+Commit the installed files — they diff cleanly and version with your
+lockfile.
+
+**After upgrading `@paramour-js/next`** —
+[`paramour doctor`](/docs/reference/next/cli/doctor) flags installed
+copies that no longer match the packaged content, and a plain
+`paramour skills` re-syncs them. Files you've edited locally are never
+overwritten without `--force`: tailoring the skill to your project is
+legitimate, and the manifest's content hashes tell edits apart from
+staleness. `paramour skills --check` is the CI form — exit `1` on
+missing or stale copies, never writes. Flags and exit codes:
+[skills reference](/docs/reference/next/cli/skills).
+
+## The AGENTS.md section
+
+Skills need a skills-reading tool. As a lower-tech complement, `init` also
+appends a short marker-delimited paramour section to an existing root
+`AGENTS.md` (or `CLAUDE.md`) — the instructions file most agent tools
+inject into every session. It says what the skill is, where it lives, and
+names the verify commands, so even a tool that reads no skills at all
+learns the `generate` → `check` → commit loop. The `<!-- paramour:start
+-->` / `<!-- paramour:end -->` markers delimit the managed section;
+everything outside them is never touched, and re-running init reconciles
+the section in place.
+
+## No skill installed: llms.txt
+
+Agents that reach for web search instead of local skills get a
+machine-readable version of this documentation:
+
+- [`paramour.dev/llms.txt`](https://paramour.dev/llms.txt) — an index of
+  every docs page with descriptions and links.
+- [`paramour.dev/llms-full.txt`](https://paramour.dev/llms-full.txt) — the
+  entire docs corpus as plain markdown in one fetch.
+
+Point an agent at either when it needs paramour knowledge and the skill
+isn't installed — pasting the `llms-full.txt` URL into a prompt is the
+zero-setup fallback. The bundled skill is still the better source when
+available: it is version-locked to your installed package, while the site
+documents the latest release.

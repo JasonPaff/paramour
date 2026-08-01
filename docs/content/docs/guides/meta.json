@@ -6,7 +6,8 @@
     "cli",
     "nuqs",
     "devtools",
-    "testing"
+    "testing",
+    "ai-agents"
   ],
   "title": "Guides"
 }
