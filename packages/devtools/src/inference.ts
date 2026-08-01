@@ -1,15 +1,16 @@
 import type { AnyCodec, CodecDescription, Issue, SearchConfig } from "paramour";
 
 import { decodeSearch, SearchDecodeError } from "paramour";
-import { foreignMessage, parseValue } from "paramour/internal";
+import { codecShapeLabel, foreignMessage, parseValue } from "paramour/internal";
 
 /**
  * Pure decode/attribution logic. Everything here goes through core's
- * published surface — `parseValue` and `foreignMessage` via the
- * `paramour/internal` tooling entry (the catch-attribution probe core
- * exports for exactly this) and the single-key `decodeSearch` trick — a
- * synthesized one-key config gives full presence/default/catch/duplicate
- * semantics for one value without touching `~`-internals.
+ * published surface — `parseValue`, `foreignMessage`, and `codecShapeLabel`
+ * via the `paramour/internal` tooling entry (the catch-attribution probe
+ * and issue-label helpers core exports for exactly this) and the single-key
+ * `decodeSearch` trick — a synthesized one-key config gives full
+ * presence/default/catch/duplicate semantics for one value without touching
+ * `~`-internals.
  */
 
 /** Why a rendered value differs from the wire. */
@@ -81,9 +82,22 @@ export function previewDecode(
     }
     // Foreign throws arrive UNWRAPPED (decodeSearch's taxonomy) from user
     // schema/custom-codec code, including values String() itself cannot
-    // stringify — core's foreignMessage carries the hardening.
+    // stringify — core's foreignMessage carries the hardening. The
+    // synthesized issue is enriched like a real one: the codec is in hand
+    // for `expected` — labeled by core's own codecShapeLabel, no forceMany,
+    // because this is a whole-codec search-position decode (the codec's own
+    // arity carries any `[]`), matching decodeSearch's issue labels — and a
+    // scalar draft IS the offending wire value (a string[] draft has no
+    // single one — same absence rule as core).
     return {
-      issues: [{ key, message: foreignMessage(error) }],
+      issues: [
+        {
+          expected: codecShapeLabel(codec),
+          key,
+          message: foreignMessage(error),
+          ...(typeof draft === "string" ? { wire: draft } : {}),
+        },
+      ],
       status: "error",
     };
   }
