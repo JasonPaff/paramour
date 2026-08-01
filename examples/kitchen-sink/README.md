@@ -113,3 +113,16 @@ drift. Add or remove a page folder and regenerate:
 pnpm --filter example-kitchen-sink paramour           # writes paramour-env.d.ts
 pnpm --filter example-kitchen-sink paramour -- --check # CI no-write variant (exit 1 on drift)
 ```
+
+## The installed agent skill
+
+`.agents/skills/paramour/` is a committed install of the agent skill bundled
+in `@paramour-js/next` (written by `paramour skills`, stamped by its
+`.paramour-skills.json` manifest). CI runs `paramour skills --check` against
+it, so editing the skill source in `packages/next/skills/` without re-running
+`paramour skills` here fails the build:
+
+```sh
+pnpm --filter example-kitchen-sink exec paramour skills           # re-sync
+pnpm --filter example-kitchen-sink exec paramour skills --check   # CI variant
+```

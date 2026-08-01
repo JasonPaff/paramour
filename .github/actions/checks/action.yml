@@ -36,6 +36,14 @@ runs:
     - run: pnpm --filter example-type-errors run check
       shell: bash
 
+    # examples/kitchen-sink commits an installed copy of the bundled agent
+    # skill (.agents/skills/paramour). --check exits 1 when that copy drifts
+    # from packages/next/skills/, so editing the skill source without
+    # re-running `paramour skills` in the example fails here. Needs the
+    # built CLI, hence after build.
+    - run: pnpm --filter example-kitchen-sink exec paramour skills --check
+      shell: bash
+
     - run: pnpm test
       shell: bash
 
