@@ -6,6 +6,27 @@
 @source "../node_modules/fumadocs-ui/dist/**/*.js";
 @source "../node_modules/fumadocs-twoslash/dist/**/*.js";
 
+/* Brand accent: rose/crimson, leaning into the name. Only the primary/ring
+   slots move off the neutral preset — the rest of the palette stays gray so
+   the accent reads as deliberate rather than decorative. Overrides the
+   variables fumadocs' @theme emits on :root, so every fd-primary consumer
+   (buttons, links, active sidebar items, comparison checkmarks) picks it up. */
+:root {
+  --color-fd-primary: oklch(51.4% 0.222 16.935);
+  --color-fd-primary-foreground: oklch(98% 0.008 17);
+  --color-fd-ring: oklch(58.6% 0.253 17.585);
+  /* Hero glow strength: light mode's darker primary reads stronger at the
+     same mix, so it gets a lighter hand. */
+  --landing-glow: 8%;
+}
+
+.dark {
+  --color-fd-primary: oklch(71.2% 0.194 13.428);
+  --color-fd-primary-foreground: oklch(22% 0.06 15);
+  --color-fd-ring: oklch(71.2% 0.194 13.428);
+  --landing-glow: 14%;
+}
+
 /* Landing-page URL assembly (components/url-assembly.tsx): segments fade in
    on a stagger driven by --segment-delay; codec-produced segments get one
    highlight pulse after appearing. Reduced motion shows the finished URL. */
@@ -53,5 +74,64 @@
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
+  }
+}
+
+/* Hero backdrop: an accent glow bleeding down from the top edge over a dot
+   grid, both masked out before the first content section so the atmosphere
+   stays in the hero. Sits in an absolutely-positioned aria-hidden layer. */
+@utility landing-hero-bg {
+  background-image:
+    radial-gradient(
+      ellipse 85% 70% at 50% -15%,
+      color-mix(
+        in oklab,
+        var(--color-fd-primary) var(--landing-glow, 10%),
+        transparent
+      ),
+      transparent 70%
+    ),
+    radial-gradient(
+      color-mix(in oklab, var(--color-fd-foreground) 14%, transparent) 1px,
+      transparent 1px
+    );
+  background-size:
+    auto,
+    24px 24px;
+  mask-image: linear-gradient(to bottom, black 30%, transparent 92%);
+}
+
+/* The hero code block is the centerpiece — a soft accent glow lifts it off
+   the page without changing the CodeBlock component itself. */
+@utility landing-hero-code {
+  border-radius: 1rem;
+  box-shadow:
+    0 0 90px -18px color-mix(in oklab, var(--color-fd-primary) 45%, transparent),
+    0 12px 40px -18px rgb(0 0 0 / 0.35);
+}
+
+/* Scroll-driven section reveal: pure CSS progressive enhancement. Browsers
+   without animation-timeline (and reduced-motion users) render sections in
+   their final state — the page never depends on JS to become visible. */
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility landing-reveal {
+  @supports (animation-timeline: view()) {
+    animation: landing-rise linear both;
+    animation-range: entry 5% entry 55%;
+    animation-timeline: view();
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
   }
 }
