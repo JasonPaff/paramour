@@ -3,12 +3,12 @@ import type { CodecDescription, RouterKind } from "paramour";
 import { formatCodecDescription } from "paramour";
 
 /**
- * Pure presentation helpers (design-12 DT7/DT9/DT17): codec shapes, wire
- * and parsed value rendering, and the `href()` reproduction snippet.
+ * Pure presentation helpers: codec shapes, wire and parsed value rendering,
+ * and the `href()` reproduction snippet.
  */
 
 /**
- * One-line shape label from a `CodecDescription` (DT7), e.g.
+ * One-line shape label from a `CodecDescription`, e.g.
  * `enum(asc|desc)? =asc catch` — core's shared walk in its compact skin,
  * so the panel and `paramour list` can never drift on the field set.
  */
@@ -17,7 +17,7 @@ export function formatShape(description: CodecDescription): string {
 }
 
 /**
- * Wire column rendering (DT7): absence is `—`; present values are
+ * Wire column rendering: absence is `—`; present values are
  * JSON-quoted so whitespace and emptiness are visible, repeated keys
  * comma-joined in wire order.
  */
@@ -31,7 +31,7 @@ export function formatWire(
 }
 
 /**
- * A JS source literal for a decoded value (DT9): `Date` prints as
+ * A JS source literal for a decoded value: `Date` prints as
  * `new Date("<iso>")` so the snippet round-trips through `href`, arrays and
  * plain objects recurse, identifier-safe keys go unquoted.
  */
@@ -67,8 +67,8 @@ export function jsLiteral(value: unknown): string {
 }
 
 /**
- * The `href(route, { params, search })` reproduction snippet (DT9): the
- * user's route identifier is unknowable, so a path-derived placeholder name
+ * The `href(route, { params, search })` reproduction snippet: the user's
+ * route identifier is unknowable, so a path-derived placeholder name
  * carries the true pattern in a trailing comment. Empty halves are omitted.
  * The snippet doubles as documentation of the API the user should be
  * writing.

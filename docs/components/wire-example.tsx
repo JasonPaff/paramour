@@ -28,7 +28,7 @@ import { show, showValue } from "@/lib/show-value";
 type ErrorName = keyof typeof ERROR_CLASSES;
 
 /**
- * A live-computed wire-format example (plan-docs-milestone-5 decision 6).
+ * A live-computed wire-format example.
  *
  * `code` is BOTH the displayed snippet and the executed program: it is
  * evaluated against the shipped `paramour` barrel at docs build time, and the
@@ -125,8 +125,8 @@ const SCOPE: Record<string, unknown> = {
 /**
  * Compiles an example against {@link SCOPE}. `new Function` is the point,
  * not an accident: the displayed source string IS the executed program, so
- * the snippet and its output cannot disagree (decision 6). Build-time only —
- * examples are authored in this repo's MDX, never user input.
+ * the snippet and its output cannot disagree. Build-time only — examples are
+ * authored in this repo's MDX, never user input.
  */
 function compileExample(code: string): (...args: unknown[]) => unknown {
   const names = Object.keys(SCOPE);

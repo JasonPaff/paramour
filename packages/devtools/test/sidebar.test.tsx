@@ -23,7 +23,7 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("session sidebar (DT10/DT15)", () => {
+describe("session sidebar", () => {
   it("lists sessions in first-observed order; non-current entries are stale", () => {
     const seam = freshSeam();
     seam.buffer.push(
@@ -67,7 +67,7 @@ describe("session sidebar (DT10/DT15)", () => {
     expect(screen.getByText("stale snapshot")).toBeDefined();
   });
 
-  it("stacks every current-matching session (layout + page both report, DT10)", () => {
+  it("stacks every current-matching session (layout + page both report)", () => {
     setUrl("/docs/intro");
     const seam = freshSeam();
     seam.buffer.push(

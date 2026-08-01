@@ -1,11 +1,11 @@
 /**
- * Publication drift check (design-14 DS11, plan-docs-milestone-5 A4): the
- * public wire-format spec page must publish exactly the rule IDs the
- * conformance suite cites, modulo the explicit allowlist below. The read
- * across package boundaries into `docs/` is deliberate — the spec page is
- * the public republication of the rules this package's conformance suite
- * pins, and cross-checking the two files IS this test's purpose. It lives
- * beside `conformance.test.ts`, whose citations are half its input.
+ * Publication drift check: the public wire-format spec page must publish
+ * exactly the rule IDs the conformance suite cites, modulo the explicit
+ * allowlist below. The read across package boundaries into `docs/` is
+ * deliberate — the spec page is the public republication of the rules this
+ * package's conformance suite pins, and cross-checking the two files IS
+ * this test's purpose. It lives beside `conformance.test.ts`, whose
+ * citations are half its input.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

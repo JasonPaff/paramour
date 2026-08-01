@@ -9,8 +9,8 @@ interface LegacyProps {
 // getInitialProps is the oldest data surface still in service, and its
 // NextPageContext has NO `params` — even on a dynamic route the path params
 // arrive pre-merged into `query`. parseContext handles that shape by
-// extracting [id] from query by segment name (PR10), sound because Next's
-// own merge gives route params precedence there. This is the throwing twin:
+// extracting [id] from query by segment name, sound because Next's own merge
+// gives route params precedence there. This is the throwing twin:
 // /legacy/not-a-number throws a decode error and Next renders its error
 // page — see pages/products/[id].tsx for safeParseContext → notFound.
 const LegacyPage: NextPage<LegacyProps> = ({ id }) => {

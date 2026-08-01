@@ -67,10 +67,10 @@ const MAX_PREFILTER_BYTES = 512 * 1024;
  * its text mentions a define constructor (grep-then-load). `routeFiles`
  * config globs replace the default patterns when the heuristic misfires.
  *
- * jiti evaluates matched files (the §7.2 loader carry-over). Known limits,
- * both handled by the per-module degrade: tsconfig `paths` aliases are not
- * resolved (a future improvement could feed them into jiti's `alias`
- * option), and `server-only`-style imports throw outside Next.
+ * jiti evaluates matched files (the loader carry-over from config loading).
+ * Known limits, both handled by the per-module degrade: tsconfig `paths`
+ * aliases are not resolved (a future improvement could feed them into jiti's
+ * `alias` option), and `server-only`-style imports throw outside Next.
  */
 export async function discoverRouteDefinitions(
   projectRoot: string,

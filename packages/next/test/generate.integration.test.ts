@@ -10,12 +10,12 @@ import { makeTempDir, makeTree } from "./helpers.js";
 
 /**
  * World A/B integration test — the runtime twin of core's `test-registry`
- * type suite (design-05 testing plan). Generates a real artifact through the
- * scan → emit → write pipeline, then type-checks a consumer twice with the
- * compiler API: without the artifact in the program (world A: any literal
- * accepted via the RL8 `string` fallback) and with it (world B: unregistered
- * literals fail at the constructors, per router and cross-router — PR9's
- * two-member artifact drives both).
+ * type suite. Generates a real artifact through the scan → emit → write
+ * pipeline, then type-checks a consumer twice with the compiler API: without
+ * the artifact in the program (world A: any literal accepted via the `string`
+ * fallback) and with it (world B: unregistered literals fail at the
+ * constructors, per router and cross-router — the artifact's two per-router
+ * members drive both).
  */
 
 // The "paramour" specifier is paths-mapped to src (winning over core's
@@ -69,7 +69,7 @@ function checkProgram(rootNames: readonly string[]): string[] {
   });
 }
 
-describe("generated artifact flips defineAppRoute verification on (TR3/RL8)", () => {
+describe("generated artifact flips defineAppRoute verification on", () => {
   let artifactPath: string;
   let consumerPath: string;
 
@@ -110,7 +110,7 @@ describe("generated artifact flips defineAppRoute verification on (TR3/RL8)", ()
     const diagnostics = checkProgram([artifactPath, consumerPath]);
     // Exactly two diagnostics also proves "/about" and "/legacy" still
     // compile through their own constructors: "/nope" is registered nowhere,
-    // and "/legacy" is a pages route handed to defineAppRoute (PR9's
+    // and "/legacy" is a pages route handed to defineAppRoute (the separate
     // per-router members doing their job).
     expect(diagnostics).toHaveLength(2);
     expect(diagnostics.join("\n")).toContain("TS2345");

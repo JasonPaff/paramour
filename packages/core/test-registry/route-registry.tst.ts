@@ -1,9 +1,9 @@
 /**
- * Type-level tests for the route layer (design-03/design-06), world B:
- * POST-generation behavior, with a hand-authored stand-in for the codegen
- * artifact. This target compiles in its own program (tstyche.registry.json)
- * because module augmentation is program-global — sharing a compilation unit
- * with route-api.tst.ts would silently flip every world-A fallback assertion.
+ * Type-level tests for the route layer, world B: POST-generation behavior,
+ * with a hand-authored stand-in for the codegen artifact. This target
+ * compiles in its own program (tstyche.registry.json) because module
+ * augmentation is program-global — sharing a compilation unit with
+ * route-api.tst.ts would silently flip every world-A fallback assertion.
  * Imports use the real "paramour" specifier (paths-mapped to src) so the
  * augmentation targets exactly the module identity the generated .d.ts will.
  */
@@ -29,7 +29,7 @@ declare module "paramour" {
   }
 }
 
-test("registered path literals are accepted and retained, per router (RL8/PR9)", () => {
+test("registered path literals are accepted and retained, per router", () => {
   const app = defineAppRoute("/about", {});
   expect(app.path).type.toBe<"/about">();
   const pages = definePagesRoute("/legacy", {});
@@ -45,7 +45,7 @@ test("unregistered path literals are rejected — the world-A fallback is gone",
   });
 });
 
-test("cross-router paths are rejected both ways (PR9)", () => {
+test("cross-router paths are rejected both ways", () => {
   // Each constructor sees ONLY its own registry member: a pages path handed
   // to defineAppRoute is exactly the wrong-router mistake the split exists
   // to catch, and vice versa.
@@ -59,7 +59,7 @@ test("cross-router paths are rejected both ways (PR9)", () => {
   });
 });
 
-test("method gating survives world B (PR3): parse* app-only, parseContext pages-only", () => {
+test("method gating survives world B: parse* app-only, parseContext pages-only", () => {
   const app = defineAppRoute("/product/[id]", { params: { id: p.integer() } });
   const pages = definePagesRoute("/legacy/[id]", {
     params: { id: p.integer() },
@@ -69,7 +69,7 @@ test("method gating survives world B (PR3): parse* app-only, parseContext pages-
   expect(pages).type.toHaveProperty("parseContext");
 });
 
-test("app hooks reject a pages route, in world B too (PR3, PR11 §3)", () => {
+test("app hooks reject a pages route, in world B too", () => {
   // The hooks resolve through the BUILT d.ts (tsconfig paths), so this
   // certifies the gate as consumers see it, post declaration emit.
   const app = defineAppRoute("/product/[id]", { params: { id: p.integer() } });
@@ -84,7 +84,7 @@ test("app hooks reject a pages route, in world B too (PR3, PR11 §3)", () => {
   expect(useSearchOrThrow).type.not.toBeCallableWith(pages);
 });
 
-test("pages hooks reject an app route, in world B too (PR3, PR11 §3)", () => {
+test("pages hooks reject an app route, in world B too", () => {
   const app = defineAppRoute("/product/[id]", { params: { id: p.integer() } });
   const pages = definePagesRoute("/legacy/[id]", {
     params: { id: p.integer() },
@@ -95,7 +95,7 @@ test("pages hooks reject an app route, in world B too (PR3, PR11 §3)", () => {
   expect(usePagesSearch).type.not.toBeCallableWith(app);
 });
 
-test("param extraction still runs on the literal, not the registry (spike-01)", () => {
+test("param extraction still runs on the literal, not the registry", () => {
   const route = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },
   });
@@ -109,7 +109,7 @@ test("param extraction still runs on the literal, not the registry (spike-01)", 
   });
 });
 
-test("href string form: registered static paths only, both routers (SH1/SH2)", () => {
+test("href string form: registered static paths only, both routers", () => {
   // The static union is derived from the same registry the constructors
   // read: "/" | "/about" (app) and "/legacy" (pages) — router-agnostic,
   // like href itself.
@@ -122,18 +122,18 @@ test("href string form: registered static paths only, both routers (SH1/SH2)", (
   expect(href).type.not.toBeCallableWith("/abou");
 });
 
-test("href string form: dynamic paths need a route object (SH2/SH7)", () => {
+test("href string form: dynamic paths need a route object", () => {
   // A dynamic literal is registered but NOT static — string form rejects it.
   expect(href).type.not.toBeCallableWith("/product/[id]");
   expect(href).type.not.toBeCallableWith("/legacy/[id]");
-  // SH7: /docs is REACHABLE (optional catch-all), but reachability ≠
-  // staticness — the route carries a codec, so linking it stays
-  // route-object work (href(docsRoute) already builds "/docs" bare).
+  // /docs is REACHABLE (optional catch-all), but reachability ≠ staticness
+  // — the route carries a codec, so linking it stays route-object work
+  // (href(docsRoute) already builds "/docs" bare).
   expect(href).type.not.toBeCallableWith("/docs");
   expect(href).type.not.toBeCallableWith("/docs/[[...slug]]");
 });
 
-test("href narrows its brand to the registered literal for both routers (RL4/PR3)", () => {
+test("href narrows its brand to the registered literal for both routers", () => {
   const product = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },
   });

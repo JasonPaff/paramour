@@ -145,7 +145,7 @@ export function Playground() {
               value={page}
             />
             <p className="hint">
-              Set <code>page = 1</code> to watch D8 elision drop it; clear{" "}
+              Set <code>page = 1</code> to watch default elision drop it; clear{" "}
               <code>labels</code> to see the required key still serialize
               (empty), or set <code>page = abc</code> for a{" "}
               <code>SerializeError</code>.

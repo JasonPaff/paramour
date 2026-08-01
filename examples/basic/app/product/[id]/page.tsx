@@ -4,7 +4,7 @@ import type { RouteProps } from "paramour";
 import { ParamsPanel } from "./params-panel";
 import { productRoute } from "./route.def";
 
-// parse/parseParams work identically in generateMetadata (DESIGN §8).
+// parse/parseParams work identically in generateMetadata.
 export async function generateMetadata(props: RouteProps): Promise<Metadata> {
   const { id } = await productRoute.parseParams(props);
   return { title: `Product #${String(id)}` };

@@ -23,8 +23,8 @@ export interface CodecDescription {
   readonly caught: boolean;
   readonly defaultValue?: CodecDefaultDescription;
   /**
-   * Nested description of a composite list codec's element scalar (CV6;
-   * `p.csv` and `p.array`).
+   * Nested description of a composite list codec's element scalar (`p.csv`
+   * and `p.array`).
    */
   readonly element?: CodecDescription;
   readonly enumMembers?: readonly string[];
@@ -94,8 +94,9 @@ export function describeRoute(route: AnyRoute): RouteDescription {
   for (const segment of route["~segments"]) {
     if (segment.kind === "static") continue;
     const codec = paramsConfig[segment.name];
-    // Unreachable for routes built by the define constructors (RL1 requires
-    // exactly the extracted names); guards hand-assembled objects.
+    // Unreachable for routes built by the define constructors (they require
+    // a codec for exactly the path's extracted param names); guards
+    // hand-assembled objects.
     if (codec === undefined) continue;
     params[segment.name] = {
       ...describeCodec(codec),

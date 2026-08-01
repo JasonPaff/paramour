@@ -4,15 +4,15 @@ import { decodeSearch, SearchDecodeError } from "paramour";
 import { foreignMessage, parseValue } from "paramour/internal";
 
 /**
- * Pure decode/attribution logic (design-12 DT7/DT8). Everything here goes
- * through core's published surface — `parseValue` and `foreignMessage` via
- * the `paramour/internal` tooling entry (the catch-attribution probe core
- * exports for exactly this) and the single-key `decodeSearch` trick —
- * a synthesized one-key config gives full presence/default/catch/duplicate
+ * Pure decode/attribution logic. Everything here goes through core's
+ * published surface — `parseValue` and `foreignMessage` via the
+ * `paramour/internal` tooling entry (the catch-attribution probe core
+ * exports for exactly this) and the single-key `decodeSearch` trick — a
+ * synthesized one-key config gives full presence/default/catch/duplicate
  * semantics for one value without touching `~`-internals.
  */
 
-/** Why a rendered value differs from the wire (DT7's inference rule). */
+/** Why a rendered value differs from the wire. */
 export type Attribution = "catch" | "default" | undefined;
 
 export type PreviewResult =
@@ -20,11 +20,11 @@ export type PreviewResult =
   | { readonly status: "ok"; readonly value: unknown };
 
 /**
- * DT7: default = wire absent + presence declared "defaulted"; catch = wire
- * present + `.catch()` declared + the parse would have failed without it.
- * The duplicate-scalar case (two values for a single-value param) is a
- * parse failure decodeSearch raises itself, so it can't be probed through
- * `parseValue` — special-cased here.
+ * The attribution rule: default = wire absent + presence declared
+ * "defaulted"; catch = wire present + `.catch()` declared + the parse would
+ * have failed without it. The duplicate-scalar case (two values for a
+ * single-value param) is a parse failure decodeSearch raises itself, so it
+ * can't be probed through `parseValue` — special-cased here.
  */
 export function attributionFor(
   description: CodecDescription,
@@ -43,7 +43,7 @@ export function attributionFor(
 
 /**
  * The raw parse outcome WITHOUT `.catch()` recovery — core's `parseValue`
- * exists for this probe (DT7). Foreign throws from a custom codec count as
+ * exists for this probe. Foreign throws from a custom codec count as
  * failures too: whatever the class, the wire value did not parse cleanly.
  */
 export function parseWouldFail(codec: AnyCodec, raw: string): boolean {
@@ -56,7 +56,7 @@ export function parseWouldFail(codec: AnyCodec, raw: string): boolean {
 }
 
 /**
- * What WOULD this wire draft decode to (DT8's live edit validation)?
+ * What WOULD this wire draft decode to — the live edit validation.
  * `draft === undefined` previews absence — surfacing the default value or
  * `undefined`, teaching presence semantics. Full fidelity via the
  * single-key `decodeSearch`: defaults, catches, required-missing, and the

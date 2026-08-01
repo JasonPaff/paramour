@@ -11,7 +11,7 @@ interface ProductProps {
   q: null | string;
 }
 
-// The pages server surface (PR10): getServerSideProps hands params and query
+// The pages server surface: getServerSideProps hands params and query
 // synchronously and pre-merged; parseContext splits them (ctx.params
 // authoritative for path params, query minus the segment names as search).
 // safeParseContext is `safely`'s shape — a malformed URL is morally a 404

@@ -4,10 +4,10 @@ import { useRouteParams, useSearch } from "@paramour-js/next/app";
 
 import { productRoute } from "./route.def";
 
-// Client-side twin of the server parse in page.tsx (DESIGN §9). The hooks are
-// a useMemo over Next's useParams()/useSearchParams(): no loading state, and a
-// malformed URL surfaces as the `status: "error"` arm rather than throwing —
-// the component renders a fallback instead of crashing.
+// Client-side twin of the server parse in page.tsx. The hooks are a useMemo
+// over Next's useParams()/useSearchParams(): no loading state, and a malformed
+// URL surfaces as the `status: "error"` arm rather than throwing — the
+// component renders a fallback instead of crashing.
 export function ParamsPanel() {
   const params = useRouteParams(productRoute);
   const search = useSearch(productRoute);

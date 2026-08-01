@@ -1,8 +1,8 @@
 "use client";
 
 // route.parse() throws on decode failure; the App Router delivers it to the
-// nearest error boundary (DESIGN §8). Visit /products/not-a-number or
-// /products/-5 to land here.
+// nearest error boundary. Visit /products/not-a-number or /products/-5 to
+// land here.
 export default function ProductError({
   error,
   reset,

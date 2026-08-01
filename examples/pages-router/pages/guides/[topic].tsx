@@ -25,7 +25,7 @@ export const getStaticPaths: GetStaticPaths = () => ({
   paths: guideTopics.map((topic) => buildPath(guideRoute, { topic })),
 });
 
-// The pages STATIC surface (PR10): a getStaticProps context carries no query
+// The pages STATIC surface: a getStaticProps context carries no query
 // string, so parseContext rejects it by design — decode ctx.params directly.
 // Node has already percent-decoded the values, hence percentDecode: false.
 export const getStaticProps: GetStaticProps<GuideProps> = (ctx) => {

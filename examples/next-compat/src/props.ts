@@ -1,9 +1,9 @@
 /**
- * Pins `RouteProps` (core `route.ts` RL6) against the shape a real Next App
- * Router page receives. Core stays framework-agnostic and deliberately does
- * NOT reference Next's generated `PageProps` global — which also doesn't exist
- * in a fresh clone before `next build`/`next dev` first runs, so asserting
- * against it here would couple this check to a prior build.
+ * Pins `RouteProps` (from core's `route.ts`) against the shape a real Next
+ * App Router page receives. Core stays framework-agnostic and deliberately
+ * does NOT reference Next's generated `PageProps` global — which also doesn't
+ * exist in a fresh clone before `next build`/`next dev` first runs, so
+ * asserting against it here would couple this check to a prior build.
  *
  * The manual shape below is what Next 15/16 actually pass: both members are
  * present and Promise-wrapped (async params landed in Next 15).

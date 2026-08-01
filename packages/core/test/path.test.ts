@@ -12,7 +12,7 @@ import {
   SerializeError,
 } from "../src";
 
-describe("encodeParams / buildPath (RL5)", () => {
+describe("encodeParams / buildPath", () => {
   it("R1: a single param is serialized, encoded, and substituted", () => {
     const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
@@ -28,7 +28,7 @@ describe("encodeParams / buildPath (RL5)", () => {
     expect(buildPath(route, { name: "a b/c" })).toBe("/tag/a%20b%2Fc");
   });
 
-  it("static segments are emitted verbatim, never re-encoded (RL2)", () => {
+  it("static segments are emitted verbatim, never re-encoded", () => {
     const route = defineAppRoute("/über/[id]", { params: { id: p.string() } });
     expect(buildPath(route, { id: "x" })).toBe("/über/x");
   });
@@ -354,7 +354,7 @@ describe("encodeStaticParams (the static-generation surface)", () => {
   });
 });
 
-describe("decodeParams (RL7)", () => {
+describe("decodeParams", () => {
   it("decodes singles per codec grammar; unknown keys are ignored", () => {
     const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
@@ -396,7 +396,7 @@ describe("decodeParams (RL7)", () => {
     );
   });
 
-  it("[id] given an array is a shape issue, not catchable (RL7)", () => {
+  it("[id] given an array is a shape issue, not catchable", () => {
     const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer().catch(0) },
     });
@@ -408,7 +408,7 @@ describe("decodeParams (RL7)", () => {
     );
   });
 
-  it("a catch-all given a string is a shape issue, not catchable (RL7)", () => {
+  it("a catch-all given a string is a shape issue, not catchable", () => {
     const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string().catch("x") },
     });
@@ -418,7 +418,7 @@ describe("decodeParams (RL7)", () => {
     );
   });
 
-  it("a non-string element is a shape issue with its index (RL7)", () => {
+  it("a non-string element is a shape issue with its index", () => {
     const route = defineAppRoute("/files/[...seg]", {
       params: { seg: p.string().catch("x") },
     });
@@ -444,7 +444,7 @@ describe("decodeParams (RL7)", () => {
     expect(decodeParams(route, { id: "nope" })).toEqual({ id: 7 });
   });
 
-  it(".catch() recovers catch-all elements ELEMENT-WISE (RL7)", () => {
+  it(".catch() recovers catch-all elements ELEMENT-WISE", () => {
     const route = defineAppRoute("/files/[...n]", {
       params: { n: p.integer().catch(0) },
     });

@@ -1,16 +1,16 @@
-/** A scanned route path labeled with the router that produced it (PR9). */
+/** A scanned route path labeled with the router that produced it. */
 export interface ScannedRoute {
   path: string;
   router: "app" | "pages";
 }
 
 /**
- * Route-collision failure mode (PR9): states Next itself refuses to build
- * have no valid artifact, so the scanners throw instead of emitting one.
- * Composition points map this error to their ruled exits — CLI exit 2,
- * `withTypedRoutes` throw during config evaluation, and a non-fatal loud
- * log under watch (the TR5 exception: a collision mid-`--watch` is usually
- * a file mid-move, so the last good artifact stays on disk).
+ * Route-collision failure mode: states Next itself refuses to build have no
+ * valid artifact, so the scanners throw instead of emitting one. Composition
+ * points map this error to their own exits — CLI exit 2, `withTypedRoutes`
+ * throw during config evaluation, and a non-fatal loud log under watch (a
+ * collision mid-`--watch` is usually a file mid-move, so the last good
+ * artifact stays on disk).
  */
 export class RouteCollisionError extends Error {
   override name = "RouteCollisionError";
@@ -32,7 +32,7 @@ const DYNAMIC_SEGMENT =
   /^(?:\[\[\.\.\.(?<optional>.+)\]\]|\[\.\.\.(?<catchAll>.+)\]|\[(?<plain>[^[\]]+)\])$/;
 
 /**
- * PR9's structural collisions — same detection pass, non-equal strings. Two
+ * Structural collisions — same detection pass, non-equal strings. Two
  * states Next also refuses to build that plain string equality misses:
  *
  * - **Different slug names at one level**: `/x/[id]` + `/x/[slug]` — Next:
@@ -68,7 +68,7 @@ export function assertNoStructuralCollisions(
       const existing = dynamicAt.get(key);
       if (existing !== undefined && existing.segment !== segment) {
         throw new RouteCollisionError(
-          `route collision: "${existing.path}" (${existing.router}) and "${route.path}" (${route.router}) declare conflicting dynamic segments (${existing.segment} vs ${segment}) at the same position — Next refuses different slug names for the same dynamic path (PR9)`,
+          `route collision: "${existing.path}" (${existing.router}) and "${route.path}" (${route.router}) declare conflicting dynamic segments (${existing.segment} vs ${segment}) at the same position — Next refuses different slug names for the same dynamic path`,
         );
       }
       if (existing === undefined) {
@@ -83,7 +83,7 @@ export function assertNoStructuralCollisions(
       const baseRoute = byPath.get(base);
       if (baseRoute !== undefined) {
         throw new RouteCollisionError(
-          `route collision: "${route.path}" (${route.router}) also matches "${base}" (${baseRoute.router}) — an optional catch-all has the same specificity as its base path, which Next refuses to build (PR9)`,
+          `route collision: "${route.path}" (${route.router}) also matches "${base}" (${baseRoute.router}) — an optional catch-all has the same specificity as its base path, which Next refuses to build`,
         );
       }
     }

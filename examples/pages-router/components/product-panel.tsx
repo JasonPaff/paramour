@@ -4,10 +4,10 @@ import { productRoute } from "../lib/routes";
 
 // Client-side twin of the server parse in pages/products/[id].tsx. The pages
 // hooks read useRouter().query, so their result is THREE-state: this page has
-// getServerSideProps, and on a GSSP page the first render is already
-// isReady with a populated query (design-06 spike 3) — the pending arm never
-// surfaces here, but the type still makes us say what it would render. See
-// /find for a page where it actually shows.
+// getServerSideProps, and on a GSSP page the first render is already isReady
+// with a populated query — the pending arm never surfaces here, but the type
+// still makes us say what it would render. See /find for a page where it
+// actually shows.
 export function ProductPanel() {
   const params = useRouteParams(productRoute);
   const search = useSearch(productRoute);

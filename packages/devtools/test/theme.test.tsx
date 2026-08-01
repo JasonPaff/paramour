@@ -10,7 +10,7 @@ const route = defineAppRoute("/home", {});
 
 afterEach(cleanup);
 
-describe("theme switching (DT14)", () => {
+describe("theme switching", () => {
   it("flips data-theme on the SAME root node — no remount", () => {
     setUrl("/home");
     const seam = freshSeam();

@@ -21,19 +21,19 @@ import {
 } from "./search.js";
 
 /**
- * `any` is deliberate (RL4, same variance gotcha as AnyCodec): codec configs
+ * `any` is deliberate (same variance gotcha as AnyCodec): codec configs
  * reach contravariant positions through the parse methods and `HrefArgs`;
  * the `unknown` form would reject every concrete route.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyAppRoute = AppRoute<string, any, any>;
 
-/** Pages twin of {@link AnyAppRoute} (PR3). */
+/** Pages twin of {@link AnyAppRoute}. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyPagesRoute = PagesRoute<string, any, any>;
 
 /**
- * Router-agnostic (PR3): matches both brands. This is the bound for
+ * Router-agnostic: matches both brands. This is the bound for
  * everything that only needs the data core — `href()`, the standalone
  * decoders, `InferRouteParams` — none of which differ by router.
  */
@@ -41,9 +41,9 @@ export type AnyPagesRoute = PagesRoute<string, any, any>;
 export type AnyRoute = Route<string, any, any>;
 
 /**
- * An App Router route (PR3/PR7): the async props-based parse surface —
- * three surfaces × throwing/safe (RL1/RL6). Props may be promised (Next
- * 15/16) and are awaited before any decode runs.
+ * An App Router route: the async props-based parse surface — three surfaces
+ * × throwing/safe. Props may be promised (Next 15/16) and are awaited before
+ * any decode runs.
  */
 export interface AppRoute<
   Path extends string,
@@ -59,9 +59,9 @@ export interface AppRoute<
     params: ParamsOutput<Path, PC>;
     search: SearchOutputOf<SC>;
   }>;
-  /** Bare params object (RL6) — layout props are structurally assignable. */
+  /** Bare params object — layout props are structurally assignable. */
   parseParams(props: ParamsPropsInput): Promise<ParamsOutput<Path, PC>>;
-  /** Bare search object (RL6) — the search half alone. */
+  /** Bare search object — the search half alone. */
   parseSearch(props: SearchPropsInput): Promise<SearchOutputOf<SC>>;
   safeParse(props: RoutePropsInput): Promise<
     SafeResult<{
@@ -77,7 +77,7 @@ export interface AppRoute<
   ): Promise<SafeResult<SearchOutputOf<SC>>>;
 }
 
-/** Names of `[...name]` catch-all segments in the path literal (RL3). */
+/** Names of `[...name]` catch-all segments in the path literal. */
 export type CatchAllNames<Path extends string> =
   Segments<Path> extends infer S extends string
     ? S extends `[...${infer Name}]`
@@ -86,21 +86,21 @@ export type CatchAllNames<Path extends string> =
     : never;
 
 /**
- * Exact-key enforcement (RL1): every excess key's value type becomes `never`,
+ * Exact-key enforcement: every excess key's value type becomes `never`,
  * so a misspelled param fails to compile on its own property line while `PC`
  * itself stays the naked inference site for `const` codec-literal retention.
  */
 export type ConformParams<Path extends string, PC> = PC &
   Record<Exclude<keyof PC, PathParamNames<Path>>, never>;
 
-/** Decoded params object type for a route (RL3); see {@link ParamsOutput}. */
+/** Decoded params object type for a route; see {@link ParamsOutput}. */
 export type InferRouteParams<R extends AnyRoute> = ParamsOutput<
   R["path"],
   R["~params"]
 >;
 
 /**
- * Accepts promised props and plain objects alike (RL6). This width lives on
+ * Accepts promised props and plain objects alike. This width lives on
  * the parse INPUT surface ({@link RoutePropsInput} and friends), not on the
  * annotation types: every supported Next (peer `>=15`) delivers page props
  * as promises, and Next 15.5's generated `.next/types` page check requires
@@ -111,13 +111,13 @@ export type InferRouteParams<R extends AnyRoute> = ParamsOutput<
 export type MaybePromise<T> = Promise<T> | T;
 
 /**
- * RL3: an empty name (`[]`, `[...]`, `[[...]]`) is not a token — it falls
- * through as static text; the runtime malformed-bracket check is the backstop.
+ * An empty name (`[]`, `[...]`, `[[...]]`) is not a token — it falls through
+ * as static text; the runtime malformed-bracket check is the backstop.
  */
 export type NonEmptyName<Name extends string> = Name extends "" ? never : Name;
 
 /**
- * Names of `[[...name]]` optional catch-all segments (RL3). The `infer S`
+ * Names of `[[...name]]` optional catch-all segments. The `infer S`
  * indirection is load-bearing: conditionals distribute only over naked type
  * parameters, and `Segments<Path>` is an alias application, not a parameter.
  */
@@ -129,14 +129,14 @@ export type OptionalCatchAllNames<Path extends string> =
     : never;
 
 /**
- * Structural context contract for the pages parse surface (PR10): the shape
+ * Structural context contract for the pages parse surface: the shape
  * `getServerSideProps` and `getInitialProps` contexts share, with no
  * `next/*` import (the ParamsProps/SearchProps precedent). `query` is
  * REQUIRED: `GetStaticPropsContext` has no query string, so it fails to
  * compose here by design — typed search at build time would be a lie; the
  * static story is core's `decodeParams`/`safeDecodeParams`. Both
  * assignability claims are pinned per supported Next major in
- * `examples/next-compat/src/contexts.ts` (PR13).
+ * `examples/next-compat/src/contexts.ts`.
  */
 export interface PagesContext {
   readonly params?: ParamsSource | undefined;
@@ -144,7 +144,7 @@ export interface PagesContext {
 }
 
 /**
- * A Pages Router route (PR3/PR10): the sync context-based parse surface.
+ * A Pages Router route: the sync context-based parse surface.
  * `getServerSideProps` / `getInitialProps` hand params and query
  * synchronously and pre-merged, so there is no promised-props machinery
  * here — the context split (params authoritative, query minus path-param
@@ -161,13 +161,13 @@ export interface PagesRoute<
    * present; when absent (`getInitialProps` — `NextPageContext` has no
    * `params` even on dynamic routes) they are extracted from `query` by
    * segment name, which is sound because Next's own merge gives route
-   * params precedence in `query` (PR10).
+   * params precedence in `query`.
    */
   parseContext(context: PagesContext): {
     params: ParamsOutput<Path, PC>;
     search: SearchOutputOf<SC>;
   };
-  /** {@link parseContext} in the safe shape — `safely`'s taxonomy (PR12). */
+  /** {@link parseContext} in the safe shape — `safely`'s taxonomy. */
   safeParseContext(context: PagesContext): SafeResult<{
     params: ParamsOutput<Path, PC>;
     search: SearchOutputOf<SC>;
@@ -175,12 +175,12 @@ export interface PagesRoute<
 }
 
 /**
- * Augmented by codegen with per-router path unions (RL8/PR9):
+ * Augmented by codegen with per-router path unions:
  * `{ appRoutes: "/a" | …; pagesRoutes: "/x" | … }`. Each member is
- * independently ABSENT when its scan is empty (TR3's absent-not-`never`
- * rule), preserving per-router world-A/B independence. The generated
- * artifact is a pure `.d.ts` module augmentation — no runtime import, so
- * tree-shaking is untouched (spike-01 lock-ins #3/#4).
+ * independently ABSENT when its scan is empty — absent, never `never` —
+ * preserving per-router world-A/B independence. The generated artifact is a
+ * pure `.d.ts` module augmentation — no runtime import, so tree-shaking is
+ * untouched.
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- augmentation target
 export interface ParamourRegister {}
@@ -194,18 +194,18 @@ export type ParamOutput<PC, K extends PropertyKey> = K extends keyof PC
 
 /**
  * Params schema shape for a path: one codec per dynamic segment name. The
- * codec describes ONE segment element (design-02 D5/D6) — arrays come from
- * the segment kind, and presence modifiers are compile errors (`ParamCodec`).
- * RL9 assigned this to path.ts; it stays here instead so the whole path
- * grammar lives in one module — path.ts consumes it via type-only imports,
- * keeping runtime imports one-directional (route.ts → path.ts).
+ * codec describes ONE segment element (D5/D6) — arrays come from the segment
+ * kind, and presence modifiers are compile errors (`ParamCodec`). It lives
+ * here rather than in path.ts so the whole path grammar sits in one module —
+ * path.ts consumes it via type-only imports, keeping runtime imports
+ * one-directional (route.ts → path.ts).
  */
 export type ParamsConfig<Path extends string> = Readonly<
   Record<PathParamNames<Path>, ParamCodec>
 >;
 
 /**
- * Parse-output shape (RL3): `[id]` → `Out`, `[...slug]` → `Out[]`,
+ * Parse-output shape: `[id]` → `Out`, `[...slug]` → `Out[]`,
  * `[[...slug]]` → `Out[]` — every key REQUIRED on the output side; an absent
  * optional catch-all normalizes to `[]` at decode time (D6), so no `?:`
  * split exists here (that split is the href-input side's concern). Keyed by
@@ -220,7 +220,7 @@ export type ParamsOutput<Path extends string, PC> = {
 };
 
 /**
- * Structural props contract for the params half (RL6): layout props are
+ * Structural props contract for the params half: layout props are
  * assignable, and a missing member decodes like an empty source
  * (required-missing issues, never a crash). Deliberately NOT Next's
  * generated `PageProps` global — core stays framework-agnostic, and that
@@ -231,7 +231,7 @@ export interface ParamsProps {
 }
 
 /**
- * What `parseParams` ACCEPTS (RL6): {@link ParamsProps} plus plain sync
+ * What `parseParams` ACCEPTS: {@link ParamsProps} plus plain sync
  * objects — see {@link MaybePromise} for why the annotation type is
  * promise-only while the parse input stays wide.
  */
@@ -239,7 +239,7 @@ export interface ParamsPropsInput {
   readonly params?: MaybePromise<ParamsSource>;
 }
 
-/** Every dynamic segment name in the path literal (RL3). */
+/** Every dynamic segment name in the path literal. */
 export type PathParamNames<Path extends string> =
   CatchAllNames<Path> | OptionalCatchAllNames<Path> | SingleParamNames<Path>;
 
@@ -247,8 +247,8 @@ export type PathParamNames<Path extends string> =
  * Pre-generation: ParamourRegister has no `appRoutes` member, so this
  * resolves to `string` and any path literal is accepted (unverified).
  * Post-generation it resolves to the union of filesystem-verified app-router
- * paths (RL8, spike-01). Per-router on purpose (PR9): an empty app scan
- * keeps THIS fallback while `pagesRoutes` narrows, and vice versa.
+ * paths. Per-router on purpose: an empty app scan keeps THIS fallback while
+ * `pagesRoutes` narrows, and vice versa.
  */
 export type RegisteredAppRoutePaths = ParamourRegister extends {
   appRoutes: infer R extends string;
@@ -256,7 +256,7 @@ export type RegisteredAppRoutePaths = ParamourRegister extends {
   ? R
   : string;
 
-/** Pages twin of {@link RegisteredAppRoutePaths} (PR9). */
+/** Pages twin of {@link RegisteredAppRoutePaths}. */
 export type RegisteredPagesRoutePaths = ParamourRegister extends {
   pagesRoutes: infer R extends string;
 }
@@ -264,7 +264,7 @@ export type RegisteredPagesRoutePaths = ParamourRegister extends {
   : string;
 
 /**
- * Static-only subset of {@link RegisteredAppRoutePaths} (SH2): derived by
+ * Static-only subset of {@link RegisteredAppRoutePaths}: derived by
  * syntactic filter, not emitted — dynamic-ness is a property of the path
  * literal, so the registry format doesn't change. Same world-A `string`
  * fallback as the full union (the filter passes `string` through).
@@ -272,18 +272,18 @@ export type RegisteredPagesRoutePaths = ParamourRegister extends {
 export type RegisteredStaticAppRoutePaths =
   StaticPathsOf<RegisteredAppRoutePaths>;
 
-/** Pages twin of {@link RegisteredStaticAppRoutePaths} (SH2). */
+/** Pages twin of {@link RegisteredStaticAppRoutePaths}. */
 export type RegisteredStaticPagesRoutePaths =
   StaticPathsOf<RegisteredPagesRoutePaths>;
 
 /**
  * Every registered STATIC path across both routers — the string form of
- * href's path argument (SH1/SH2). Deliberately NOT the union of the two
- * per-router types (SH3): each falls back to `string` when its registry
- * member is absent, and in a single-router project the absent side's
- * `string` would swallow the union and erase verification for the router
- * that HAS routes. The permissive fallback applies only when NEITHER member
- * is present (world A / TR3's empty merge).
+ * href's path argument. Deliberately NOT the union of the two per-router
+ * types: each falls back to `string` when its registry member is absent, and
+ * in a single-router project the absent side's `string` would swallow the
+ * union and erase verification for the router that HAS routes. The
+ * permissive fallback applies only when NEITHER member is present (world A,
+ * where codegen has merged nothing into the registry).
  */
 export type RegisteredStaticRoutePaths = [PresentRegisteredPaths] extends [
   never,
@@ -292,7 +292,7 @@ export type RegisteredStaticRoutePaths = [PresentRegisteredPaths] extends [
   : StaticPathsOf<PresentRegisteredPaths>;
 
 /**
- * The router-agnostic core of a defined route (PR3): path, configs, and the
+ * The router-agnostic core of a defined route: path, configs, and the
  * define-time token cache. The parse surface is router-specific and lives on
  * {@link AppRoute} / {@link PagesRoute} — gating it via the interface split
  * makes the wrong surface ABSENT, not just ill-typed. `~`-prefixed members
@@ -307,7 +307,7 @@ export interface Route<
 > {
   readonly path: Path;
   readonly "~params": PC;
-  /** The router brand (PR3) — type-state, same discipline as Codec's P/C/A. */
+  /** The router brand — type-state, same discipline as Codec's P/C/A. */
   readonly "~router": R;
   readonly "~search": SC;
   /**
@@ -319,10 +319,10 @@ export interface Route<
 }
 
 /**
- * Conditional on the path shape (RL1, spike-01 lock-in #2): dynamic paths
- * REQUIRE `params` with exactly the extracted segment names; static paths
- * REJECT it (`?: never` — may be absent, may never be present, which under
- * exactOptionalPropertyTypes holds even for non-fresh objects).
+ * Conditional on the path shape: dynamic paths REQUIRE `params` with exactly
+ * the extracted segment names; static paths REJECT it (`?: never` — may be
+ * absent, may never be present, which under exactOptionalPropertyTypes holds
+ * even for non-fresh objects).
  */
 export type RouteConfig<
   Path extends string,
@@ -333,7 +333,7 @@ export type RouteConfig<
   : { readonly params: ConformParams<Path, PC>; readonly search?: SC };
 
 /**
- * Full page-props contract (RL6): the type a page annotates its props with.
+ * Full page-props contract: the type a page annotates its props with.
  * Next's `PageProps` is structurally assignable, and both members are
  * promise-only so the annotation survives Next 15.5's generated page check
  * (see {@link MaybePromise}). Deliberately NOT Next's generated `PageProps`
@@ -341,23 +341,23 @@ export type RouteConfig<
  */
 export interface RouteProps extends ParamsProps, SearchProps {}
 
-/** What `parse`/`safeParse` ACCEPT (RL6): {@link RouteProps} plus sync props. */
+/** What `parse`/`safeParse` ACCEPT: {@link RouteProps} plus sync props. */
 export interface RoutePropsInput extends ParamsPropsInput, SearchPropsInput {}
 
-/** Which router a route belongs to (PR3) — the value of the `~router` brand. */
+/** Which router a route belongs to — the value of the `~router` brand. */
 export type RouterKind = "app" | "pages";
 
 /**
- * Status-discriminated result shape (RL6, design-06 PR12 — unified with the
- * pages hooks' `RouterResult`, which extends this union by one `pending`
- * member): `if (result.status === "error")` narrows both arms, and both
- * routers' results destructure identically.
+ * Status-discriminated result shape, unified with the pages hooks'
+ * `RouterResult` (which extends this union by one `pending` member):
+ * `if (result.status === "error")` narrows both arms, and both routers'
+ * results destructure identically.
  */
 export type SafeResult<T> =
   { data: T; status: "success" } | { error: RouteDecodeError; status: "error" };
 
 /**
- * Structural props contract for the search half (RL6). The wire record
+ * Structural props contract for the search half. The wire record
  * shape is the same as the params side's, hence the shared source type.
  */
 export interface SearchProps {
@@ -371,15 +371,15 @@ export interface SearchPropsInput {
 
 /**
  * Distributes a path literal into the union of its `/`-separated segment
- * literals. Malformed bracket tokens fall through as static text — no
- * type-level path linting (RL3); tokenizePath is the runtime backstop.
+ * literals. Malformed bracket tokens fall through as static text — there is
+ * no type-level path linting; tokenizePath is the runtime backstop.
  */
 export type Segments<S extends string> = S extends `${infer Head}/${infer Rest}`
   ? Segments<Head> | Segments<Rest>
   : S;
 
 /**
- * Names of single `[name]` segments (RL3). Conditional order is load-bearing
+ * Names of single `[name]` segments. Conditional order is load-bearing
  * and mirrors tokenizePath: both catch-all forms must be excluded first or
  * `[...slug]` would extract as a single param named `"...slug"`.
  */
@@ -396,7 +396,7 @@ export type SingleParamNames<Path extends string> =
 
 /**
  * Union of the registry members that are actually PRESENT — `never` when
- * neither router has generated routes. The input to SH3's combined-union
+ * neither router has generated routes. The input to the combined-union
  * fallback rule; see {@link RegisteredStaticRoutePaths}.
  */
 /* eslint-disable @typescript-eslint/no-duplicate-type-constituents, @typescript-eslint/no-redundant-type-constituents --
@@ -412,29 +412,29 @@ type PresentRegisteredPaths =
 /* eslint-enable @typescript-eslint/no-duplicate-type-constituents, @typescript-eslint/no-redundant-type-constituents */
 
 /**
- * Filters a path union to its static members (SH2): any `[` marks a dynamic
+ * Filters a path union to its static members: any `[` marks a dynamic
  * segment. `string` passes through (it doesn't extend the bracket template),
  * which is exactly what keeps the world-A fallback intact. Note reachability
- * ≠ staticness (SH7): `/docs/[[...slug]]` serves `/docs`, but it carries a
- * codec and decode expectations, so it is excluded here.
+ * ≠ staticness: `/docs/[[...slug]]` serves `/docs`, but it carries a codec
+ * and decode expectations, so it is excluded here.
  */
 type StaticPathsOf<P extends string> = P extends `${string}[${string}`
   ? never
   : P;
 
 /**
- * Defines an App Router route: the URL-shaped path literal (RL2) plus its
- * param/search codec configs. Validates the literal eagerly (RL1 —
- * fail-fast at config definition time, same stance as eager `.default()`
- * serialization). The router is a *declaration*, not an inference (PR7):
+ * Defines an App Router route: the URL-shaped path literal plus its
+ * param/search codec configs. Validates the literal eagerly — fail-fast at
+ * config definition time, the same stance as eager `.default()`
+ * serialization. The router is a *declaration*, not an inference:
  * pre-codegen the registry cannot distinguish routers, so an inferred brand
  * would silently degrade in world A — the split constructor is what keeps
  * the brand intact there.
  */
 export function defineAppRoute<
   // Pre-generation RegisteredAppRoutePaths resolves to `string`, making the
-  // intersection look redundant — but the RL1 signature is pinned; the
-  // `& string` half is what template-literal inference and Route's own
+  // intersection look redundant — but this signature is pinned deliberately:
+  // the `& string` half is what template-literal inference and Route's own
   // constraint see regardless of what codegen merges into the registry.
   // eslint-disable-next-line @typescript-eslint/no-duplicate-type-constituents
   Path extends RegisteredAppRoutePaths & string,
@@ -445,7 +445,7 @@ export function defineAppRoute<
     ...routeData("app", path, config),
     async parse(props: RoutePropsInput) {
       const [paramsSource, searchSource] = await awaitProps(props);
-      // RL6: params first — a params failure throws before search decodes.
+      // Params first — a params failure throws before search decodes.
       const decodedParams = decodeParams(route, paramsSource ?? {});
       return {
         params: decodedParams,
@@ -474,28 +474,29 @@ export function defineAppRoute<
 }
 
 /**
- * Defines a Pages Router route (PR7 — neither router is the default; see
+ * Defines a Pages Router route — neither router is the default; see
  * {@link defineAppRoute} for why the constructor is split rather than
- * inferred). Same eager literal validation (RL1); the parse surface is the
- * sync context pair (PR10).
+ * inferred. Same eager literal validation; the parse surface is the sync
+ * context pair.
  */
 export function definePagesRoute<
   // Same pinned-signature rationale as defineAppRoute's intersection.
   // eslint-disable-next-line @typescript-eslint/no-duplicate-type-constituents
   Path extends RegisteredPagesRoutePaths & string,
   const PC extends ParamsConfig<Path> = ParamsConfig<Path>,
-  // PR9: search ∩ params disjointness. `router.query` merges the two halves
-  // with route params winning, so a pages search key shadowing a path param
-  // could never receive a value — it fails to compile here instead. App
-  // routes carry no such constraint: their two sources are separate, so
-  // `?id=` on `/product/[id]` is well-defined there.
+  // Search and params must stay disjoint namespaces on this router:
+  // `router.query` merges the two halves with route params winning, so a
+  // pages search key shadowing a path param could never receive a value — it
+  // fails to compile here instead. App routes carry no such constraint:
+  // their two sources are separate, so `?id=` on `/product/[id]` is
+  // well-defined there.
   const SC extends Readonly<Partial<Record<PathParamNames<Path>, never>>> &
     SearchSlot = Record<never, never>,
 >(path: Path, config: RouteConfig<Path, PC, SC>): PagesRoute<Path, PC, SC> {
   const data = routeData("pages", path, config);
-  // PR10: the query→params extraction and query→search subtraction both key
-  // on the dynamic-segment names; computed once at define time (the
-  // ~segments ethos — per-call parses never re-derive them).
+  // The query→params extraction and query→search subtraction both key on
+  // the dynamic-segment names; computed once at define time (the ~segments
+  // ethos — per-call parses never re-derive them).
   const paramNames = new Set<string>();
   for (const segment of data["~segments"]) {
     if (segment.kind !== "static") paramNames.add(segment.name);
@@ -507,7 +508,7 @@ export function definePagesRoute<
         context,
         paramNames,
       );
-      // PR10: params first — same morally-a-404 rule as the app surface.
+      // Params first — same morally-a-404 rule as the app surface.
       // R5: pages sources (ctx.params / ctx.query) are already percent-decoded
       // by Node's querystring layer, so skip core's decode to avoid a
       // double-decode (App-Router's decodeParams keeps the default).
@@ -520,8 +521,8 @@ export function definePagesRoute<
       };
     },
     safeParseContext(context: PagesContext) {
-      // safely's taxonomy (PR12), minus the await: only decode failures
-      // become the error arm; contract violations stay loud.
+      // safely's taxonomy, minus the await: only decode failures become the
+      // error arm; contract violations stay loud.
       try {
         return { data: route.parseContext(context), status: "success" };
       } catch (error) {
@@ -546,10 +547,10 @@ function awaitProp(
 }
 
 /**
- * Awaits BOTH props members before any decode runs (RL6): the
- * params-before-search rule is about *decode* order, not await order —
- * throwing while the searchParams promise is still pending would turn a
- * rejecting props promise into an unhandled rejection.
+ * Awaits BOTH props members before any decode runs: the params-before-search
+ * rule is about *decode* order, not await order — throwing while the
+ * searchParams promise is still pending would turn a rejecting props promise
+ * into an unhandled rejection.
  */
 function awaitProps(
   props: RoutePropsInput,
@@ -559,7 +560,7 @@ function awaitProps(
 
 /**
  * Own enumerable properties of `source` whose keys are NOT in `keys` —
- * the query→search subtraction (PR10). Entries → fromEntries so keys like
+ * the query→search subtraction. Entries → fromEntries so keys like
  * "__proto__" stay ordinary own properties (decodeParams's ethos).
  */
 function omitOwn(
@@ -573,7 +574,7 @@ function omitOwn(
 
 /**
  * Own properties of `source` at exactly `keys` — the query→params
- * extraction (PR10). A name missing from the source is simply omitted, so
+ * extraction. A name missing from the source is simply omitted, so
  * it surfaces downstream as decodeParams's ordinary required-missing issue,
  * never a crash here.
  */
@@ -619,9 +620,9 @@ async function rebrandRejection<T>(promise: Promise<T>): Promise<T> {
 }
 
 /**
- * Shared define-time core of both constructors (PR7): validates the literal
- * eagerly (RL1 — throws ParamourError on an invalid literal) and pins the
- * data members both parse surfaces build on. The conditional RouteConfig is
+ * Shared define-time core of both constructors: validates the literal
+ * eagerly (throwing ParamourError on an invalid literal) and pins the data
+ * members both parse surfaces build on. The conditional RouteConfig is
  * unresolved inside a generic body; the cast here is the one place its two
  * branches are unified.
  */
@@ -647,7 +648,7 @@ function routeData<
 }
 
 /**
- * Wraps a throwing parse into the status-discriminated shape (RL6, PR12).
+ * Wraps a throwing parse into the status-discriminated shape.
  * Only decode failures become the `error` arm; source-contract violations
  * and rebranded foreign errors stay loud.
  */
@@ -666,13 +667,13 @@ async function safely<T>(run: () => Promise<T>): Promise<SafeResult<T>> {
 }
 
 /**
- * Splits a pages context into its params/search decode sources (PR10).
+ * Splits a pages context into its params/search decode sources.
  * `params` is authoritative when present — handed to decodeParams whole,
  * whose own contract check rejects a garbage member; absent, path params
  * are extracted from `query` by name. Search is always `query` minus the
  * path-param names. A missing `query` is a CONTRACT violation, not a decode
  * issue: `getStaticProps` has no query string, so composing its context
- * here would be a lie (PR10) — the error names the supported path instead.
+ * here would be a lie — the error names the supported path instead.
  */
 function splitPagesContext(
   context: PagesContext,
@@ -688,7 +689,7 @@ function splitPagesContext(
   const untrustedQuery: unknown = query;
   if (typeof untrustedQuery !== "object" || untrustedQuery === null) {
     throw new ParamourError(
-      `pages context has no query object (got ${describeType(untrustedQuery)}): getStaticProps contexts carry no query string — decode ctx.params with safeDecodeParams instead (PR10)`,
+      `pages context has no query object (got ${describeType(untrustedQuery)}): getStaticProps contexts carry no query string — decode ctx.params with safeDecodeParams instead`,
     );
   }
   return [params ?? pickOwn(query, paramNames), omitOwn(query, paramNames)];

@@ -6,8 +6,8 @@ import { scanPagesRoutes } from "../src/scan-pages.js";
 import { makeTempDir, makeTree, trySymlink } from "./helpers.js";
 
 /**
- * PR4's fixture matrix (PR11 §1) — one fixture per scanner rule. The trees
- * are built programmatically for the same reason as scan-app.test.ts.
+ * The scanner's fixture matrix — one fixture per scanner rule. The trees are
+ * built programmatically for the same reason as scan-app.test.ts.
  */
 
 /** Build a tree in a temp dir and scan it in one step. */
@@ -22,7 +22,7 @@ function scanTree(
     : scanPagesRoutes(root, pageExtensions);
 }
 
-describe("scanPagesRoutes: file-based discovery (PR4)", () => {
+describe("scanPagesRoutes: file-based discovery", () => {
   it("maps index.tsx to '/' and nested index to its directory", () => {
     expect(scanTree(["index.tsx", "blog/index.tsx"])).toEqual(["/", "/blog"]);
   });
@@ -65,7 +65,7 @@ describe("scanPagesRoutes: file-based discovery (PR4)", () => {
   });
 });
 
-describe("scanPagesRoutes: dynamic segments on files and folders (PR4)", () => {
+describe("scanPagesRoutes: dynamic segments on files and folders", () => {
   it("preserves [id] as a file", () => {
     expect(scanTree(["product/[id].tsx"])).toEqual(["/product/[id]"]);
   });
@@ -87,7 +87,7 @@ describe("scanPagesRoutes: dynamic segments on files and folders (PR4)", () => {
   });
 });
 
-describe("scanPagesRoutes: top-level-only exclusions (PR4)", () => {
+describe("scanPagesRoutes: top-level-only exclusions", () => {
   it("excludes pages/api/** entirely", () => {
     expect(scanTree(["api/users.ts", "api/deep/nested.ts"])).toEqual([]);
   });
@@ -115,11 +115,11 @@ describe("scanPagesRoutes: top-level-only exclusions (PR4)", () => {
     ]);
   });
 
-  it("routes other top-level _-prefixed files (spike 1: only the three names are special)", () => {
+  it("routes other top-level _-prefixed files (only the three names are special)", () => {
     expect(scanTree(["_foo.tsx"])).toEqual(["/_foo"]);
   });
 
-  it("routes nested _-prefixed files and folders (spike 1)", () => {
+  it("routes nested _-prefixed files and folders", () => {
     expect(scanTree(["_lib/bar.tsx", "blog/_draft.tsx"])).toEqual([
       "/_lib/bar",
       "/blog/_draft",
@@ -131,7 +131,7 @@ describe("scanPagesRoutes: top-level-only exclusions (PR4)", () => {
   });
 });
 
-describe("scanPagesRoutes: app-only conventions are literal here (PR4)", () => {
+describe("scanPagesRoutes: app-only conventions are literal here", () => {
   it("treats (group) as a literal segment, not stripped", () => {
     expect(scanTree(["(marketing)/about.tsx"])).toEqual(["/(marketing)/about"]);
   });
@@ -145,7 +145,7 @@ describe("scanPagesRoutes: app-only conventions are literal here (PR4)", () => {
   });
 });
 
-describe("scanPagesRoutes: collisions are errors, never deduped (PR4/PR9)", () => {
+describe("scanPagesRoutes: collisions are errors, never deduped", () => {
   it("errors on folder/file spelling twins (blog.tsx + blog/index.tsx)", () => {
     expect(() => scanTree(["blog.tsx", "blog/index.tsx"])).toThrow(
       RouteCollisionError,
@@ -163,13 +163,13 @@ describe("scanPagesRoutes: collisions are errors, never deduped (PR4/PR9)", () =
     );
   });
 
-  it("errors on different slug names at one level, file spelling (PR9 structural)", () => {
+  it("errors on different slug names at one level, file spelling", () => {
     expect(() => scanTree(["[id].tsx", "[slug].tsx"])).toThrow(
       RouteCollisionError,
     );
   });
 
-  it("errors on different slug names at one level, folder spelling (PR9 structural)", () => {
+  it("errors on different slug names at one level, folder spelling", () => {
     expect(() => scanTree(["x/[id]/index.tsx", "x/[slug]/index.tsx"])).toThrow(
       RouteCollisionError,
     );

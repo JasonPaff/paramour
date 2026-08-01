@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         {/* NuqsAdapter is nuqs v2's required provider for the App Router —
-            it powers /interop's useQueryStates (NQ12). */}
+            it powers /interop's useQueryStates. */}
         <NuqsAdapter>
           <div className="shell">
             <header className="topbar">

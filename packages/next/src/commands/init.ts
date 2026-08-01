@@ -89,7 +89,7 @@ export async function runInit(
       stdout(`  • ${existing} already exists — skipped (--force overwrites)`);
     } else {
       // A .mjs/.json left behind would be shadowed by the scaffold under the
-      // ts-first discovery order (§7.2) — --force must truly replace it.
+      // ts-first discovery order — --force must truly replace it.
       if (existing !== undefined && existing !== "paramour.config.ts" && !dry) {
         unlinkSync(join(projectRoot, existing));
       }

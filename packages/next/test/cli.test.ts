@@ -70,7 +70,7 @@ function livePid(): number {
   return child.pid;
 }
 
-/** Temp project made the working directory (projectRoot = cwd, TR7). */
+/** Temp project made the working directory (projectRoot = cwd). */
 function makeProject(entries: readonly string[]): string {
   const root = makeTempDir();
   makeTree(root, entries);
@@ -78,7 +78,7 @@ function makeProject(entries: readonly string[]): string {
   return root;
 }
 
-describe("paramour generate — one-shot (TR7)", () => {
+describe("paramour generate — one-shot", () => {
   it("writes the artifact and exits 0", async () => {
     const root = makeProject(["app/page.tsx", "app/about/page.tsx"]);
     const run = cli(["generate"]);
@@ -116,7 +116,7 @@ describe("paramour generate — one-shot (TR7)", () => {
     expect(run.out[0]).toContain("2 pages routes");
   });
 
-  it("generates a hybrid project with both members (PR1)", async () => {
+  it("generates a hybrid project with both members", async () => {
     const root = makeProject(["app/page.tsx", "pages/legacy.tsx"]);
     const run = cli(["generate"]);
     await expect(run.code).resolves.toBe(0);
@@ -126,7 +126,7 @@ describe("paramour generate — one-shot (TR7)", () => {
     expect(run.out[0]).toContain("1 app route, 1 pages route");
   });
 
-  it("maps an app/pages collision to exit 2 without writing (PR9)", async () => {
+  it("maps an app/pages collision to exit 2 without writing", async () => {
     const root = makeProject(["app/about/page.tsx", "pages/about.tsx"]);
     const run = cli(["generate"]);
     await expect(run.code).resolves.toBe(2);
@@ -134,7 +134,7 @@ describe("paramour generate — one-shot (TR7)", () => {
     expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
   });
 
-  it("maps the populated-ignored-dir config error to exit 2 (spike-2 ruling)", async () => {
+  it("maps the populated-ignored-dir config error to exit 2", async () => {
     const root = makeProject(["app/page.tsx", "src/pages/index.tsx"]);
     const run = cli(["generate"]);
     await expect(run.code).resolves.toBe(2);
@@ -184,7 +184,7 @@ describe("paramour generate — one-shot (TR7)", () => {
   });
 });
 
-describe("paramour generate — flags and usage (TR7)", () => {
+describe("paramour generate — flags and usage", () => {
   it("--help prints the global usage to stdout and exits 0", async () => {
     makeProject([]);
     const run = cli(["--help"]);
@@ -255,7 +255,7 @@ describe("paramour generate — flags and usage (TR7)", () => {
   });
 });
 
-describe("paramour generate — config precedence (TR7 / §7.2)", () => {
+describe("paramour generate — config precedence", () => {
   it("uses config-file values when no flags are passed", async () => {
     const root = makeProject(["customapp/page.mdx"]);
     writeFileSync(
@@ -354,7 +354,7 @@ describe("paramour generate — config precedence (TR7 / §7.2)", () => {
   });
 });
 
-describe("paramour generate --check (TR7)", () => {
+describe("paramour generate --check", () => {
   it("exits 0 on a fresh artifact", async () => {
     const root = makeProject(["app/page.tsx"]);
     writeFileSync(join(root, "paramour-env.d.ts"), emitApp(["/"]));
@@ -405,7 +405,7 @@ describe("paramour generate --check (TR7)", () => {
   });
 });
 
-describe("paramour check — first-class alias of generate --check (TR7)", () => {
+describe("paramour check — first-class alias of generate --check", () => {
   it("exits 0 on a fresh artifact", async () => {
     const root = makeProject(["app/page.tsx"]);
     writeFileSync(join(root, "paramour-env.d.ts"), emitApp(["/"]));
@@ -448,7 +448,7 @@ describe("paramour check — first-class alias of generate --check (TR7)", () =>
   });
 });
 
-describe("paramour generate --watch (TR5/TR6/TR7)", { retry: 2 }, () => {
+describe("paramour generate --watch", { retry: 2 }, () => {
   function watchCli(argv: readonly string[]): CliRun {
     const controller = new AbortController();
     controllers.push(controller);
@@ -505,7 +505,7 @@ describe("paramour generate --watch (TR5/TR6/TR7)", { retry: 2 }, () => {
     expect(run.err.join("\n")).toMatch(/EISDIR|directory/i);
   });
 
-  it("keeps the last good artifact and keeps watching through a collision (PR9/TR5)", async () => {
+  it("keeps the last good artifact and keeps watching through a collision", async () => {
     const root = makeProject(["app/about/page.tsx", "pages/"]);
     const artifact = join(root, "paramour-env.d.ts");
     const good = emitArtifact({ appRoutes: ["/about"], pagesRoutes: [] });
@@ -543,7 +543,7 @@ describe("paramour generate --watch (TR5/TR6/TR7)", { retry: 2 }, () => {
     expect(run.out.join("\n")).toContain(
       `watcher already running (pid ${String(owner)})`,
     );
-    // Initial generation ran; the owner's lock is untouched (TR6).
+    // Initial generation ran; the owner's lock is untouched.
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
       emitApp(["/"]),
     );

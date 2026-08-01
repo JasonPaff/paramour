@@ -10,12 +10,11 @@ import { interopRoute } from "./route.def";
 // (same as /find and /search).
 export const dynamic = "force-dynamic";
 
-// The division of labor (NQ11): this server component is the LOUD, branded
-// failure surface — the route decode sees the same URL the client parsers
-// read and reports real grammar violations with per-key issues. The client
-// side (Controls) is nuqs's territory: high-frequency URL state where a
-// malformed value is recoverable UI (null / the codec's .catch value), never
-// a crash.
+// The division of labor: this server component is the LOUD, branded failure
+// surface — the route decode sees the same URL the client parsers read and
+// reports real grammar violations with per-key issues. The client side
+// (Controls) is nuqs's territory: high-frequency URL state where a malformed
+// value is recoverable UI (null / the codec's .catch value), never a crash.
 export default async function InteropPage(props: RouteProps) {
   const result = await interopRoute.safeParseSearch(props);
 
@@ -42,7 +41,7 @@ export default async function InteropPage(props: RouteProps) {
               something malformed (<code>?page=abc</code>, or a duplicated
               scalar like <code>?page=1&amp;page=2</code>) and the branded error
               names the offense — while the client controls below keep
-              rendering, reading null for what they cannot parse (NQ7).{" "}
+              rendering, reading null for what they cannot parse.{" "}
               <Link href={href(interopRoute)}>Reset to the clean URL</Link>.
             </p>
           </>
@@ -79,7 +78,7 @@ export default async function InteropPage(props: RouteProps) {
       <Controls />
 
       <p className="hint">
-        Two documented read-path asymmetries (NQ6/NQ7): a duplicated scalar key
+        Two read-path asymmetries worth knowing about: a duplicated scalar key
         is a decode error server-side but nuqs reads the first value; and a
         factory default (<code>.default(() =&gt; …)</code>) derives a nullable
         parser — absent reads <code>null</code> client-side, apply the factory

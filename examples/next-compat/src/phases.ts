@@ -1,6 +1,7 @@
 /**
- * Pins the phase strings hardcoded in `with-typed-routes.ts` (TR4 hermeticity
- * ruling: importing `next/constants` would make `next` a runtime dependency).
+ * Pins the phase strings hardcoded in `with-typed-routes.ts` (they are
+ * hardcoded to stay hermetic: importing `next/constants` would make `next` a
+ * runtime dependency).
  *
  * Silent-failure guard. If a value ever diverged, `withTypedRoutes` would stop
  * matching either phase and fall through to pass-through: no codegen, no

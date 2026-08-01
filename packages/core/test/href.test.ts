@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { defineAppRoute, href, p, ParamourError, SerializeError } from "../src";
 
-describe("href assembly (RL4)", () => {
+describe("href assembly", () => {
   it("assembles path, ?query, #hash in fixed order", () => {
     const route = defineAppRoute("/product/[id]", {
       params: { id: p.integer() },
@@ -89,7 +89,7 @@ describe("href assembly (RL4)", () => {
   });
 });
 
-describe("string-form href (SH1)", () => {
+describe("string-form href", () => {
   it("builds the bare path — same output as a route object would", () => {
     expect(href("/about")).toBe("/about");
     expect(href("/")).toBe("/");
@@ -107,7 +107,7 @@ describe("string-form href (SH1)", () => {
     expect(typeof href("/about")).toBe("string");
   });
 
-  it("SH6: rejects a dynamic path — brackets need a route object", () => {
+  it("rejects a dynamic path — brackets need a route object", () => {
     for (const path of [
       "/product/[id]",
       "/files/[...path]",
@@ -118,17 +118,17 @@ describe("string-form href (SH1)", () => {
     }
   });
 
-  it("SH6: rejects a path that is not /-prefixed", () => {
+  it("rejects a path that is not /-prefixed", () => {
     expect(() => href("about")).toThrow(ParamourError);
     expect(() => href("")).toThrow(ParamourError);
   });
 
-  it("SH6: rejects query/hash smuggled into the path string", () => {
+  it("rejects query/hash smuggled into the path string", () => {
     expect(() => href("/about?q=1")).toThrow(ParamourError);
     expect(() => href("/about#top")).toThrow(ParamourError);
   });
 
-  it("SH6: a JS caller passing params/search fails loud, not silently dropped", () => {
+  it("a JS caller passing params/search fails loud, not silently dropped", () => {
     const stringHref = href as (path: string, options?: unknown) => string;
     expect(() => stringHref("/about", { search: { q: "x" } })).toThrow(
       ParamourError,

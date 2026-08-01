@@ -9,7 +9,7 @@ import { dashboardRoute } from "../route.def";
 const days = { "7d": 7, "30d": 30, "90d": 90 } as const;
 
 // A slot page consuming the SAME route def as the page beside it. This file
-// is invisible to the scanner (the whole @stats subtree is skipped, TR2), yet
+// is invisible to the scanner (the whole @stats subtree is skipped), yet
 // the typed hooks work unchanged: the def is an imported object, not a
 // registry lookup keyed on this file's path.
 export default function StatsSlot() {

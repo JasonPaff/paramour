@@ -1,6 +1,6 @@
 /**
- * Type-level tests for the p.* codec API (design-02). Ported from spike 02
- * against the real implementation.
+ * Type-level tests for the p.* codec API, run against the real
+ * implementation.
  */
 import { expect, test } from "tstyche";
 import { z } from "zod";
@@ -33,7 +33,7 @@ test("modifiers update presence type-state", () => {
   expect(p.integer().catch(0).default(1)["~presence"]).type.toBe<"defaulted">();
 });
 
-test(".default() overloads expose value vs factory form in type-state (NQ6a)", () => {
+test(".default() overloads expose value vs factory form in type-state", () => {
   // Value form participates in D8 elision; factory form never does. The
   // literal-typed ~defaultElides lets derived surfaces (@paramour-js/nuqs)
   // give value-defaulted keys non-nullable reads.
@@ -52,7 +52,7 @@ test(".default() overloads expose value vs factory form in type-state (NQ6a)", (
   expect(p.integer()["~defaultElides"]).type.toBe<boolean>();
 });
 
-test(".default() never infers the value branch for a function argument (NQ6a)", () => {
+test(".default() never infers the value branch for a function argument", () => {
   // Runtime isFactory treats ANY function as a factory, so a function
   // argument must either match the factory overload or fail to compile —
   // an inferred E=true that the runtime would contradict (absent key reads

@@ -21,8 +21,8 @@ const packageManifest = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ) as PackageManifest;
 
-// The hook-gating tests (PR11 §3) map @paramour-js/next's subpaths the same
-// way, so their module identity is pinned by the same tripwire.
+// The hook-gating tests map @paramour-js/next's subpaths the same way, so
+// their module identity is pinned by the same tripwire.
 const nextPackageManifest = JSON.parse(
   readFileSync(new URL("../../next/package.json", import.meta.url), "utf8"),
 ) as PackageManifest;
@@ -51,7 +51,7 @@ describe("registry suite targets the real module identity", () => {
     ).toBe("./dist/index.d.ts");
   });
 
-  it("paths-maps the @paramour-js/next hook entries to their built types (PR11 §3)", () => {
+  it("paths-maps the @paramour-js/next hook entries to their built types", () => {
     expect(registryTsconfig).toContain(
       '"@paramour-js/next/app": ["../next/dist/app.d.ts"]',
     );

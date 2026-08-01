@@ -2,7 +2,7 @@
  * Minimal ambient view of `next/navigation`, so `@paramour-js/next` typechecks
  * and builds WITHOUT materializing Next in the workspace — the same hermetic
  * stance `with-typed-routes.ts` takes with its structural Next-config view
- * (design-05 TR4; `pnpm-workspace.yaml` keeps `next` peer-only on purpose).
+ * (`pnpm-workspace.yaml` keeps `next` peer-only on purpose).
  *
  * This is a hand-authored `.d.ts` *input*: tsc does not re-emit it to `dist`,
  * and the emitted `app.d.ts` references only `paramour`/`react` types (the
@@ -25,9 +25,8 @@
  * return against `ParamsSource` on every supported major.
  *
  * `useRouter` is declared at exactly the arity/shape `app.ts` consumes for
- * the devtools `navigate` capability (design-12 DT8): real Next's
- * `replace(href, options?)` is call-compatible with the 1-arity view, and
- * its `void` return matches. `usePathname` is the capability's resolution
+ * the devtools `navigate` capability: real Next's `replace(href, options?)`
+ * is call-compatible with the 1-arity view, and its `void` return matches. `usePathname` is the capability's resolution
  * base — basePath-/locale-relative, which is what `replace` expects back.
  * `examples/next-compat/src/navigation.ts` pins the real signatures'
  * assignability on every supported major.

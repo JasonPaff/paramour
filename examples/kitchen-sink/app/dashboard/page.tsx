@@ -18,8 +18,8 @@ export default async function DashboardPage(props: RouteProps) {
       <p className="eyebrow">children slot — decoded on the server</p>
       <p>
         Range: <strong>{search.range}</strong> — switch it and watch the URL
-        bar: <code>7d</code> is the default, so it elides (D8) and the canonical
-        URL is bare <code>/dashboard</code>.
+        bar: <code>7d</code> is the default, so it elides and the canonical URL
+        is bare <code>/dashboard</code>.
       </p>
       <div className="pills">
         {ranges.map((range) => (

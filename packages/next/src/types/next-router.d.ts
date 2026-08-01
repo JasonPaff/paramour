@@ -1,8 +1,8 @@
 /**
  * Minimal ambient view of `next/router` — the /pages twin of
- * `next-navigation.d.ts` (design-06 PR13) — so `@paramour-js/next`
- * typechecks and builds WITHOUT materializing Next in the workspace
- * (`next` stays peer-only on purpose).
+ * `next-navigation.d.ts` — so `@paramour-js/next` typechecks and builds
+ * WITHOUT materializing Next in the workspace (`next` stays peer-only on
+ * purpose).
  *
  * This is a hand-authored `.d.ts` *input*: tsc does not re-emit it, and the
  * emitted `pages.d.ts` references only `paramour` types (the `next/router`
@@ -11,11 +11,10 @@
  *
  * It covers exactly what `pages.ts` consumes: `useRouter()` returning
  * `query` + `isReady`, plus `asPath` (the basePath-/locale-relative
- * resolution base) and `replace` for the devtools `navigate` capability
- * (design-12 DT8). `query` is declared as core's `ParamsSource`
- * rather than a hand-copied `Record<...>` — it is forwarded straight into
- * core's decoders, and naming the type instead of restating it removes the
- * drift. Real Next's `replace(url, as?, options?): Promise<boolean>` is
+ * resolution base) and `replace` for the devtools `navigate` capability.
+ * `query` is declared as core's `ParamsSource` rather than a hand-copied
+ * `Record<...>` — it is forwarded straight into core's decoders, and naming
+ * the type instead of restating it removes the drift. Real Next's `replace(url, as?, options?): Promise<boolean>` is
  * call-compatible with the 1-arity view declared here.
  *
  * The declared specifier is the extensionful `next/router.js` — it must

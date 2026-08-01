@@ -87,7 +87,7 @@ describe("per-kind round-trips match decodeSearch/encodeSearch", () => {
   });
 });
 
-describe("eq is wire-form equality (NQ4)", () => {
+describe("eq is wire-form equality", () => {
   it("distinct Date objects with the same wire form are equal", () => {
     const parser = derive(p.isoDate());
     // isoDate's wire form is the DAY — same day, different instants.
@@ -120,7 +120,7 @@ describe("eq is wire-form equality (NQ4)", () => {
   });
 });
 
-describe("clearOnDefault parity with D8 elision (NQ4/NQ5)", () => {
+describe("clearOnDefault parity with D8 elision", () => {
   const config = {
     labels: p.csv().default(["a"]),
     page: p.integer().default(1),
@@ -158,7 +158,7 @@ describe("clearOnDefault parity with D8 elision (NQ4/NQ5)", () => {
   });
 });
 
-describe("defaults (NQ6)", () => {
+describe("defaults", () => {
   it("value-form defaults derive withDefault with a derivation-time snapshot", () => {
     const parser = nuqsParser(p.integer().default(1));
     expect(parser.defaultValue).toBe(1);
@@ -186,7 +186,7 @@ describe("defaults (NQ6)", () => {
   });
 });
 
-describe(".catch() parity, then null (NQ7)", () => {
+describe(".catch() parity, then null", () => {
   it(".catch(value) recovers a malformed wire value before nuqs's null", () => {
     const parser = nuqsParser(p.integer().catch(0));
     expect(parser.parse("junk")).toBe(0);
@@ -250,7 +250,7 @@ describe(".catch() parity, then null (NQ7)", () => {
   });
 });
 
-describe("arity-many codecs derive multi parsers (NQ8a)", () => {
+describe("arity-many codecs derive multi parsers", () => {
   it("round-trips repeated keys, absent reads []", () => {
     const parser = nuqsParser(p.array());
     expect(parser.parse(["a", "b"])).toEqual(["a", "b"]);
@@ -293,7 +293,7 @@ describe("arity-many codecs derive multi parsers (NQ8a)", () => {
   });
 });
 
-describe("duplicate-scalar keys: the NQ7 read-path asymmetry, executable", () => {
+describe("duplicate-scalar keys: the read-path asymmetry, executable", () => {
   it("nuqs reads the first value where the server decode reports P5", () => {
     const config = { page: p.integer() };
     const load = createLoader(nuqsParsers(config));
@@ -314,7 +314,7 @@ describe("duplicate-scalar keys: the NQ7 read-path asymmetry, executable", () =>
   });
 });
 
-describe("runtime rejections (NQ8b backstops)", () => {
+describe("runtime rejections (backstops)", () => {
   it("rejects rawSearch routes", () => {
     const route = defineAppRoute("/raw", {
       search: rawSearch(z.object({ q: z.string() })),
@@ -341,7 +341,7 @@ describe("runtime rejections (NQ8b backstops)", () => {
   });
 });
 
-describe("route objects and bare configs are interchangeable (NQ2)", () => {
+describe("route objects and bare configs are interchangeable", () => {
   const route = defineAppRoute("/interop", {
     search: {
       page: p.integer().default(1),

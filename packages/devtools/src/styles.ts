@@ -1,17 +1,17 @@
 /**
- * The panel's entire stylesheet (design-12 DT14/DT16–DT18), rendered as an
- * inline `<style>` element by the panel root — no stylesheet import, no
- * CSS-in-JS dependency, zero runtime deps. All selectors are `.pmr-`
- * prefixed, so duplicate injection (two panels) is harmless. CSP note: an
- * inline `<style>` needs `style-src 'unsafe-inline'` or a nonce —
- * acceptable for a dev-only tool, documented rather than solved in v1.
+ * The panel's entire stylesheet, rendered as an inline `<style>` element by
+ * the panel root — no stylesheet import, no CSS-in-JS dependency, zero
+ * runtime deps. All selectors are `.pmr-` prefixed, so duplicate injection
+ * (two panels) is harmless. CSP note: an inline `<style>` needs
+ * `style-src 'unsafe-inline'` or a nonce — acceptable for a dev-only tool,
+ * documented rather than solved in v1.
  *
- * Theming (DT14): the shell's `theme` prop lands as a `data-theme`
- * attribute on `.pmr-root`; the custom-property token set below flips with
- * it — no theme context, no remount. Violet/indigo accent is paramour's
- * own; the four status colors follow devtool traffic-light convention
- * (DT16). Density and the monospace wire stack per DT17; the only motion
- * is the ~400ms row flash plus the copy-button glyph swap (DT18).
+ * Theming: the shell's `theme` prop lands as a `data-theme` attribute on
+ * `.pmr-root`; the custom-property token set below flips with it — no theme
+ * context, no remount. Violet/indigo accent is paramour's own; the four
+ * status colors follow devtool traffic-light convention. Density and the
+ * monospace wire stack keep the tables scannable; the only motion is the
+ * ~400ms row flash plus the copy-button glyph swap.
  */
 export const PANEL_CSS = `
 .pmr-root {

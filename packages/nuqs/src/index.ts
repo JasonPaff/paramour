@@ -1,13 +1,13 @@
 /**
- * `@paramour-js/nuqs` — derives nuqs parsers from paramour codecs (design-10).
+ * `@paramour-js/nuqs` — derives nuqs parsers from paramour codecs.
  *
- * A THIN seam (NQ1): one codec (or a route's whole search config) in,
- * ordinary nuqs parser currency out. Presence, defaults, catch recovery, and
- * equality are read off the codec's `~`-internals (NQ9) so nothing is ever
- * declared twice, and nuqs's own surface (`useQueryStates`, `withOptions`,
+ * A THIN seam: one codec (or a route's whole search config) in, ordinary
+ * nuqs parser currency out. Presence, defaults, catch recovery, and equality
+ * are read off the codec's `~`-internals so nothing is ever declared twice,
+ * and nuqs's own surface (`useQueryStates`, `withOptions`,
  * `createSerializer`, `createLoader`, the server cache) composes untouched.
  * `createParser`/`createMultiParser` are imported from `nuqs/server` on
- * purpose (NQ10): the root `nuqs` export pulls in the client hooks, and this
+ * purpose: the root `nuqs` export pulls in the client hooks, and this
  * package must stay usable in server code.
  */
 import {
@@ -30,23 +30,23 @@ import {
 declare const noTwinReason: unique symbol;
 
 /**
- * Compile-time rejection marker (NQ8b): shapes with no faithful nuqs
- * translation make the `nuqsParser`/`nuqsParsers` ARGUMENT fail to compile
- * via an intersection with this brand, so the `Reason` literal surfaces in
- * the type error. The one symbol-keyed property is the whole mechanism: the
+ * Compile-time rejection marker: shapes with no faithful nuqs translation
+ * make the `nuqsParser`/`nuqsParsers` ARGUMENT fail to compile via an
+ * intersection with this brand, so the `Reason` literal surfaces in the type
+ * error. The one symbol-keyed property is the whole mechanism: the
  * unexported symbol is unforgeable, so no runtime value inhabits the type,
  * and it carries `Reason` into the error text. The runtime `ParamourError`
- * backstops below make the same judgment for plain-JS callers (RL1 ethos:
- * contract violations are loud, never a silent null).
+ * backstops below make the same judgment for plain-JS callers — contract
+ * violations are loud, never a silent null.
  */
 export interface NoNuqsTwin<Reason extends string> {
   readonly [noTwinReason]: Reason;
 }
 
 /**
- * The parser map derived from a whole search config — ordinary nuqs currency
- * (NQ1). `-readonly` strips the modifier a route's `const`-inferred search
- * slot carries: the map is a fresh object the adapter builds, so
+ * The parser map derived from a whole search config — ordinary nuqs
+ * currency. `-readonly` strips the modifier a route's `const`-inferred
+ * search slot carries: the map is a fresh object the adapter builds, so
  * route-derived and bare-config-derived maps get the identical shape.
  */
 export type NuqsParserMap<S extends SearchConfig> = {
@@ -54,14 +54,14 @@ export type NuqsParserMap<S extends SearchConfig> = {
 };
 
 /**
- * The nuqs parser derived from one codec. Per-key derivation (NQ3):
- * - arity-"many" → a multi (repeated-key) parser with `defaultValue: []`
- *   (NQ8a): absent and `[]` are the same wire state (S6/P6), so the nuqs
- *   read matches core's always-present array decode.
- * - value-form `.default(v)` → `withDefault`, non-nullable read (NQ5/NQ6).
- * - factory `.default(() => v)` → nullable (NQ6): the factory is
- *   time-varying by declaration; a frozen `withDefault` would lie. Apply
- *   the factory at the read site if you want the paramour-decoded shape.
+ * The nuqs parser derived from one codec, key by key:
+ * - arity-"many" → a multi (repeated-key) parser with `defaultValue: []`:
+ *   absent and `[]` are the same wire state (S6/P6), so the nuqs read
+ *   matches core's always-present array decode.
+ * - value-form `.default(v)` → `withDefault`, non-nullable read.
+ * - factory `.default(() => v)` → nullable: the factory is time-varying by
+ *   declaration; a frozen `withDefault` would lie. Apply the factory at the
+ *   read site if you want the paramour-decoded shape.
  * - required or optional → nullable; nuqs's null is the correct reading of
  *   "absent" for both.
  * A hand-typed `Codec<…, "defaulted">` (its `~defaultElides` left at the
@@ -69,7 +69,7 @@ export type NuqsParserMap<S extends SearchConfig> = {
  *
  * The single `~defaultElides` probe subsumes a presence check: `E = true`
  * is only reachable through the value-form `.default()` overload, which
- * sets `~presence: "defaulted"` in the same return type (NQ6a).
+ * sets `~presence: "defaulted"` in the same return type.
  */
 export type NuqsParserOf<C extends AnyCodec> = C["~arity"] extends "many"
   ? OutputOf<C> extends readonly unknown[]
@@ -103,9 +103,9 @@ type DefaultedSingle<Out> = ReturnType<SingleParserBuilder<Out>["withDefault"]>;
 /**
  * Keys whose output type includes `null`: nuqs's parser contract overloads
  * null as "unparseable/absent", so a legitimately-null value would be
- * indistinguishable from a parse failure on the nuqs side (NQ8). Rejected
- * at the type level only — `~out` is phantom, so there is no runtime probe;
- * a null slipped past the types degrades to nuqs's native null semantics.
+ * indistinguishable from a parse failure on the nuqs side. Rejected at the
+ * type level only — `~out` is phantom, so there is no runtime probe; a null
+ * slipped past the types degrades to nuqs's native null semantics.
  */
 type NullOutputKeys<S extends SearchConfig> = {
   [K in keyof S]: null extends OutputOf<S[K]> ? K : never;
@@ -117,9 +117,9 @@ type RouteParserMap<R extends AnyRoute> = R["~search"] extends SearchConfig
 
 /**
  * Derive a nuqs parser from one codec, exactly as it sits in a route's
- * search config — `.optional()`, `.default()`, `.catch()` already applied
- * (NQ3). Named after what comes out, mirroring nuqs's `parseAs*` vocabulary
- * from the call site's perspective (NQ2).
+ * search config — `.optional()`, `.default()`, `.catch()` already applied.
+ * Named after what comes out, mirroring nuqs's `parseAs*` vocabulary from
+ * the call site's perspective.
  */
 export function nuqsParser<C extends AnyCodec>(
   codec: C & CompatibleCodec<C>,
@@ -131,9 +131,9 @@ export function nuqsParser(codec: unknown): unknown {
 /**
  * Derive a whole nuqs parser map from a route object (routes-as-currency,
  * the common case) or a bare `SearchConfig` (standalone codec maps are
- * first-class in the framework-free core) — NQ2. The result is ordinary
- * nuqs currency: pass it to `useQueryStates`, `createSerializer`,
- * `createLoader`, or the server cache as-is (NQ1).
+ * first-class in the framework-free core). The result is ordinary nuqs
+ * currency: pass it to `useQueryStates`, `createSerializer`,
+ * `createLoader`, or the server cache as-is.
  */
 export function nuqsParsers<R extends AnyRoute>(
   route: CompatibleRoute<R> & R,
@@ -159,8 +159,8 @@ function deriveMany(codec: AnyCodec, key: null | string): unknown {
   const serialize = wireSerializer(codec, key);
 
   const parser = createMultiParser<unknown[]>({
-    // NQ4 wire-form equality, element-wise: both sides serialize to the
-    // same wire strings in the same order.
+    // Wire-form equality, element-wise: both sides serialize to the same
+    // wire strings in the same order.
     eq: (a, b) =>
       a.length === b.length &&
       a.every((element, index) => serialize(element) === serialize(b[index])),
@@ -169,14 +169,14 @@ function deriveMany(codec: AnyCodec, key: null | string): unknown {
         return values.map((raw) => parseElement(raw));
       } catch (error) {
         // Whole-key recovery, mirroring decodeSearch's arity-many branch:
-        // one bad element resolves the entire key to catch/null (NQ7/NQ8a).
+        // one bad element resolves the entire key to catch/null.
         return recoverParse(error, catchValue) as null | unknown[];
       }
     },
     serialize: (value) => value.map((element) => serialize(element)),
   });
-  // NQ8a: absent and [] are the same wire state for arity-many codecs
-  // (S6/P6), so `withDefault([])` makes the nuqs read match core's decode
+  // Absent and [] are the same wire state for arity-many codecs (S6/P6),
+  // so `withDefault([])` makes the nuqs read match core's decode
   // (arity-many keys are always present) and clearOnDefault([]) match
   // core's encode ([] emits nothing).
   return parser.withDefault([]);
@@ -195,7 +195,7 @@ function deriveSingle(codec: AnyCodec, key: null | string): unknown {
   const serialize = wireSerializer(codec, key);
 
   const parser = createParser<unknown>({
-    // NQ4: wire-form equality — the SAME judgment encodeSearch's D8 elision
+    // Wire-form equality — the SAME judgment encodeSearch's D8 elision
     // makes, so nuqs's clearOnDefault and paramour's elision agree by
     // construction, for every codec kind including p.custom, with zero
     // per-kind logic and zero user-supplied comparators.
@@ -210,8 +210,8 @@ function deriveSingle(codec: AnyCodec, key: null | string): unknown {
     serialize,
   });
 
-  // NQ6: only value-form defaults derive withDefault; clearOnDefault stays
-  // ON (NQ5) because with NQ4's eq it is the same judgment as D8 elision.
+  // Only value-form defaults derive withDefault; clearOnDefault stays ON
+  // because with wire-form eq it is the same judgment as D8 elision.
   // The snapshot is read ONCE here — core's toThunk hands array defaults
   // out as fresh copies, so the frozen value is isolated; mutating a
   // reference-typed default after derivation is unsupported (README).
@@ -229,14 +229,14 @@ function deriveSingle(codec: AnyCodec, key: null | string): unknown {
 }
 
 /**
- * NQ7: .catch() parity first — a malformed value recovers exactly as the
- * server decode would — and only a codec without catch falls back to
- * nuqs's null. Only ParseError is translated (brand-based instanceof, so
- * cross-instance codecs work — NQ9); anything else, including a throwing
- * catch factory, propagates loud (the errors.ts taxonomy: contract
- * violations never masquerade as recoverable client state). One shared
- * helper on purpose, core's `recoverParseError` precedent: the single and
- * multi parsers must never drift on this judgment.
+ * .catch() parity first — a malformed value recovers exactly as the server
+ * decode would — and only a codec without catch falls back to nuqs's null.
+ * Only ParseError is translated (brand-based instanceof, so cross-instance
+ * codecs work); anything else, including a throwing catch factory,
+ * propagates loud (the errors.ts taxonomy: contract violations never
+ * masquerade as recoverable client state). One shared helper on purpose,
+ * core's `recoverParseError` precedent: the single and multi parsers must
+ * never drift on this judgment.
  */
 function recoverParse(
   error: unknown,
@@ -251,8 +251,8 @@ function recoverParse(
 /**
  * Plain-JS backstop: structural probe for the two function-typed internals
  * every codec carries. Structural on purpose — codecs from a second
- * physical copy of core must pass (NQ9); version-skew safety comes from the
- * dependency shape (NQ10), not runtime checks.
+ * physical copy of core must pass; version-skew safety comes from the
+ * dependency shape, not runtime checks.
  */
 function requireCodec(
   value: unknown,
@@ -291,7 +291,7 @@ function resolveSearchConfig(source: unknown): Record<string, unknown> {
     );
   }
   if (isRawSearch(config as SearchConfig)) {
-    // NQ8b runtime backstop: rawSearch validates the whole search object
+    // Runtime backstop: rawSearch validates the whole search object
     // with one schema — there are no per-key codecs to derive from.
     throw new ParamourError(
       "rawSearch routes validate the whole search object with one schema; there are no per-key codecs to derive nuqs parsers from",
@@ -310,7 +310,7 @@ function resolveSearchConfig(source: unknown): Record<string, unknown> {
  * make the same judgment on the same wire strings, so a plain-JS custom
  * serializer returning a non-string is a loud SerializeError on both sides
  * — never a silent `"undefined"` comparison. Sharing core's implementation
- * (not a local copy) is what makes that parity hold by construction (NQ4).
+ * (not a local copy) is what makes that parity hold by construction.
  */
 function wireSerializer(
   codec: AnyCodec,

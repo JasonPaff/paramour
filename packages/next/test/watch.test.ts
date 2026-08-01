@@ -9,8 +9,8 @@ import { makeTempDir, makeTree } from "./helpers.js";
  * Native fs events are async and platform-lagged, so these tests poll with
  * `vi.waitFor` for positive assertions and use a real settle delay for
  * negative ones; the whole suite retries because CI runners can be slow to
- * deliver events. The Linux (`ubuntu-latest`) CI run doubles as design-05
- * spike 2's `fs.watch({ recursive })` observation.
+ * deliver events. The Linux (`ubuntu-latest`) CI run doubles as the check
+ * that `fs.watch({ recursive })` behaves there.
  */
 
 const DEBOUNCE_MS = 50;
@@ -55,7 +55,7 @@ async function startWatcher(
   return { onError, onRescan };
 }
 
-describe("watchRouteDirs (TR5/PR8)", { retry: 2 }, () => {
+describe("watchRouteDirs", { retry: 2 }, () => {
   it("fires a rescan when a file appears under the app dir", async () => {
     const appDir = makeTempDir();
     const { onRescan } = await startWatcher([appDir]);
@@ -63,7 +63,7 @@ describe("watchRouteDirs (TR5/PR8)", { retry: 2 }, () => {
     await expectRescan(onRescan);
   });
 
-  it("watches both route dirs of a hybrid project (PR8)", async () => {
+  it("watches both route dirs of a hybrid project", async () => {
     const root = makeTempDir();
     makeTree(root, ["app/", "pages/"]);
     const { onRescan } = await startWatcher([
@@ -181,10 +181,10 @@ describe("watchRouteDirs (TR5/PR8)", { retry: 2 }, () => {
     expect(onRescan).not.toHaveBeenCalled();
   });
 
-  it("skips a missing dir silently — not watched, not an error (PR8)", async () => {
+  it("skips a missing dir silently — not watched, not an error", async () => {
     // Callers pass what discovery resolved; a dir gone by watch time is a
-    // raced deletion and dev continues in stale-types mode (TR5). The
-    // present dir still watches.
+    // raced deletion and dev continues in stale-types mode. The present dir
+    // still watches.
     const root = makeTempDir();
     makeTree(root, ["app/"]);
     const missing = join(root, "pages-does-not-exist");

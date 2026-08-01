@@ -9,7 +9,7 @@ import {
   routeVariableName,
 } from "../src/format.js";
 
-describe("formatShape (DT7)", () => {
+describe("formatShape", () => {
   it("renders kind, presence, default, catch, enum members, csv element", () => {
     expect(formatShape(describeCodec(p.integer()))).toBe("integer");
     expect(formatShape(describeCodec(p.string().optional()))).toBe("string?");
@@ -33,7 +33,7 @@ describe("formatShape (DT7)", () => {
   });
 });
 
-describe("formatWire (DT7)", () => {
+describe("formatWire", () => {
   it("absence is a dash; values quote to make whitespace visible", () => {
     expect(formatWire(undefined)).toBe("—");
     expect(formatWire([])).toBe("—");
@@ -42,7 +42,7 @@ describe("formatWire (DT7)", () => {
   });
 });
 
-describe("jsLiteral (DT9)", () => {
+describe("jsLiteral", () => {
   it("prints values as source literals, Dates round-trippable", () => {
     expect(jsLiteral("hi")).toBe('"hi"');
     expect(jsLiteral(3)).toBe("3");
@@ -57,7 +57,7 @@ describe("jsLiteral (DT9)", () => {
   });
 });
 
-describe("routeVariableName (DT9)", () => {
+describe("routeVariableName", () => {
   it("derives a camelCase placeholder from the pattern", () => {
     expect(routeVariableName("/shop/[slug]")).toBe("shopSlugRoute");
     expect(routeVariableName("/docs/[[...path]]")).toBe("docsPathRoute");
@@ -66,7 +66,7 @@ describe("routeVariableName (DT9)", () => {
   });
 });
 
-describe("reproSnippet (DT9)", () => {
+describe("reproSnippet", () => {
   it("emits the href() call with empty halves omitted", () => {
     expect(reproSnippet("/shop", "app", undefined, undefined)).toBe(
       "href(shopRoute /* /shop (app router) */)",

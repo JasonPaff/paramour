@@ -8,7 +8,7 @@ import { explorerRoute } from "@/app/explorer/route.def";
 import { SITE_URL } from "@/lib/site";
 import { source } from "@/lib/source";
 
-// Dogfooded (DS6): every URL is built by href() from the same route objects
+// Dogfooded: every URL is built by href() from the same route objects
 // the pages link with, so the sitemap cannot cite a path the registry lacks.
 export default function sitemap(): MetadataRoute.Sitemap {
   return [

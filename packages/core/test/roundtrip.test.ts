@@ -1,7 +1,7 @@
 /**
- * Round-trip property tests (wire spec §6, DESIGN §11): for every codec and
- * valid value x, decode(platform-decode(encode(x))) ≅ x, honoring the three
- * §6 exceptions (-0 → 0; [] ≡ absent; Dates by instant / calendar day).
+ * Round-trip property tests: for every codec and valid value x,
+ * decode(platform-decode(encode(x))) ≅ x, honoring the three documented
+ * exceptions (-0 → 0; [] ≡ absent; Dates by instant / calendar day).
  * p.json / p.custom get deterministic coverage elsewhere (conformance C18,
  * codecs.test.ts), not arbitraries.
  */
@@ -20,7 +20,7 @@ import {
   type Route,
 } from "../src";
 
-// Serialize-side Date range (N8): years 0000–9999 only.
+// Serialize-side Date range: years 0000–9999 only.
 const dateArb = fc.date({
   max: new Date("9999-12-31T23:59:59.999Z"),
   min: new Date("0000-01-01T00:00:00.000Z"),
@@ -92,7 +92,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     );
   });
 
-  it("p.number() through [v] — precision exact, -0 comes back as 0 (§6.1)", () => {
+  it("p.number() through [v] — precision exact, -0 comes back as 0", () => {
     const route = defineAppRoute("/x/[v]", { params: { v: p.number() } });
     fc.assert(
       fc.property(
@@ -122,7 +122,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     );
   });
 
-  it("p.timestamp() round-trips by instant (§6.3)", () => {
+  it("p.timestamp() round-trips by instant", () => {
     const route = defineAppRoute("/x/[v]", { params: { v: p.timestamp() } });
     fc.assert(
       fc.property(dateArb, (value) => {
@@ -131,7 +131,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     );
   });
 
-  it("p.isoDate() round-trips by calendar day (§6.3)", () => {
+  it("p.isoDate() round-trips by calendar day", () => {
     const route = defineAppRoute("/x/[v]", { params: { v: p.isoDate() } });
     fc.assert(
       fc.property(dateArb, (value) => {
@@ -156,7 +156,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     );
   });
 
-  it("optional catch-all: [] elides and comes back as [] (§6.2 analog)", () => {
+  it("optional catch-all: [] elides and comes back as []", () => {
     const route = defineAppRoute("/docs/[[...slug]]", {
       params: { slug: p.string() },
     });
@@ -171,8 +171,8 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
     );
   });
 
-  // The static pipeline (PR10): getStaticPaths / generateStaticParams values
-  // reach getStaticProps' ctx.params already Node-decoded, so the way back is
+  // The static pipeline: getStaticPaths / generateStaticParams values reach
+  // getStaticProps' ctx.params already Node-decoded, so the way back is
   // decodeParams with { percentDecode: false } — no byte layer in the loop.
   it("static pipeline: p.string() through encodeStaticParams ≅ id", () => {
     const route = defineAppRoute("/x/[v]", { params: { v: p.string() } });
@@ -220,7 +220,7 @@ describe("params round-trip: decodeParams ∘ platform ∘ encodeParams ≅ id",
   });
 });
 
-describe("dual property (§6): serialize ∘ parse ≅ id on canonical wire", () => {
+describe("dual property: serialize ∘ parse ≅ id on canonical wire", () => {
   const parseWire = (codec: Codec<unknown>, raw: string): unknown =>
     codec["~parseElement"](raw);
   const serializeValue = (codec: Codec<unknown>, value: unknown): string =>
@@ -312,7 +312,7 @@ describe("dual property (§6): serialize ∘ parse ≅ id on canonical wire", ()
 });
 
 describe("full loop: parse ∘ href ≅ id", () => {
-  it("params + mixed-presence search survive the whole wire (§6)", async () => {
+  it("params + mixed-presence search survive the whole wire", async () => {
     const route = defineAppRoute("/shop/[cat]", {
       params: { cat: p.string() },
       search: {

@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 /**
- * Emission behavior of the Pages-Router hooks (design-12 DT4/DT11): the
- * pre-`isReady` render reports `pending` as a first-class observation
- * (keyed by PENDING_FINGERPRINT, so exactly once), the ready flip emits the
- * real decode, wire snapshots expand repeated keys and exclude path params
- * on the search side, and `navigate` swallows next/router's routine
+ * Emission behavior of the Pages-Router hooks: the pre-`isReady` render
+ * reports `pending` as a first-class observation (keyed by
+ * PENDING_FINGERPRINT, so exactly once), the ready flip emits the real
+ * decode, wire snapshots expand repeated keys and exclude path params on the
+ * search side, and `navigate` swallows next/router's routine
  * navigation-abort rejections.
  */
 import type { ReactElement, ReactNode } from "react";
@@ -30,8 +30,8 @@ const userRoute = definePagesRoute("/user/[id]", {
   },
 });
 
-// The stub-era `__set*` choreography is now ordinary provider props (TA7):
-// `__setAsPath` splits into pathname + search (asPath derives, TA6),
+// The stub-era `__set*` choreography is now ordinary provider props:
+// `__setAsPath` splits into pathname + search (asPath derives from them),
 // `__setQuery`'s path-param keys go in `params` and the rest in `search`,
 // `__getReplaceCalls` becomes an `onReplace` capture array. Mid-test URL
 // changes reassign `current` and rerender.
@@ -73,7 +73,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("pending is a first-class observation (DT11)", () => {
+describe("pending is a first-class observation", () => {
   it("emits pending exactly once pre-isReady, then the decode on flip", () => {
     current = options({ isReady: false, params: {}, search: "" });
     const { rerender } = renderHook(() => useSearch(userRoute), { wrapper });
@@ -120,9 +120,9 @@ describe("wire snapshots", () => {
   });
 });
 
-// The public provider's `replace` always RESOLVES `true` (TA6); rejection
-// injection pins pages.ts's DT8 rejection handling, so those tests bypass
-// the provider and render a hand-built adapter through the internal seam.
+// The public provider's `replace` always RESOLVES `true`; rejection
+// injection pins pages.ts's rejection handling, so those tests bypass the
+// provider and render a hand-built adapter through the internal seam.
 function rejectingWrapper(
   rejection: Error,
 ): (props: { children: ReactNode }) => ReactElement {
@@ -146,9 +146,9 @@ function rejectingWrapper(
   };
 }
 
-describe("navigate capability (DT8)", () => {
+describe("navigate capability", () => {
   it("resolves the panel's search-only string against asPath's path part", () => {
-    // `asPath` (derived pathname + search, TA6) is basePath-/locale-relative
+    // `asPath` (derived from pathname + search) is basePath-/locale-relative
     // — exactly what replace() expects back — and its query/hash are
     // stripped before the panel's search string is appended.
     renderHook(() => useRouteParams(userRoute), { wrapper });
@@ -204,7 +204,7 @@ describe("navigate capability (DT8)", () => {
   });
 });
 
-describe("pathname re-emission (DT8)", () => {
+describe("pathname re-emission", () => {
   it("re-emits with a fresh navigate when asPath's path part moves under an unchanged declared slice", () => {
     const { rerender } = renderHook(() => useSearch(userRoute), { wrapper });
     expect(buffer()).toHaveLength(1);

@@ -2,10 +2,10 @@ import type { Issue } from "paramour";
 import type { ReactNode } from "react";
 
 /**
- * DT7: `issues[]` rendered prominently on decode failure — always in the
- * single-scroll flow, never behind a tab (DT15's anti-tab rationale). The
- * raw-search root sentinel key `"<search>"` reads as the whole search
- * string failing.
+ * `issues[]` rendered prominently on decode failure — always in the
+ * single-scroll flow, never behind a tab, so a failing decode can never be
+ * hidden one click away. The raw-search root sentinel key `"<search>"`
+ * reads as the whole search string failing.
  */
 export function IssuesSection({
   issues,

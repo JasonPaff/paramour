@@ -55,14 +55,14 @@ const links = [
     label: "Interop",
     prefix: "/interop",
     // Every search key is defaulted, optional, or an array — omittable, so
-    // href() needs no arguments (the nuqs-interop wing, NQ12).
+    // href() needs no arguments (the nuqs-interop wing).
     to: href(interopRoute),
   },
   // The exotic-conventions wing: a route group page, a parallel-routes page,
   // and the two interception hosts. Gallery's prefix also matches
   // /gallery/[photoId], so the tab stays lit under the modal.
   //
-  // These four use href's string form (SH1): a registered STATIC path stands
+  // These four use href's string form: a registered STATIC path stands
   // in for the route object, so linking needs no route.def import at all. The
   // path is still verified — the union comes from the generated registry, and
   // a typo or a dynamic path (`href("/gallery/[photoId]")`) fails to compile.
@@ -76,7 +76,7 @@ const links = [
   {
     label: "Legacy",
     prefix: "/legacy",
-    // A pages route in an app/ nav (PR1): href() is router-agnostic.
+    // A pages route in an app/ nav: href() is router-agnostic.
     to: href(legacyRoute, { search: { ref: "nav" } }),
   },
 ];

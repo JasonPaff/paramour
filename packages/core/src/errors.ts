@@ -1,14 +1,14 @@
-/** One failed key in an aggregate decode error (shared by both surfaces, RL6). */
+/** One failed key in an aggregate decode error (shared by both surfaces). */
 export interface Issue {
   readonly key: string;
   readonly message: string;
 }
 
-/** The single error type surfaced by a full route parse failure (RL6). */
+/** The single error type surfaced by a full route parse failure. */
 export type RouteDecodeError = ParamsDecodeError | SearchDecodeError;
 
 /**
- * Cross-copy identity brands (RL6). `Symbol.for()` keys resolve in the
+ * Cross-copy identity brands. `Symbol.for()` keys resolve in the
  * realm-global symbol registry, so a second physical copy of this module
  * (dual-package hazard, bundler duplication) mints the SAME symbols:
  * `instanceof` recognizes instances across copies, while a structurally
@@ -42,7 +42,7 @@ export class ParamourError extends Error {
   }
 }
 
-/** Aggregate failure for a whole route-params decode (RL6). */
+/** Aggregate failure for a whole route-params decode. */
 export class ParamsDecodeError extends ParamourError {
   static {
     brandPrototype(this, paramsDecodeErrorBrand);
@@ -97,11 +97,11 @@ export class SearchDecodeError extends ParamourError {
 }
 
 /**
- * A search source violated its wire-shape contract (design-08 STD7): a
- * non-object source, or a non-string / non-string[] value under a read key.
- * Thrown by search.ts's source readers; distinct from {@link ParamourError}
- * so the Standard Schema adapter can soften exactly these throws to issues
- * while config-contract violations and rebranded validator throws stay loud.
+ * A search source violated its wire-shape contract: a non-object source, or
+ * a non-string / non-string[] value under a read key. Thrown by search.ts's
+ * source readers; distinct from {@link ParamourError} so the Standard Schema
+ * adapter can soften exactly these throws to issues while config-contract
+ * violations and rebranded validator throws stay loud.
  */
 export class SearchSourceError extends ParamourError {
   static {

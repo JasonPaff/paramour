@@ -83,7 +83,7 @@ export default function HomePage() {
             <span className="pill">useRouter().replace</span>
             <span className="pill">router.push</span>
             <span className="pill">InferSearchInput</span>
-            <span className="pill">D8 elision</span>
+            <span className="pill">default elision</span>
             <span className="pill">scroll: false</span>
           </div>
         </li>

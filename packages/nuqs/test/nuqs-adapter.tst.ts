@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { nuqsParser, nuqsParsers } from "../src/index.js";
 
-test("scalar codecs derive nullable single parsers (NQ3)", () => {
+test("scalar codecs derive nullable single parsers", () => {
   expect(nuqsParser(p.string())).type.toBe<SingleParserBuilder<string>>();
   expect(nuqsParser(p.integer())).type.toBe<SingleParserBuilder<number>>();
   expect(nuqsParser(p.isoDate())).type.toBe<SingleParserBuilder<Date>>();
@@ -21,25 +21,25 @@ test("enum keeps its literal union", () => {
   >();
 });
 
-test("optional collapses to the nullable parser (NQ3)", () => {
+test("optional collapses to the nullable parser", () => {
   expect(nuqsParser(p.string().optional())).type.toBe<
     SingleParserBuilder<string>
   >();
 });
 
-test("value-form defaults derive a non-nullable withDefault shape (NQ6/NQ6a)", () => {
+test("value-form defaults derive a non-nullable withDefault shape", () => {
   const parser = nuqsParser(p.integer().default(1));
   expect(parser.defaultValue).type.toBe<number>();
   expect(parser.parse).type.toBeCallableWith("3");
 });
 
-test("factory defaults stay honestly nullable (NQ6/NQ6a)", () => {
+test("factory defaults stay honestly nullable", () => {
   expect(nuqsParser(p.integer().default(() => 1))).type.toBe<
     SingleParserBuilder<number>
   >();
 });
 
-test("arity-many codecs derive a non-nullable multi parser (NQ8a)", () => {
+test("arity-many codecs derive a non-nullable multi parser", () => {
   const parser = nuqsParser(p.array());
   expect(parser.defaultValue).type.toBe<string[]>();
   expect(parser.serialize).type.toBeCallableWith(["a"]);
@@ -82,7 +82,7 @@ test("route objects use the route overload and keep the search config's shape", 
   }>();
 });
 
-test("null-including outputs are rejected at the call (NQ8/NQ8b)", () => {
+test("null-including outputs are rejected at the call", () => {
   const nullable = p.custom<null | string>({
     parse: (raw) => (raw === "null" ? null : raw),
     serialize: (value) => value ?? "null",
@@ -95,7 +95,7 @@ test("null-including outputs are rejected at the call (NQ8/NQ8b)", () => {
   });
 });
 
-test("rawSearch and search-less routes are rejected at the call (NQ8/NQ8b)", () => {
+test("rawSearch and search-less routes are rejected at the call", () => {
   const raw = defineAppRoute("/raw", {
     search: rawSearch(z.object({ q: z.string() })),
   });

@@ -13,7 +13,7 @@ function makeProject(files: Record<string, string>): string {
   return root;
 }
 
-describe("loadConfigFile (TR7 / §7.2)", () => {
+describe("loadConfigFile", () => {
   it("returns undefined when no config file exists", async () => {
     await expect(loadConfigFile(makeTempDir())).resolves.toBeUndefined();
   });
@@ -109,7 +109,7 @@ describe("loadConfigFile (TR7 / §7.2)", () => {
     );
   });
 
-  it("accepts pagesDir (PR8)", async () => {
+  it("accepts pagesDir", async () => {
     const root = makeProject({
       "paramour.config.json": `{ "pagesDir": "legacy-pages" }`,
     });

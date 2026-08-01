@@ -22,7 +22,7 @@ beforeEach(() => {
   setUrl("/product/42?page=2");
 });
 
-describe("replay (DT5)", () => {
+describe("replay", () => {
   it("a late subscriber sees everything buffered before it attached", () => {
     const seam = freshSeam();
     seam.buffer.push(
@@ -43,7 +43,7 @@ describe("replay (DT5)", () => {
   });
 });
 
-describe("session grouping (DT10)", () => {
+describe("session grouping", () => {
   it("groups HMR-reminted route objects under one path+router key, latest route wins", () => {
     const seam = freshSeam();
     const remintedRoute = defineAppRoute("/product/[id]", {
@@ -123,7 +123,7 @@ describe("session grouping (DT10)", () => {
   });
 });
 
-describe("status derivation (DT16)", () => {
+describe("status derivation", () => {
   it("error beats pending beats ok across the two halves", () => {
     const seam = freshSeam();
     const unsubscribe = subscribe(() => undefined);
@@ -145,7 +145,7 @@ describe("status derivation (DT16)", () => {
   });
 });
 
-describe("change stamps (DT18)", () => {
+describe("change stamps", () => {
   it("increments only when a key's parsed value changes", () => {
     const seam = freshSeam();
     const unsubscribe = subscribe(() => undefined);
@@ -177,8 +177,9 @@ describe("change stamps (DT18)", () => {
   });
 
   it("keeps params and search stamps independent for a same-named key", () => {
-    // Legal on App Router (PR9 forbids the collision only for pages routes):
-    // `?id=` on /item/[id] is a separate data source from the path param.
+    // Legal on App Router (the params/search name collision is forbidden
+    // only for pages routes): `?id=` on /item/[id] is a separate data
+    // source from the path param.
     const itemRoute = defineAppRoute("/item/[id]", {
       params: { id: p.integer() },
       search: { id: p.integer().default(0) },
@@ -213,7 +214,7 @@ describe("change stamps (DT18)", () => {
   });
 });
 
-describe("current-URL matching (DT10)", () => {
+describe("current-URL matching", () => {
   it("marks sessions whose pattern matches the pathname as current", () => {
     const seam = freshSeam();
     const unsubscribe = subscribe(() => undefined);
@@ -360,7 +361,7 @@ describe("current-URL matching (DT10)", () => {
   });
 });
 
-describe("navigate freshness (DT8)", () => {
+describe("navigate freshness", () => {
   it("the session-level navigate is the NEWEST observation's, regardless of half", () => {
     // The search half's closure can go stale while the params half re-emits
     // (its fingerprint includes the id); a half-preferring pick would keep
@@ -414,7 +415,7 @@ describe("snapshot stability", () => {
   });
 });
 
-describe("re-attach (DT5/DT10)", () => {
+describe("re-attach", () => {
   it("does not replay already-consumed observations into retained sessions", () => {
     const seam = freshSeam();
     const first = subscribe(() => undefined);
@@ -435,9 +436,9 @@ describe("re-attach (DT5/DT10)", () => {
     expect(getSnapshot().sessions[0]?.changeStamps.search.page).toBe(1);
     first();
 
-    // Panel closed and reopened: sessions are retained (DT10), the buffer
-    // still holds both observations — replay must not re-walk history and
-    // inflate the stamps (re-flashing rows that did not change).
+    // Panel closed and reopened: sessions are retained, the buffer still
+    // holds both observations — replay must not re-walk history and inflate
+    // the stamps (re-flashing rows that did not change).
     const second = subscribe(() => undefined);
     expect(getSnapshot().sessions).toHaveLength(1);
     expect(getSnapshot().sessions[0]?.changeStamps.search.page).toBe(1);

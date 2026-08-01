@@ -13,9 +13,9 @@ interface WireRow {
 /**
  * The concepts page's codec-by-codec wire table, with the "On the wire"
  * column computed by the shipped library at docs build time (the page's
- * "every example below is real output" claim, made true by construction —
- * plan-docs-milestone-5 A2). The codec and in-memory columns are display
- * strings; only the wire column is a claim, and it is never hand-written.
+ * "every example below is real output" claim, made true by construction).
+ * The codec and in-memory columns are display strings; only the wire column
+ * is a claim, and it is never hand-written.
  */
 export function CodecWireTable() {
   return (

@@ -2,7 +2,7 @@
  * Pins `withTypedRoutes`'s return against what a real `next.config.ts` may
  * export by default.
  *
- * The wrapper takes a structural `NextConfigLike` view (TR4) and returns
+ * The wrapper takes a structural `NextConfigLike` view and returns
  * `ConfigFunction<C> = (phase: string, ctx: unknown) => C | Promise<C>`. Next
  * has no stable named export for the function-config form, so its documented
  * shape is re-declared here and the wrapper's return asserted against it. Fails

@@ -12,7 +12,7 @@ import {
   SearchDecodeError,
 } from "../src";
 
-describe("defineAppRoute define-time validation (RL1/RL2)", () => {
+describe("defineAppRoute define-time validation", () => {
   it("rejects a ? anywhere in the literal", () => {
     expect(() => defineAppRoute("/search?q=1", {})).toThrow(ParamourError);
     expect(() => defineAppRoute("/search?q=1", {})).toThrow(
@@ -85,7 +85,7 @@ describe("defineAppRoute define-time validation (RL1/RL2)", () => {
     }
   });
 
-  it("rejects a (group) segment — paths are URL-shaped (RL2)", () => {
+  it("rejects a (group) segment — paths are URL-shaped", () => {
     expect(() => defineAppRoute("/(marketing)/about", {})).toThrow(
       ParamourError,
     );
@@ -94,7 +94,7 @@ describe("defineAppRoute define-time validation (RL1/RL2)", () => {
     );
   });
 
-  it("rejects an @slot segment — paths are URL-shaped (RL2)", () => {
+  it("rejects an @slot segment — paths are URL-shaped", () => {
     expect(() => defineAppRoute("/@modal/photo", {})).toThrow(ParamourError);
     expect(() => defineAppRoute("/@modal/photo", {})).toThrow(
       /parallel-route slot/,
@@ -115,7 +115,7 @@ describe("defineAppRoute define-time validation (RL1/RL2)", () => {
   });
 });
 
-describe("route object shape (RL1)", () => {
+describe("route object shape", () => {
   it("exposes the path literal and ~-prefixed configs", () => {
     const params = { id: p.integer() };
     const search = { q: p.string() };
@@ -139,7 +139,7 @@ describe("route object shape (RL1)", () => {
   });
 });
 
-describe("route parse methods (RL6)", () => {
+describe("route parse methods", () => {
   const route = defineAppRoute("/product/[id]", {
     params: { id: p.integer() },
     search: { q: p.string() },
@@ -242,7 +242,7 @@ describe("route parse methods (RL6)", () => {
     ).resolves.toEqual({ q: "hi" });
   });
 
-  it("safeParse discriminates on status (PR12)", async () => {
+  it("safeParse discriminates on status", async () => {
     const ok = await route.safeParse({
       params: { id: "42" },
       searchParams: { q: "hi" },
@@ -312,7 +312,7 @@ describe("route parse methods (RL6)", () => {
   });
 });
 
-describe("route methods over a rawSearch config (design-04)", () => {
+describe("route methods over a rawSearch config", () => {
   // The full method surface must reach the rawSearch decode branch through
   // defineAppRoute's ~search wiring — raw-search.test.ts calls decodeSearch
   // directly, which would miss a defineAppRoute wiring regression.
@@ -365,7 +365,7 @@ describe("route methods over a rawSearch config (design-04)", () => {
   });
 });
 
-describe("ParamsDecodeError (RL6)", () => {
+describe("ParamsDecodeError", () => {
   it("aggregates issues and mirrors SearchDecodeError's message format", () => {
     const issues = [
       { key: "id", message: "expected an integer" },
@@ -390,7 +390,7 @@ describe("ParamsDecodeError (RL6)", () => {
   });
 });
 
-describe("instanceof brand hardening (RL6)", () => {
+describe("instanceof brand hardening", () => {
   it("native instanceof keeps working across the hierarchy", () => {
     const error = new ParamsDecodeError([]);
     expect(error).toBeInstanceOf(ParamsDecodeError);

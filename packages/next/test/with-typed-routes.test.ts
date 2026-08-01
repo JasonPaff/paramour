@@ -17,8 +17,9 @@ function emitApp(appRoutes: readonly string[]): string {
 }
 
 /**
- * TR4 suite. Values duplicated from next/constants on purpose — the phase
- * strings ARE the contract the wrapper dispatches on (hermeticity ruling).
+ * Values duplicated from next/constants on purpose — the phase strings ARE
+ * the contract the wrapper dispatches on, and duplicating them keeps the
+ * package hermetic.
  */
 const PHASE_BUILD = "phase-production-build";
 const PHASE_DEV = "phase-development-server";
@@ -52,7 +53,7 @@ function livePid(): number {
 /**
  * Temp project with the given tree, made the working directory — the
  * wrapper resolves everything from cwd, matching where Next evaluates the
- * config (spike-#1 census).
+ * config.
  */
 function makeProject(entries: readonly string[]): string {
   const root = makeTempDir();
@@ -71,7 +72,7 @@ function silenceWarn(): ReturnType<typeof vi.fn> {
   return spy;
 }
 
-describe("withTypedRoutes phase dispatch (TR4)", () => {
+describe("withTypedRoutes phase dispatch", () => {
   it("passes through phases other than build and dev untouched", async () => {
     const root = makeProject(["app/page.tsx"]);
     const config = { pageExtensions: ["tsx"] };
@@ -114,7 +115,7 @@ describe("withTypedRoutes phase dispatch (TR4)", () => {
     await config(PHASE_DEV, {});
     expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
     expect(devWatcherCountForTests()).toBe(0);
-    // Two evaluations, one log line (TR5 log-once).
+    // Two evaluations, one log line (log once).
     expect(warn).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining("no route directory"),
     );
@@ -129,7 +130,7 @@ describe("withTypedRoutes phase dispatch (TR4)", () => {
     );
   });
 
-  it("generates a hybrid project with both members (PR1)", async () => {
+  it("generates a hybrid project with both members", async () => {
     const root = makeProject(["app/page.tsx", "pages/legacy.tsx"]);
     silenceWarn();
     await withTypedRoutes({})(PHASE_BUILD, {});
@@ -138,7 +139,7 @@ describe("withTypedRoutes phase dispatch (TR4)", () => {
     );
   });
 
-  it("throws the populated-ignored-dir config error from config evaluation (spike-2 ruling)", async () => {
+  it("throws the populated-ignored-dir config error from config evaluation", async () => {
     makeProject(["app/page.tsx", "src/pages/index.tsx"]);
     await expect(withTypedRoutes({})(PHASE_DEV, {})).rejects.toThrow(
       /silently unreachable/,
@@ -147,7 +148,7 @@ describe("withTypedRoutes phase dispatch (TR4)", () => {
   });
 });
 
-describe("withTypedRoutes build phase (TR4)", () => {
+describe("withTypedRoutes build phase", () => {
   it("generates a missing artifact and warns loudly, listing new paths", async () => {
     const root = makeProject(["app/page.tsx", "app/about/page.tsx"]);
     const warn = silenceWarn();
@@ -191,7 +192,7 @@ describe("withTypedRoutes build phase (TR4)", () => {
     );
   });
 
-  it("strict: true still resolves when generation itself fails (§7.3: only drift may fail a strict build)", async () => {
+  it("strict: true still resolves when generation itself fails (only drift may fail a strict build)", async () => {
     // outFile pointing at an existing DIRECTORY makes the artifact write
     // throw (EISDIR) — an incidental generation failure, not drift.
     makeProject(["app/page.tsx", "artifact-dir/"]);
@@ -221,7 +222,7 @@ describe("withTypedRoutes build phase (TR4)", () => {
     expect(readFileSync(artifact, "utf8")).toBe(emitApp(["/"]));
   });
 
-  it("throws on an app/pages collision even without strict (PR9)", async () => {
+  it("throws on an app/pages collision even without strict", async () => {
     const root = makeProject(["app/about/page.tsx", "pages/about.tsx"]);
     await expect(withTypedRoutes({})(PHASE_BUILD, {})).rejects.toThrow(
       /collision/,
@@ -244,7 +245,7 @@ describe("withTypedRoutes build phase (TR4)", () => {
   });
 });
 
-describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
+describe("withTypedRoutes dev phase", { retry: 2 }, () => {
   it("generates immediately and starts one watcher across re-evaluations", async () => {
     const root = makeProject(["app/page.tsx"]);
     const config = withTypedRoutes({});
@@ -259,20 +260,20 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
         "utf8",
       ),
     ).toBe(String(process.pid));
-    // Spike-#1 census: Turbopack dev invokes the config function twice in
-    // the same process — the singleton must absorb the second call.
+    // Turbopack dev invokes the config function twice in the same process —
+    // the singleton must absorb the second call.
     await config(PHASE_DEV, {});
     expect(devWatcherCountForTests()).toBe(1);
   });
 
-  it("throws on an app/pages collision at dev startup (PR9: config evaluation)", async () => {
+  it("throws on an app/pages collision at dev startup (config evaluation)", async () => {
     makeProject(["app/about/page.tsx", "pages/about.tsx"]);
     await expect(withTypedRoutes({})(PHASE_DEV, {})).rejects.toThrow(
       /collision/,
     );
   });
 
-  it("treats a collision DURING watch as non-fatal: loud log, last good artifact intact (PR9/TR5)", async () => {
+  it("treats a collision DURING watch as non-fatal: loud log, last good artifact intact", async () => {
     const root = makeProject(["app/about/page.tsx", "pages/"]);
     const artifact = join(root, "paramour-env.d.ts");
     const good = emitArtifact({ appRoutes: ["/about"], pagesRoutes: [] });
@@ -292,7 +293,7 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
 
   it("continues (config resolves) when dev-phase generation fails", async () => {
     // Same directory-as-artifact trick as the build-phase test: the write
-    // throws, dev must keep going in stale-types mode (§7.3).
+    // throws, dev must keep going in stale-types mode.
     makeProject(["app/page.tsx", "artifact-dir/"]);
     const warn = silenceWarn();
     const config = { reactStrictMode: true as const };
@@ -319,7 +320,7 @@ describe("withTypedRoutes dev phase (TR4/TR5/TR6)", { retry: 2 }, () => {
     }, 5000);
   });
 
-  it("continues (config resolves) when lock acquisition itself throws (§7.3)", async () => {
+  it("continues (config resolves) when lock acquisition itself throws", async () => {
     const root = makeProject(["app/page.tsx"]);
     // The canonical lock path exists as a DIRECTORY: writing the pidfile
     // throws EISDIR, which must not take down `next dev`.

@@ -7,7 +7,7 @@ import { scanRoutes } from "../src/scan.js";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /**
- * Structural-collision regex behavior (PR9, bug 6): a dynamic segment param
+ * Structural-collision regex behavior (bug 6): a dynamic segment param
  * may contain a dot (`[file.ext]`), matching core's SINGLE_TOKEN regex
  * (packages/core/src/path.ts). Before the fix the plain alternative excluded
  * `.`, so `[a.b]` was misread as a literal segment and the different-slug-name

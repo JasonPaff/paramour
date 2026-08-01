@@ -27,9 +27,9 @@ What it demonstrates:
   at build time — a bad params object fails `next build`, not a request), and
   `fallback: "blocking"` means `getStaticProps` still decodes `ctx.params`
   itself: `safeDecodeParams(route, ctx.params, { percentDecode: false })`, the
-  documented static-context path (PR10 — `parseContext` rejects query-less
-  contexts by design). Try `/guides/not-a-topic`: the enum decode fails and
-  becomes `notFound: true`, a real 404.
+  documented static-context path (`parseContext` rejects query-less contexts
+  by design). Try `/guides/not-a-topic`: the enum decode fails and becomes
+  `notFound: true`, a real 404.
 - **Three-state client hooks** — `useRouteParams`/`useSearch` return
   `pending | success | error`. `/find` is statically optimized, so a hard
   load actually renders the `pending` arm before `router.isReady` flips (try

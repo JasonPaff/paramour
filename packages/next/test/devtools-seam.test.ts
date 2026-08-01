@@ -1,7 +1,7 @@
 /**
- * Unit tests for the devtools observation seam (design-12 DT5/DT6): the
- * global slot's buffer capping, replay-to-a-late-listener protocol,
- * unsubscribe, listener isolation, and the production no-op guard. Full DCE
+ * Unit tests for the devtools observation seam: the global slot's buffer
+ * capping, replay-to-a-late-listener protocol, unsubscribe, listener
+ * isolation, and the production no-op guard. Full DCE
  * of the guarded call sites is the bundler's contract, not testable here —
  * this suite pins the GUARD's behavior (`emitObservation` returns before
  * touching the slot under `NODE_ENV === "production"`).
@@ -67,7 +67,7 @@ describe("emitObservation", () => {
     emitObservation(makeObservation("early-1"));
     emitObservation(makeObservation("early-2"));
 
-    // The DT5 attach protocol, verbatim: synchronous read-then-add.
+    // The attach protocol, verbatim: synchronous read-then-add.
     const seam = getParamourSeam();
     const seen: ParamourObservation[] = [...seam.buffer];
     seam.listeners.add((observation) => seen.push(observation));
@@ -106,7 +106,7 @@ describe("emitObservation", () => {
     expect(seen).toHaveLength(1);
   });
 
-  it('is a no-op when NODE_ENV === "production" (DT6 guard behavior)', () => {
+  it('is a no-op when NODE_ENV === "production" (guard behavior)', () => {
     const seen: ParamourObservation[] = [];
     const seam = getParamourSeam();
     seam.listeners.add((observation) => seen.push(observation));

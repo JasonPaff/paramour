@@ -4,14 +4,14 @@ import { emitArtifact, writeIfChanged } from "./emit.js";
 import { scanRoutes } from "./scan.js";
 
 /**
- * The shared generation engine (TR9): `withTypedRoutes` and the CLI drive
- * these same functions, so wrapper and `paramour generate` cannot drift on
- * what a pass produces. Everything here is @internal — not barrel API.
+ * The shared generation engine: `withTypedRoutes` and the CLI drive these
+ * same functions, so wrapper and `paramour generate` cannot drift on what a
+ * pass produces. Everything here is @internal — not barrel API.
  */
 
 /** Result of {@link checkArtifact}. */
 export interface CheckResult {
-  /** App-router drift — split per router so the report names it (PR9). */
+  /** App-router drift — split per router so the report names it. */
   app: RouterDrift;
   /** `true` when the artifact file does not exist at all. */
   missingFile: boolean;
@@ -21,7 +21,7 @@ export interface CheckResult {
   upToDate: boolean;
 }
 
-/** Inputs to one generation/check pass; either dir may be absent (PR1). */
+/** Inputs to one generation/check pass; either dir may be absent. */
 export interface GenerateInputs {
   appDir?: string | undefined;
   artifactPath: string;
@@ -37,11 +37,11 @@ export interface GenerateResult {
   pagesRoutes: string[];
   /** Prior artifact content, `null` when the file did not exist. */
   previousContent: null | string;
-  /** `false` on a byte-identical no-op (TR3 write-if-changed). */
+  /** `false` on a byte-identical no-op (write-if-changed). */
   written: boolean;
 }
 
-/** One router's appeared/disappeared route paths (TR4/TR7 drift). */
+/** One router's appeared/disappeared route paths. */
 export interface RouterDrift {
   /** Routes on disk (scan) that the artifact lacks. */
   appeared: string[];
@@ -51,18 +51,18 @@ export interface RouterDrift {
 
 /**
  * Reads the per-router unions back out of a previously emitted artifact for
- * drift diffs (TR4/TR7). Only ever applied to text this package generated
- * (TR3 deterministic form), so line-anchored matches on the member headers
- * and union members are exact, not heuristic. `\s*$` on both tolerates a
+ * drift diffs. Only ever applied to text this package generated (its
+ * deterministic form), so line-anchored matches on the member headers and
+ * union members are exact, not heuristic. `\s*$` on both tolerates a
  * CRLF-resaved artifact.
  */
 const MEMBER_HEADER = /^\s*(appRoutes|pagesRoutes):\s*$/;
 const UNION_MEMBER = /^\s*\| "(.*)";?\s*$/;
 
 /**
- * `--check` (TR7): scan to memory and byte-compare against disk — never
- * writes. A missing artifact is drift, not an error: that is exactly the
- * CI-degrades-to-world-A case the committed file exists to prevent (TR3).
+ * `--check`: scan to memory and byte-compare against disk — never writes. A
+ * missing artifact is drift, not an error: that is exactly the
+ * CI-degrades-to-world-A case the committed file exists to prevent.
  */
 export function checkArtifact(inputs: GenerateInputs): CheckResult {
   const routes = scanRoutes(inputs, inputs.pageExtensions);
@@ -89,7 +89,7 @@ export function checkArtifact(inputs: GenerateInputs): CheckResult {
 
 /**
  * Per-router drift of a completed {@link generate} pass against the artifact
- * it replaced — the wrapper's build-phase drift report (TR4).
+ * it replaced — the wrapper's build-phase drift report.
  */
 export function diffGenerated(result: GenerateResult): {
   app: RouterDrift;
@@ -103,8 +103,8 @@ export function diffGenerated(result: GenerateResult): {
 }
 
 /**
- * The `  + /new (app)` / `  - /old (pages)` lines of a drift report
- * (TR4/TR7) — each line names the router its path moved in (PR9).
+ * The `  + /new (app)` / `  - /old (pages)` lines of a drift report — each
+ * line names the router its path moved in.
  */
 export function formatRouteDiff(
   app: RouterDrift,
@@ -118,7 +118,7 @@ export function formatRouteDiff(
   ];
 }
 
-/** One generation pass: scan → emit → write-if-changed (TR3). */
+/** One generation pass: scan → emit → write-if-changed. */
 export function generate(inputs: GenerateInputs): GenerateResult {
   const routes = scanRoutes(inputs, inputs.pageExtensions);
   return {
@@ -152,7 +152,7 @@ export function parseArtifactRoutes(previousContent: null | string): {
       continue;
     }
     // Any other line ends the member block — union members are contiguous
-    // in the TR3 deterministic form.
+    // in the deterministic emitted form.
     current = undefined;
   }
   return { appRoutes, pagesRoutes };

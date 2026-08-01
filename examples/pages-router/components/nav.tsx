@@ -6,7 +6,7 @@ import { findRoute, guideRoute, homeRoute, productRoute } from "../lib/routes";
 
 // Every link is built with href(): typed params/search in, a plain string
 // out — Href is a string subtype, so it feeds next/link directly. href() is
-// router-agnostic (PR3): the same call shape the App Router examples use.
+// router-agnostic: the same call shape the App Router examples use.
 //
 // `path`/`exact` drive only the active-tab highlight; href() output is the
 // real destination.

@@ -16,18 +16,18 @@ import { DEFAULT_PAGE_EXTENSIONS } from "./scan-app.js";
 import { resolveRouteDirs, type RouteDirs } from "./scan.js";
 import { watchRouteDirs } from "./watch.js";
 
-/** Options for {@link withTypedRoutes} (TR4). */
+/** Options for {@link withTypedRoutes}. */
 export interface WithTypedRoutesOptions {
   /**
    * Artifact location, for monorepos where the Next app root isn't where the
-   * file should live (TR3 escape hatch). Relative paths resolve against the
+   * file should live — the escape hatch. Relative paths resolve against the
    * project root. Default: `paramour-env.d.ts` at the project root.
    */
   outFile?: string;
   /**
-   * Upgrade build-phase drift from a loud warning to a build failure (TR4)
-   * — for teams that want the committed artifact to be the law. Default
-   * `false`, friendly to gitignored-file workflows and CI images.
+   * Upgrade build-phase drift from a loud warning to a build failure — for
+   * teams that want the committed artifact to be the law. Default `false`,
+   * friendly to gitignored-file workflows and CI images.
    */
   strict?: boolean;
 }
@@ -36,8 +36,8 @@ export interface WithTypedRoutesOptions {
 type ConfigFunction<C> = (phase: string, ctx: unknown) => C | Promise<C>;
 
 /**
- * Minimal structural view of a Next config (TR4). `pageExtensions` is the
- * only field the wrapper reads; everything else passes through untouched.
+ * Minimal structural view of a Next config. `pageExtensions` is the only
+ * field the wrapper reads; everything else passes through untouched.
  * Structural on purpose — the package is hermetic (peer-only relationship
  * with `next`). Deliberately NOT the generic constraint: a weak-type
  * constraint would reject every config that doesn't happen to set
@@ -50,20 +50,20 @@ interface NextConfigLike {
 
 /**
  * Phase constants from `next/constants`, hardcoded so the package stays
- * hermetic (TR4 hermeticity ruling): the values are stable, documented
- * public API, and importing them would make `next` a runtime dependency.
+ * hermetic: the values are stable, documented public API, and importing them
+ * would make `next` a runtime dependency.
  */
 const PHASE_DEVELOPMENT_SERVER = "phase-development-server";
 const PHASE_PRODUCTION_BUILD = "phase-production-build";
 
 /**
- * TR6 guard 1 — the in-process singleton, keyed by route dirs + artifact
- * path. Load-bearing even for a single `next dev`: the spike-#1 census found
- * Turbopack dev invokes the config function twice in the same process.
+ * The in-process single-writer guard — a singleton keyed by route dirs +
+ * artifact path. Load-bearing even for a single `next dev`: Turbopack dev
+ * invokes the config function twice in the same process.
  */
 const devWatcherTeardowns = new Map<string, () => void>();
 
-/** Messages already logged — "log once" (TR5) across repeat evaluations. */
+/** Messages already logged — "log once" across repeat evaluations. */
 const warnedOnce = new Set<string>();
 
 /** @internal Test seam: the number of live dev-watcher singletons. */
@@ -83,21 +83,22 @@ export function resetDevWatchersForTests(): void {
 }
 
 /**
- * Wrap a Next config with route-registry generation (TR4). Returns the
+ * Wrap a Next config with route-registry generation. Returns the
  * config-function form; Next's phase argument is the mode discriminator:
  *
  * - production build → one generation pass before the config is returned
  *   (the build type-checks against fresh routes); drift warns loudly, or
  *   fails the build under `strict: true`.
  * - dev server → one immediate generation pass, then the debounced watcher
- *   (TR5) behind both single-writer guards (TR6).
+ *   behind both single-writer guards (the in-process singleton and the
+ *   cross-process pidfile lock).
  * - every other phase → pass-through, no generation.
  *
  * Two states throw during config evaluation instead of degrading to
  * stale-types mode, both phases alike, because Next itself has no valid
- * build for them: an app↔pages route collision (PR9), and discovery's
- * populated-ignored-dir config error (spike-2 ruling — Next is silently
- * serving none of those pages).
+ * build for them: an app↔pages route collision, and discovery's
+ * populated-ignored-dir config error (Next is silently serving none of those
+ * pages).
  */
 export function withTypedRoutes<C extends object>(
   config: C | ConfigFunction<C>,
@@ -110,8 +111,8 @@ export function withTypedRoutes<C extends object>(
       return resolved;
 
     // The dev server and every build worker evaluate the config with the
-    // project root as cwd (spike-#1 census); TR7's CLI flags are the home
-    // for anything more configurable than this.
+    // project root as cwd; the CLI flags are the home for anything more
+    // configurable than this.
     const projectRoot = process.cwd();
     const artifactPath = resolve(
       projectRoot,
@@ -119,11 +120,12 @@ export function withTypedRoutes<C extends object>(
     );
     const pageExtensions =
       (resolved as NextConfigLike).pageExtensions ?? DEFAULT_PAGE_EXTENSIONS;
-    // May throw the spike-2 config error — deliberately not caught (above).
+    // May throw the populated-ignored-dir config error — deliberately not
+    // caught (see above).
     const dirs = resolveRouteDirs(projectRoot, pageExtensions);
     if (dirs.appDir === undefined && dirs.pagesDir === undefined) {
-      // §7.3: codegen is never load-bearing — a config wrapper must not
-      // take down `next dev`/`next build` over a missing route dir.
+      // Codegen is never load-bearing — a config wrapper must not take down
+      // `next dev`/`next build` over a missing route dir.
       warnOnce(
         `paramour: no route directory (app/, pages/, src/app/, or src/pages/) under ${projectRoot}; route generation skipped`,
       );
@@ -146,12 +148,12 @@ export function withTypedRoutes<C extends object>(
 }
 
 /**
- * Build-phase pass (TR4): regenerate, then warn loudly on drift — naming the
- * paths that appeared/disappeared and the router they moved in — but
- * continue; `strict` upgrades drift to a thrown error *after* the file is
- * already corrected. A missing artifact counts as drift: that is exactly the
- * CI-degrades-to-world-A scenario the committed file exists to prevent
- * (TR3). A route collision is NOT incidental failure and rethrows (PR9).
+ * Build-phase pass: regenerate, then warn loudly on drift — naming the paths
+ * that appeared/disappeared and the router they moved in — but continue;
+ * `strict` upgrades drift to a thrown error *after* the file is already
+ * corrected. A missing artifact counts as drift: that is exactly the
+ * CI-degrades-to-world-A scenario the committed file exists to prevent. A
+ * route collision is NOT incidental failure and rethrows.
  */
 function generateForBuild(
   dirs: RouteDirs,
@@ -163,12 +165,12 @@ function generateForBuild(
   try {
     result = generate({ ...dirs, artifactPath, pageExtensions });
   } catch (error) {
-    // PR9: Next fails this build anyway; surfacing the collision from the
-    // config evaluation names the actual problem instead of leaving a stale
+    // Next fails this build anyway; surfacing the collision from the config
+    // evaluation names the actual problem instead of leaving a stale
     // artifact to confuse the type errors that follow.
     if (error instanceof RouteCollisionError) throw error;
-    // §7.3 again: incidental generation failure is stale types, not a
-    // broken build. Only *drift* is allowed to fail a strict build.
+    // Again: incidental generation failure is stale types, not a broken
+    // build. Only *drift* is allowed to fail a strict build.
     console.warn(
       "paramour: route generation failed; building with stale route types",
       error,
@@ -190,9 +192,10 @@ function generateForBuild(
 }
 
 /**
- * Dev-phase generation (TR4): failure warns and continues (§7.3) — except a
- * route collision, which throws from the config evaluation here exactly as
- * in the build phase (PR9; only the running WATCHER treats it non-fatally).
+ * Dev-phase generation: failure warns and continues (codegen is never
+ * load-bearing) — except a route collision, which throws from the config
+ * evaluation here exactly as in the build phase; only the running WATCHER
+ * treats it non-fatally.
  */
 function generateSafely(
   dirs: RouteDirs,
@@ -211,8 +214,8 @@ function generateSafely(
 }
 
 /**
- * Start the dev watcher behind both TR6 guards. Failure at any layer leaves
- * dev running in stale-types mode — never fatal (TR5).
+ * Start the dev watcher behind both single-writer guards. Failure at any
+ * layer leaves dev running in stale-types mode — never fatal.
  */
 function startDevWatcher(
   projectRoot: string,
@@ -230,8 +233,8 @@ function startDevWatcher(
   try {
     lock = acquireWatcherLock(watcherLockPath(projectRoot));
   } catch (error) {
-    // §7.3: a corrupt lock location (e.g. a directory at the pidfile path)
-    // must not take down `next dev` — stale-types mode, like every other
+    // A corrupt lock location (e.g. a directory at the pidfile path) must
+    // not take down `next dev` — stale-types mode, like every other
     // watcher-layer failure.
     warnOnce(
       "paramour: dev watcher failed; dev continues with stale route types",
@@ -240,7 +243,7 @@ function startDevWatcher(
     return;
   }
   if (!lock.acquired) {
-    // TR6: another live process owns the watcher (e.g. `paramour generate
+    // Another live process owns the watcher (e.g. `paramour generate
     // --watch` beside `next dev`). Initial generation above already ran, so
     // dev is still correct from second zero.
     console.warn(
@@ -262,15 +265,15 @@ function startDevWatcher(
         generate({ ...dirs, artifactPath, pageExtensions });
       } catch (error) {
         if (error instanceof RouteCollisionError) {
-          // PR9's watch exception: a mid-watch collision is usually a file
-          // mid-move — log loudly every time (not once: it stays broken
-          // until fixed), keep the last good artifact, keep running (TR5).
+          // The collision watch exception: a mid-watch collision is usually
+          // a file mid-move — log loudly every time (not once: it stays
+          // broken until fixed), keep the last good artifact, keep running.
           console.warn(
             `paramour: ${error.message}; dev continues with the last good artifact`,
           );
           return;
         }
-        throw error; // routed to onError by the watcher (TR5 non-fatal)
+        throw error; // routed to onError by the watcher — non-fatal
       }
     },
   });
@@ -282,7 +285,7 @@ function startDevWatcher(
   });
 }
 
-/** TR5 "log once": repeat evaluations/events don't spam the dev console. */
+/** "Log once": repeat evaluations/events don't spam the dev console. */
 function warnOnce(message: string, detail?: unknown): void {
   if (warnedOnce.has(message)) return;
   warnedOnce.add(message);

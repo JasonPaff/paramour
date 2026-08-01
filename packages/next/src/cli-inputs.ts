@@ -25,13 +25,12 @@ export interface InputFlags {
 export class NoRouteDirsError extends Error {}
 
 /**
- * Precedence lives in exactly this function (TR7 / §7.2): flags → config
- * file → joint discovery (PR8). Paths resolve against the project root
- * (= cwd, where `next` itself would run). Discovery only runs for dirs not
- * explicitly given — passing both bypasses it (and its populated-ignored-dir
- * config error) entirely, which is the documented escape hatch. Only when
- * NEITHER dir exists is that an error (PR8): app-only and pages-only
- * projects are both fine.
+ * Precedence lives in exactly this function: flags → config file → joint
+ * discovery. Paths resolve against the project root (= cwd, where `next`
+ * itself would run). Discovery only runs for dirs not explicitly given —
+ * passing both bypasses it (and its populated-ignored-dir config error)
+ * entirely, which is the documented escape hatch. Only when NEITHER dir
+ * exists is that an error: app-only and pages-only projects are both fine.
  *
  * Commands that already loaded the config file (for fields beyond these,
  * e.g. `list`'s routeFiles) pass it as `preloaded` so jiti runs once.

@@ -43,7 +43,7 @@ function writeLock(lockPath: string, content: string): void {
   writeFileSync(lockPath, content);
 }
 
-describe("acquireWatcherLock (TR6)", () => {
+describe("acquireWatcherLock", () => {
   it("acquires a fresh lock, creating parent dirs, and records its PID", () => {
     const lockPath = tempLockPath();
     const result = acquire(lockPath);
@@ -90,9 +90,10 @@ describe("acquireWatcherLock (TR6)", () => {
   });
 
   it("throws EISDIR when the lock path is an existing directory", () => {
-    // Pin, not a ruling: readOwnerPid treats the unreadable "lock" as absent,
-    // then the acquisition write throws. Callers own mapping this to their
-    // error policy (see the cli.test.ts watch coverage).
+    // Pinning observed behavior, not a decision: readOwnerPid treats the
+    // unreadable "lock" as absent, then the acquisition write throws.
+    // Callers own mapping this to their error policy (see the cli.test.ts
+    // watch coverage).
     const lockPath = tempLockPath();
     mkdirSync(lockPath, { recursive: true });
     expect(() => acquireWatcherLock(lockPath)).toThrow(/EISDIR/);

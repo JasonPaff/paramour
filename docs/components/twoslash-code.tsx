@@ -7,7 +7,7 @@ import { CodeBlock, Pre } from "fumadocs-ui/components/codeblock";
 import { JsxEmit } from "typescript";
 
 /**
- * A Twoslash-rendered code block outside MDX (DS8 on a non-MDX page): the
+ * A Twoslash-rendered code block outside MDX, for non-MDX pages: the
  * standalone `highlight()` pipeline with the same transformer configuration
  * as source.config.ts, so React pages like the landing hero get real hover
  * types and validated `// @errors:` squiggles. The snippet compiles against

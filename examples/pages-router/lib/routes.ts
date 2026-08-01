@@ -5,10 +5,10 @@ import { positiveInt, searchQuery } from "./schemas";
 
 // One module for every route definition. The colocated route.def.ts pattern
 // from the App Router examples is impossible here BY DESIGN: under pages/,
-// every file with a page extension IS a page (design-06 spike 1 — only
-// top-level _app/_document/_error are special), so a pages/products/
-// route.def.ts would become the route /products/route.def. Definitions live
-// outside the scanned dir instead.
+// every file with a page extension IS a page (only top-level
+// _app/_document/_error are special), so a pages/products/route.def.ts would
+// become the route /products/route.def. Definitions live outside the scanned
+// dir instead.
 
 // Exported on its own so the find form can name its input type with
 // InferSearchInput<typeof findSearch>.
@@ -35,7 +35,7 @@ export const homeRoute = definePagesRoute("/", {});
 
 // No `search` config: this page is read exclusively through getInitialProps
 // + parseContext, which extracts [id] from ctx.query by segment name
-// (NextPageContext has no `params`, even on dynamic routes — PR10).
+// (NextPageContext has no `params`, even on dynamic routes).
 export const legacyRoute = definePagesRoute("/legacy/[id]", {
   params: { id: p.integer() },
 });

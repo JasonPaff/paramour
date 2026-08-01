@@ -9,8 +9,8 @@ typechecks against hand-authored ambients (`declare module
 "next/navigation"`, hardcoded phase strings, structural context/props
 shapes). Each of those is a claim about a package the shipped code never
 sees. This package is where a real Next IS installed, so the claims get
-checked twice per CI matrix leg (DESIGN §12: latest two majors, swapping
-only this package's `next`):
+checked twice per CI matrix leg (the latest two majors, swapping only this
+package's `next`):
 
 - `tsc --noEmit` over `src/` — the type pins below.
 - `next build build-app` — a minimal two-router app, for the failures the
@@ -38,7 +38,7 @@ to `any` (which would make the pins pass vacuously):
   decoders, `isReady` is a plain boolean.
 - `contexts.ts` — core's structural `PagesContext`: `getServerSideProps` and
   `getInitialProps` contexts compose with `parseContext`, `getStaticProps`
-  is rejected (PR10).
+  is rejected.
 - `props.ts` — core's `RouteProps` accepts what a real App Router page
   receives (Promise-wrapped `params`/`searchParams`) and hasn't decayed into
   accepting anything.

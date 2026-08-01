@@ -1,10 +1,10 @@
 import type { ParamourDevtoolsSeam } from "@paramour-js/next/devtools-seam";
 
 /**
- * The panel's half of the observation seam (design-12 DT5). The contract of
- * record lives in `@paramour-js/next`'s `src/devtools-seam.ts`; this module
- * consumes it TYPES-ONLY via the `./devtools-seam` subpath export (which has
- * no runtime condition — a runtime import of it fails module resolution by
+ * The panel's half of the observation seam. The contract of record lives in
+ * `@paramour-js/next`'s `src/devtools-seam.ts`; this module consumes it
+ * TYPES-ONLY via the `./devtools-seam` subpath export (which has no runtime
+ * condition — a runtime import of it fails module resolution by
  * construction, enforcing "attach via the global only" mechanically). Both
  * sides are create-if-absent on the same `Symbol.for` key, so mount order —
  * hooks first or panel first — is irrelevant and pre-mount observations
@@ -30,7 +30,7 @@ const globalSlots = globalThis as Record<
   ParamourDevtoolsSeam | undefined
 >;
 
-/** The slot, created on first touch by whichever side runs first (DT5). */
+/** The slot, created on first touch by whichever side runs first. */
 export function getOrCreateSeam(): ParamourDevtoolsSeam {
   const existing = globalSlots[SEAM_KEY];
   if (existing !== undefined) return existing;

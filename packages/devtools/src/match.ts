@@ -9,7 +9,7 @@ export type RouteSegments = AnyRoute["~segments"];
 
 /**
  * Does `pathname` (from `window.location`) match this route's pattern?
- * Powers DT10's "current URL" grouping: static segments compare against the
+ * Powers the "current URL" grouping: static segments compare against the
  * percent-DECODED path part; `single` consumes exactly one part; `catchall`
  * one-plus; `optional-catchall` zero-plus (both are terminal by Next's
  * grammar, mirrored by core's tokenizer). Trailing slashes are

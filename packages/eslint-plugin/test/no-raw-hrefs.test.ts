@@ -210,7 +210,7 @@ export function C() {
     },
   ],
   valid: [
-    // Non-"/" hrefs are exempt (LP5)
+    // Non-"/" hrefs are exempt
     `import Link from "next/link";
 export const el = <Link href="https://example.com/about" />;`,
     `import Link from "next/link";

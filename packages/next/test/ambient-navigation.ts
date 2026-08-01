@@ -45,9 +45,9 @@ export const _ambientSearchIsUrlSearchParams: URLSearchParams = ambientSearch;
 
 /**
  * The router half declares exactly the 1-arity `replace` view `app.ts`
- * consumes for the devtools `navigate` capability (design-12 DT8): a single
- * string href, `void` return. `examples/next-compat/src/navigation.ts` owns
- * the claim that real Next's `replace(href, options?)` stays call-compatible.
+ * consumes for the devtools `navigate` capability: a single string href,
+ * `void` return. `examples/next-compat/src/navigation.ts` owns the claim that
+ * real Next's `replace(href, options?)` stays call-compatible.
  */
 declare const ambientRouter: AmbientRouter;
 export const _ambientReplaceIsCallable: (href: string) => void = (href) => {

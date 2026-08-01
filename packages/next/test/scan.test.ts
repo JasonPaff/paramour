@@ -7,12 +7,12 @@ import { resolveRouteDirs, scanRoutes } from "../src/scan.js";
 import { makeTempDir, makeTree } from "./helpers.js";
 
 /**
- * Orchestrator suite (PR8/PR9, PR11 §2): joint dir discovery per the
- * spike-2 ruling, hybrid scanning, and the cross-router collision paths.
+ * Orchestrator suite: joint dir discovery, hybrid scanning, and the
+ * cross-router collision paths.
  */
 
-describe("resolveRouteDirs (spike-2 ruling)", () => {
-  it("finds root app/ and pages/ together (PR1 hybrid)", () => {
+describe("resolveRouteDirs", () => {
+  it("finds root app/ and pages/ together (hybrid)", () => {
     const root = makeTempDir();
     makeTree(root, ["app/", "pages/"]);
     expect(resolveRouteDirs(root)).toEqual({
@@ -142,7 +142,7 @@ describe("resolveRouteDirs (spike-2 ruling)", () => {
   });
 });
 
-describe("scanRoutes orchestrator (PR1/PR9)", () => {
+describe("scanRoutes orchestrator", () => {
   it("scans a hybrid project into both unions", () => {
     const root = makeTempDir();
     makeTree(root, [
@@ -193,7 +193,7 @@ describe("scanRoutes orchestrator (PR1/PR9)", () => {
     ).toThrow(/"\/a", "\/b"/);
   });
 
-  it("errors on a cross-router slug-name conflict on a shared prefix (PR9 structural)", () => {
+  it("errors on a cross-router slug-name conflict on a shared prefix", () => {
     const root = makeTempDir();
     makeTree(root, ["app/x/[id]/page.tsx", "pages/x/[slug].tsx"]);
     expect(() =>
@@ -201,7 +201,7 @@ describe("scanRoutes orchestrator (PR1/PR9)", () => {
     ).toThrow(RouteCollisionError);
   });
 
-  it("errors on cross-router optional-catch-all specificity (PR9 structural)", () => {
+  it("errors on cross-router optional-catch-all specificity", () => {
     const root = makeTempDir();
     makeTree(root, ["app/docs/page.tsx", "pages/docs/[[...slug]].tsx"]);
     expect(() =>

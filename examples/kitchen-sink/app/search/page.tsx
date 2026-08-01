@@ -30,8 +30,8 @@ export default async function SearchPage(props: RouteProps) {
   }
 
   // Vocabulary translation: keyword→q, tag→tags. An undefined keyword flows
-  // straight through — explicit undefined is a second spelling of absence
-  // (S3) — and anything equal to a value-form default elides on the way out
-  // (D8), so the built URL is already canonical.
+  // straight through — explicit undefined is a second spelling of absence —
+  // and anything equal to a value-form default elides on the way out, so the
+  // built URL is already canonical.
   redirect(href(productsListRoute, { search: { q: keyword, tags: tag } }));
 }

@@ -5,10 +5,10 @@ import { findRoute } from "../lib/routes";
 
 // No data fetching, so Next statically optimizes this page: the first client
 // render has isReady === false and an EMPTY query even when the URL visibly
-// carries one. That platform fact is why the pages hooks are three-state
-// (PR5) — the pending arm below actually renders for a moment on a hard
-// load, then flips to data. There are deliberately no OrThrow variants
-// (PR6): throwing here would flash the error boundary on every hard load.
+// carries one. That platform fact is why the pages hooks are three-state —
+// the pending arm below actually renders for a moment on a hard load, then
+// flips to data. There are deliberately no OrThrow variants: throwing here
+// would flash the error boundary on every hard load.
 export default function FindPage() {
   const search = useSearch(findRoute);
 

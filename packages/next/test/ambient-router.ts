@@ -43,7 +43,7 @@ export const _isReadyIsWideEnough: AmbientRouter["isReady"] = someBoolean;
 
 /**
  * The ambient's `replace` is the 1-arity `Promise<boolean>` view `pages.ts`
- * consumes for the devtools `navigate` capability (design-12 DT8);
+ * consumes for the devtools `navigate` capability;
  * `examples/next-compat/src/router.ts` owns the claim that real Next's
  * `replace(url, as?, options?)` stays assignable.
  */

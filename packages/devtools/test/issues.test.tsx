@@ -23,7 +23,7 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("issues rendering (DT7)", () => {
+describe("issues rendering", () => {
   it("renders one row per failed key from the LIVE error's issues", () => {
     const seam = freshSeam();
     seam.buffer.push(
@@ -52,7 +52,7 @@ describe("issues rendering (DT7)", () => {
     expect(screen.getByText("(whole search)")).toBeDefined();
   });
 
-  it("the section is absent when there are no issues (DT15)", () => {
+  it("the section is absent when there are no issues", () => {
     const seam = freshSeam();
     seam.buffer.push(
       searchObservation(

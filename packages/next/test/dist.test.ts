@@ -71,7 +71,7 @@ describe.skipIf(!existsSync(distAppJs))("dist app entry (packaging)", () => {
     expect(content).not.toContain("next/navigation");
   });
 
-  it("no next/router is reachable from /app (PR2 bundle hygiene)", () => {
+  it("no next/router is reachable from /app (bundle hygiene)", () => {
     const specifiers = reachableSpecifiers(distAppJs);
     // Guard the guard: an entry that stopped importing its own router would
     // make the negative assertion pass vacuously.
@@ -84,7 +84,7 @@ describe.skipIf(!existsSync(distAppJs))("dist app entry (packaging)", () => {
 describe.skipIf(!existsSync(distPagesJs))(
   "dist pages entry (packaging)",
   () => {
-    it('dist/pages.js carries NO "use client" directive (PR2)', () => {
+    it('dist/pages.js carries NO "use client" directive', () => {
       // The directive is an App Router (RSC graph) concept; in a pages/
       // bundle it is at best noise. Its absence is deliberate, not an
       // emit accident — pin it.
@@ -94,13 +94,13 @@ describe.skipIf(!existsSync(distPagesJs))(
 
     it("dist/pages.d.ts is hermetic: no next/router type import leaks", () => {
       // The same hermeticity claim as the app entry, for
-      // src/types/next-router.d.ts (PR13).
+      // src/types/next-router.d.ts.
       const content = readFileSync(distPagesDts, "utf8");
       expect(content).not.toContain("next/router");
       expect(content).not.toContain("next/navigation");
     });
 
-    it("no next/navigation is reachable from /pages (PR2 bundle hygiene)", () => {
+    it("no next/navigation is reachable from /pages (bundle hygiene)", () => {
       const specifiers = reachableSpecifiers(distPagesJs);
       // Extensionful on purpose — the bare specifier dies under Node ESM
       // externalization on Next 15 (see src/pages.ts).
@@ -112,7 +112,7 @@ describe.skipIf(!existsSync(distPagesJs))(
 );
 
 describe.skipIf(!existsSync(distSeamJs))(
-  "dist devtools-seam entry (packaging, design-12 DT6)",
+  "dist devtools-seam entry (packaging)",
   () => {
     it("dist/devtools-seam.js imports NOTHING (erasability precondition)", () => {
       // Every consumer call site sits behind a constant-folded NODE_ENV
@@ -132,9 +132,9 @@ describe.skipIf(!existsSync(distSeamJs))(
 );
 
 describe.skipIf(!existsSync(distTestingJs))(
-  "dist testing entry (packaging, design-16)",
+  "dist testing entry (packaging)",
   () => {
-    it('dist/testing.js keeps the "use client" RSC boundary banner through tsc (TA5)', () => {
+    it('dist/testing.js keeps the "use client" RSC boundary banner through tsc', () => {
       const content = readFileSync(distTestingJs, "utf8");
       expect(content.startsWith('"use client";')).toBe(true);
     });
@@ -145,7 +145,7 @@ describe.skipIf(!existsSync(distTestingJs))(
       expect(content).not.toContain("next/router");
     });
 
-    it("no next/* is reachable from /testing (TA3 bundle hygiene)", () => {
+    it("no next/* is reachable from /testing (bundle hygiene)", () => {
       const specifiers = reachableSpecifiers(distTestingJs);
       // Guard the guard: the entry must actually reach the adapter-seam
       // module, or the negative assertions would pass vacuously on an

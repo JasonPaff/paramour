@@ -131,7 +131,7 @@ describe("safeDecodeSearch", () => {
   });
 });
 
-describe("safeDecodeSearch with a rawSearch route (design-04)", () => {
+describe("safeDecodeSearch with a rawSearch route", () => {
   it("returns the success arm holding the schema's own output", () => {
     const result = safeDecodeSearch(rawRoute, { page: "2", q: "hi" });
     expect(result).toEqual({ data: { page: 2, q: "hi" }, status: "success" });
@@ -153,7 +153,7 @@ describe("safeDecodeSearch with a rawSearch route (design-04)", () => {
     expect(() => safeDecodeSearch(route, {})).toThrow(/validation threw/);
   });
 
-  it("an async schema throws loudly (design-02 D7), never the error arm", () => {
+  it("an async schema throws loudly, never the error arm", () => {
     const route = defineAppRoute("/async", { search: rawSearch(asyncSchema) });
     expect(() => safeDecodeSearch(route, {})).toThrow(ParamourError);
     expect(() => safeDecodeSearch(route, {})).toThrow(/synchronous/);

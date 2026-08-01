@@ -16,7 +16,7 @@ const productSegments = defineAppRoute("/product/[id]", {
 const shopDealsSegments = defineAppRoute("/shop/deals", {})["~segments"];
 const shopSegments = defineAppRoute("/shop", {})["~segments"];
 
-describe("matchesPathname (DT10 current-URL derivation)", () => {
+describe("matchesPathname (current-URL derivation)", () => {
   it("static segments match exactly", () => {
     expect(matchesPathname(shopDealsSegments, "/shop/deals")).toBe(true);
     expect(matchesPathname(shopDealsSegments, "/shop")).toBe(false);

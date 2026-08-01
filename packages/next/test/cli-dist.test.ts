@@ -13,14 +13,14 @@ function emitApp(appRoutes: readonly string[]): string {
 }
 
 /**
- * Smoke test of the BUILT bin (TR7 packaging): proves the tsc emit,
- * shebang, and jiti-resolution wiring — the seams the in-process cli.test.ts
- * suite cannot see. Skipped when dist is absent locally; always runs in CI
- * because `pnpm build` precedes `pnpm test` there.
+ * Smoke test of the BUILT bin: proves the tsc emit, shebang, and
+ * jiti-resolution wiring — the seams the in-process cli.test.ts suite cannot
+ * see. Skipped when dist is absent locally; always runs in CI because
+ * `pnpm build` precedes `pnpm test` there.
  */
 const distCli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 
-describe.skipIf(!existsSync(distCli))("dist/cli.js (TR7 bin)", () => {
+describe.skipIf(!existsSync(distCli))("dist/cli.js (bin)", () => {
   it("one-shot generates through the built bin (exit 0)", () => {
     const root = makeTempDir();
     makeTree(root, ["app/page.tsx"]);

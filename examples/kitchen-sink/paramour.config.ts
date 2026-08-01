@@ -1,6 +1,6 @@
 import type { ParamourConfig } from "@paramour-js/next";
 
-// The CLI's config file (TR7). `paramour generate` (and `--check`/`--watch`)
+// The CLI's config file. `paramour generate` (and `--check`/`--watch`)
 // read this; `withTypedRoutes` in next.config.ts does NOT — it takes its
 // options inline, so keep `outFile` here equal to the wrapper's default. Every
 // value below is set to its own default purely to show the surface; delete the

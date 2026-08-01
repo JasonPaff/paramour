@@ -9,9 +9,9 @@ import {
 // Canonicalization in the routing layer: decode the incoming query, re-encode
 // it, and 308 when the bytes differ. Explicit serialization means every
 // decoded state has exactly ONE wire form — ?page=1&sort=name collapses to
-// bare /products (D8 elision), and a hand-typed ?q=usb+c becomes ?q=usb%20c
-// (S2: spaces are %20, never +). The filter page always emits canonical URLs
-// itself (it builds them with href()), so this only ever fires on inbound
+// bare /products (defaults elide), and a hand-typed ?q=usb+c becomes
+// ?q=usb%20c (spaces are %20, never +). The filter page always emits canonical
+// URLs itself (it builds them with href()), so this only ever fires on inbound
 // links and hand-edited URLs — never in the client-nav hot path.
 const declaredKeys = new Set(Object.keys(productsListSearch));
 
@@ -27,9 +27,9 @@ export function proxy(request: NextRequest) {
 
   // Canonical pairs for the keys this route OWNS; everything else (utm_*,
   // Next's own _rsc, ...) passes through in arrival order. Decode ignores
-  // undeclared keys (P8), so canonicalization must not eat them either.
+  // undeclared keys, so canonicalization must not eat them either.
   // decoded.data flows straight into encodeSearch — explicit undefined on an
-  // omittable key is a second spelling of absence (S3).
+  // omittable key is a second spelling of absence.
   const pairs = [
     ...encodeSearch(productsListSearch, decoded.data),
     ...[...nextUrl.searchParams].filter(([key]) => !declaredKeys.has(key)),

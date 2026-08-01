@@ -14,15 +14,15 @@ import { CodecInput, isMultilineWidget } from "./codec-input.js";
 import { AttributionTag, ValueCell } from "./primitives.js";
 
 /**
- * The search half of the inspector (DT7) and the panel's editing surface
- * (DT8): per-key widgets validating live through the codec, a per-key
- * RAW WIRE toggle for reproducing invalid values, clear-to-absent, and a
- * commit-to-push flow — Enter/blur assembles the FULL pair list (untouched
- * and unknown keys carried verbatim), serializes through
- * `buildSearchString` (spaces as %20 — S-rule fidelity), and navigates via
- * the EMITTING hook's `navigate` capability. The parent remounts this
- * component when the observed wire changes (its React key), which is the
- * drafts-invalidation rule: an external navigation resets the edit session.
+ * The search half of the inspector and the panel's editing surface: per-key
+ * widgets validating live through the codec, a per-key RAW WIRE toggle for
+ * reproducing invalid values, clear-to-absent, and a commit-to-push flow —
+ * Enter/blur assembles the FULL pair list (untouched and unknown keys
+ * carried verbatim), serializes through `buildSearchString` (spaces as %20
+ * — S-rule fidelity), and navigates via the EMITTING hook's `navigate`
+ * capability. The parent remounts this component when the observed wire
+ * changes (its React key), which is the drafts-invalidation rule: an
+ * external navigation resets the edit session.
  */
 export function SearchTable({
   changeStamps,
@@ -57,8 +57,8 @@ export function SearchTable({
       : undefined;
 
   if (description.kind === "raw") {
-    // DT7: a rawSearch route renders its parsed value with the schema shown
-    // as opaque; per-key editing has no per-key codecs to validate through.
+    // A rawSearch route renders its parsed value with the schema shown as
+    // opaque; per-key editing has no per-key codecs to validate through.
     return (
       <>
         <div className="pmr-section-title">Search</div>
@@ -106,11 +106,11 @@ export function SearchTable({
     try {
       // Untouched pairs carry from the LIVE URL, not the observation's
       // decode-time snapshot: undeclared-key churn (utm_* stripped or added
-      // by the app) never re-emits (SEL4 fingerprints declared keys only),
-      // so the snapshot can be stale in both directions — committing it
-      // would resurrect removed pairs and drop added ones. `navigate` is
-      // only handed to CURRENT sessions (DT10), so the live URL is this
-      // session's page.
+      // by the app) never re-emits — the emit fingerprint covers declared
+      // keys only — so the snapshot can be stale in both directions, and
+      // committing it would resurrect removed pairs and drop added ones.
+      // `navigate` is only handed to CURRENT sessions, so the live URL is
+      // this session's page.
       const result = buildCommittedPairs(config, liveWirePairs(), effective);
       if (result.status === "invalid") {
         setInvalidKeys(result.invalidKeys);
@@ -125,7 +125,7 @@ export function SearchTable({
       return;
     }
     setInvalidKeys([]);
-    // Search string ONLY (DT8): the hook-side navigate resolves it against
+    // Search string ONLY: the hook-side navigate resolves it against
     // its own basePath-/locale-relative pathname — `window.location.pathname`
     // here would double a configured basePath through router.replace.
     navigate(search);

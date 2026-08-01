@@ -65,20 +65,19 @@ export const _searchFeedDecoder: SearchSource = realSearch;
 export const _searchIsUrlSearchParams: URLSearchParams = realSearch;
 
 /**
- * The ambient's devtools claim (design-12 DT8): real `useRouter().replace`
- * stays call-compatible with the 1-arity `(href: string) => void` view the
- * hooks consume for `navigate`. Fails if Next makes `replace`'s first
- * parameter non-string or starts returning a value the `void` view can't
- * absorb.
+ * The ambient's devtools claim: real `useRouter().replace` stays
+ * call-compatible with the 1-arity `(href: string) => void` view the hooks
+ * consume for `navigate`. Fails if Next makes `replace`'s first parameter
+ * non-string or starts returning a value the `void` view can't absorb.
  */
 export const _replaceIsCallable: (href: string) => void = (href) => {
   realRouter.replace(href);
 };
 
 /**
- * The ambient's second devtools claim (design-12 DT8): real `usePathname()`
- * returns a string — the basePath-/locale-relative resolution base the
- * hooks join the panel's search-only navigate strings onto. Fails if Next
- * makes the return nullable or non-string.
+ * The ambient's second devtools claim: real `usePathname()` returns a string
+ * — the basePath-/locale-relative resolution base the hooks join the panel's
+ * search-only navigate strings onto. Fails if Next makes the return nullable
+ * or non-string.
  */
 export const _pathnameIsString: string = realPathname;

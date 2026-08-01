@@ -3,8 +3,8 @@ import { Suspense } from "react";
 
 // Parallel routes: @stats is a SLOT, not a URL segment — Next hands it to
 // this layout as a prop beside children, and no URL ever routes to
-// /dashboard/@stats. The scanner skips the @stats subtree the same way (TR2),
-// so the artifact carries /dashboard and nothing else.
+// /dashboard/@stats. The scanner skips the @stats subtree the same way, so
+// the artifact carries /dashboard and nothing else.
 export default function DashboardLayout({
   children,
   stats,

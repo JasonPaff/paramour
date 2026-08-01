@@ -28,7 +28,7 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("status → dot + glyph mapping (DT16)", () => {
+describe("status → dot + glyph mapping", () => {
   it("renders the right class, glyph, and aria-label per status", () => {
     const seam = freshSeam();
     seam.buffer.push(
@@ -56,8 +56,8 @@ describe("status → dot + glyph mapping (DT16)", () => {
     expect(okDots[0]?.textContent).toBe("✓");
 
     // /error and /pending are non-current in the sidebar → stale gray
-    // (positional, DT10); their own status shows when selected. The sidebar
-    // still carries their entries.
+    // (positional); their own status shows when selected. The sidebar still
+    // carries their entries.
     const staleDots = screen.getAllByLabelText("stale");
     expect(staleDots.length).toBeGreaterThanOrEqual(2);
     expect(staleDots[0]?.className).toContain("pmr-dot--stale");
@@ -80,7 +80,7 @@ describe("status → dot + glyph mapping (DT16)", () => {
     expect(errorDots[0]?.textContent).toBe("✕");
   });
 
-  it("a Pages pending result renders the amber pending dot (DT7/DT11)", () => {
+  it("a Pages pending result renders the amber pending dot", () => {
     setUrl("/pending");
     const seam = freshSeam();
     seam.buffer.push(

@@ -12,9 +12,9 @@ import {
 } from "../src";
 
 /**
- * PR10/PR11 §5 — the pages server surface. parseContext reads
- * `ctx.params` (authoritative when present) and `ctx.query` (merged params +
- * search); the split and its failure taxonomy are what these tests pin.
+ * The pages server surface. parseContext reads `ctx.params` (authoritative
+ * when present) and `ctx.query` (merged params + search); the split and its
+ * failure taxonomy are what these tests pin.
  */
 
 const productRoute = definePagesRoute("/product/[id]", {
@@ -41,7 +41,7 @@ const throwingSchema: StandardSchemaV1<unknown, never> = {
   },
 };
 
-describe("definePagesRoute define-time behavior (RL1/PR3)", () => {
+describe("definePagesRoute define-time behavior", () => {
   it("validates the path literal eagerly, like the app constructor", () => {
     expect(() => definePagesRoute("/docs/", {})).toThrow(ParamourError);
     expect(() => definePagesRoute("/(group)/x", {})).toThrow(ParamourError);
@@ -52,7 +52,7 @@ describe("definePagesRoute define-time behavior (RL1/PR3)", () => {
   });
 });
 
-describe("parseContext (PR10)", () => {
+describe("parseContext", () => {
   it("decodes a getServerSideProps-shaped context: params authoritative, query minus param names is search", () => {
     const result = productRoute.parseContext({
       params: { id: "42" },
@@ -75,7 +75,7 @@ describe("parseContext (PR10)", () => {
   it("extracts path params from query by name when params is absent (getInitialProps shape)", () => {
     // NextPageContext carries query but NO params, even on dynamic routes;
     // Next's own merge gives route params precedence in query, so extraction
-    // by segment name is sound (PR10).
+    // by segment name is sound.
     const result = productRoute.parseContext({
       query: { id: "42", page: "3" },
     });
@@ -193,7 +193,7 @@ describe("parseContext (PR10)", () => {
   });
 });
 
-describe("safeParseContext (PR10/PR12)", () => {
+describe("safeParseContext", () => {
   it("wraps a valid decode in the success arm", () => {
     const result = productRoute.safeParseContext({
       params: { id: "42" },

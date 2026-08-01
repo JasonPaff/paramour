@@ -6,18 +6,17 @@ import { matchesPathname } from "./match.js";
 import { getOrCreateSeam } from "./seam.js";
 
 /**
- * The panel's session store (design-12 DT10): a module-level singleton
- * shaped for `useSyncExternalStore`. It outlives panel mounts, so the
- * session history survives closing/reopening the shell; it attaches to the
- * seam on the FIRST subscriber (replaying the buffer — DT5) and detaches at
- * zero.
+ * The panel's session store: a module-level singleton shaped for
+ * `useSyncExternalStore`. It outlives panel mounts, so the session history
+ * survives closing/reopening the shell; it attaches to the seam on the
+ * FIRST subscriber (replaying the buffer) and detaches at zero.
  */
 
 /**
  * Per-data-key counters, incremented when that key's PARSED value changes
- * between observations — feeds DT18's row flash. Kept per HALF: an App
- * route may legally declare a search key named like a path param (PR9
- * forbids the collision only for pages routes), and a shared record would
+ * between observations — feeds the row-flash highlight. Kept per HALF: an
+ * App route may legally declare a search key named like a path param (the
+ * collision is forbidden only for pages routes), and a shared record would
  * cross-flash the other table's row.
  */
 export interface ChangeStamps {
@@ -26,7 +25,7 @@ export interface ChangeStamps {
 }
 
 export interface DevtoolsSnapshot {
-  /** Session keys classified as the page currently on screen (DT10). */
+  /** Session keys classified as the page currently on screen. */
   readonly currentKeys: readonly string[];
   /** Every route observed this session, first-observed order. */
   readonly sessions: readonly RouteSession[];
@@ -42,13 +41,13 @@ export interface RouteSession {
   readonly changeStamps: ChangeStamps;
   readonly key: string;
   /**
-   * The NEWEST observation's navigate, regardless of half (DT8): the other
-   * half's closure can be older — its fingerprint may not have moved since
-   * — and edits must always route through the freshest resolution base.
+   * The NEWEST observation's navigate, regardless of half: the other half's
+   * closure can be older — its fingerprint may not have moved since — and
+   * edits must always route through the freshest resolution base.
    */
   readonly navigate: ParamourNavigate;
   readonly params?: ParamourObservation;
-  /** The NEWEST observation's basePath-relative pathname (DT8/DT10). */
+  /** The NEWEST observation's basePath-relative pathname. */
   readonly pathname: string;
   readonly route: AnyRoute;
   readonly search?: ParamourObservation;
@@ -61,10 +60,10 @@ const EMPTY_SNAPSHOT: DevtoolsSnapshot = { currentKeys: [], sessions: [] };
 interface StoreState {
   /**
    * Observations already reduced into `sessions`. Sessions are a retained
-   * module singleton (DT10) while the seam buffer also retains history for
-   * replay (DT5) — without this, every re-attach (panel close/reopen) would
-   * re-walk the buffer over sessions that already consumed it, inflating
-   * change stamps with historical transitions.
+   * module singleton while the seam buffer also retains history for replay
+   * — without this, every re-attach (panel close/reopen) would re-walk the
+   * buffer over sessions that already consumed it, inflating change stamps
+   * with historical transitions.
    */
   consumed: WeakSet<ParamourObservation>;
   detach: (() => void) | undefined;
@@ -163,7 +162,7 @@ function attach(): void {
   const onObservation = (observation: ParamourObservation): void => {
     reduce(observation);
     recomputeSnapshot();
-    // Hooks emit render-phase (DT4), so a synchronous notify here would
+    // Hooks emit during render, so a synchronous notify here would
     // setState the panel while the EMITTING component is still rendering —
     // React's "cannot update a component while rendering" violation. The
     // snapshot updates eagerly; only the React wake-up defers a microtask.
@@ -225,9 +224,9 @@ function decodePathname(pathname: string): string {
 }
 
 /**
- * Is this session the page currently on screen (DT10)? Two conditions:
- * the live location must still correspond to the session's last OBSERVED
- * pathname — a URL that moved with no fresh observation means the retained
+ * Is this session the page currently on screen? Two conditions: the live
+ * location must still correspond to the session's last OBSERVED pathname —
+ * a URL that moved with no fresh observation means the retained
  * `navigate` belongs to a page no longer mounted, so pattern-matching the
  * location alone would enable editing through a stale closure
  * (`/product/1` → `/product/2` with no re-emit) — and the route's own
@@ -243,8 +242,8 @@ function isCurrent(locationPathname: string, session: RouteSession): boolean {
 
 /**
  * Does the live location correspond to `observed`? Observed pathnames are
- * basePath-/locale-relative (DT8) while `window.location.pathname` carries
- * the prefix, so the comparison is suffix-based — observed pathnames start
+ * basePath-/locale-relative while `window.location.pathname` carries the
+ * prefix, so the comparison is suffix-based — observed pathnames start
  * with "/", which makes plain `endsWith` boundary-safe. Percent-encoding
  * may differ between the two sources, so a failed raw comparison retries
  * decoded. Trailing slashes are normalization noise.
@@ -307,7 +306,7 @@ function recomputeSnapshot(): void {
 }
 
 function reduce(observation: ParamourObservation): void {
-  // Attach-time replays walk the WHOLE buffer (DT5); anything the retained
+  // Attach-time replays walk the WHOLE buffer; anything the retained
   // sessions already consumed must not re-apply.
   if (state.consumed.has(observation)) return;
   state.consumed.add(observation);
