@@ -1,5 +1,17 @@
 # @paramour-js/devtools
 
+## 5.0.0
+
+### Minor Changes
+
+- [#35](https://github.com/JasonPaff/paramour/pull/35) [`9cf5a70`](https://github.com/JasonPaff/paramour/commit/9cf5a70ac249e6b28c997b8aa5f6d364e174ec01) Thanks [@JasonPaff](https://github.com/JasonPaff)! - The Issues table renders the structured issue fields shipped in core: a `wire` column (the offending wire value, JSON-quoted so an empty string stays visible) and an `expected` column (the codec's bare shape label), with an em dash marking meaningful absence. The edit-preview's foreign-throw fallback issue is enriched the same way — `expected` from the codec in hand, `wire` from a scalar draft.
+
+### Patch Changes
+
+- Updated dependencies [[`9cf5a70`](https://github.com/JasonPaff/paramour/commit/9cf5a70ac249e6b28c997b8aa5f6d364e174ec01)]:
+  - paramour@0.6.0
+  - @paramour-js/next@0.4.1
+
 ## 4.0.0
 
 ### Patch Changes

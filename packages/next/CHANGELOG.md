@@ -1,5 +1,14 @@
 # @paramour-js/next
 
+## 0.4.1
+
+### Patch Changes
+
+- [#35](https://github.com/JasonPaff/paramour/pull/35) [`9cf5a70`](https://github.com/JasonPaff/paramour/commit/9cf5a70ac249e6b28c997b8aa5f6d364e174ec01) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Pretty decode errors by default. `ParamsDecodeError`/`SearchDecodeError` messages are now multi-line — a route-anchored header (`Failed to decode search params for /users/[id]:`) plus one `✖ key: message` line per issue — so the Next dev overlay and terminal stacks read like a report instead of a semicolon-joined blob. Both errors carry a new `route` field (the owning route's path pattern, `null` outside a route), `Issue` gains optional structured `expected` (the codec's bare shape label, e.g. `integer`, `enum(asc|desc)`, `csv<integer>[]`), `wire` (the offending wire value), and `reason` (the failure kind: `"duplicate" | "missing" | "parse" | "shape" | "validate"`, exported as `IssueReason`) fields, `decodeSearch` accepts an optional `routePath` third argument, and `formatCodecDescription` gains a `"shape"` style rendering the bare shape label. The message's `(expected …)` suffix is keyed on `reason`, never on message sniffing: it renders exactly where the message cannot name the expected shape itself — missing keys and foreign-validator (`"validate"`) failures — while core's self-describing grammar messages, duplicate-scalar rejections, and shape mismatches go without it. `ParseError` correspondingly gains a structural `selfDescribing` flag that core's own grammar throw sites set.
+
+- Updated dependencies [[`9cf5a70`](https://github.com/JasonPaff/paramour/commit/9cf5a70ac249e6b28c997b8aa5f6d364e174ec01)]:
+  - paramour@0.6.0
+
 ## 0.4.0
 
 ### Minor Changes

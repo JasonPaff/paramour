@@ -1,5 +1,12 @@
 # @paramour-js/nuqs
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [[`9cf5a70`](https://github.com/JasonPaff/paramour/commit/9cf5a70ac249e6b28c997b8aa5f6d364e174ec01)]:
+  - paramour@0.6.0
+
 ## 0.2.1
 
 ### Patch Changes
