@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
 
 import { Card, Cards } from "fumadocs-ui/components/card";
+import {
+  Cable,
+  Coins,
+  PanelsTopLeft,
+  ScrollText,
+  ShieldCheck,
+  Terminal,
+} from "lucide-react";
 import Link from "next/link";
 import { href } from "paramour";
 
@@ -73,36 +81,42 @@ const FEATURES = [
   {
     description:
       "Validate with zod, valibot, arktype — any Standard Schema library. Paramour owns the wire format; your validator owns the rules.",
+    icon: <ShieldCheck />,
     slug: ["concepts", "standard-schema"],
     title: "Bring your own validator",
   },
   {
     description:
       "Every codec serializes and parses by a published, numbered spec. URLs are predictable enough to hold us to them.",
+    icon: <ScrollText />,
     slug: ["reference", "wire-format"],
     title: "Explicit wire format",
   },
   {
     description:
       "Routes are imported objects, not string registries. Unused routes tree-shake away; the compiler sees every reference.",
+    icon: <Coins />,
     slug: ["concepts", "route-objects"],
     title: "Route objects as currency",
   },
   {
     description:
       "generate, check, init, list, doctor — a registry codegen and drift guard that runs in CI (and builds this site).",
+    icon: <Terminal />,
     slug: ["guides", "cli"],
     title: "CLI workflows",
   },
   {
     description:
       "A TanStack Devtools panel showing wire vs parsed values, codec shapes, and decode issues live as you navigate.",
+    icon: <PanelsTopLeft />,
     slug: ["reference", "devtools"],
     title: "Devtools panel",
   },
   {
     description:
       "Derive nuqs parsers from a route's search codecs — one definition for links, hooks, and client URL state.",
+    icon: <Cable />,
     slug: ["guides", "nuqs"],
     title: "nuqs adapter",
   },
@@ -196,8 +210,11 @@ const COMPARISON = [
 export default function HomePage() {
   return (
     <main className="flex flex-1 flex-col">
-      <section className="flex flex-col items-center gap-6 px-4 pt-16 pb-10 text-center">
-        <h1 className="text-5xl font-bold tracking-tight">paramour</h1>
+      <section className="relative flex flex-col items-center gap-6 px-4 pt-16 pb-10 text-center">
+        <div aria-hidden className="absolute inset-0 -z-10 landing-hero-bg" />
+        <h1 className="bg-linear-to-br from-fd-foreground from-45% to-fd-primary bg-clip-text text-5xl font-bold tracking-tight text-transparent">
+          paramour
+        </h1>
         <p className="text-xl font-medium">
           A routing companion your compiler approves of.
         </p>
@@ -220,7 +237,7 @@ export default function HomePage() {
             How it compares
           </Link>
         </div>
-        <div className="w-full max-w-3xl text-left">
+        <div className="w-full max-w-3xl landing-hero-code text-left">
           <TwoslashCode
             code={heroSample}
             title="app/product/[id]/route.def.ts"
@@ -247,7 +264,8 @@ export default function HomePage() {
         </ul>
       </section>
 
-      <section className="mx-auto w-full max-w-5xl px-4 py-14">
+      <section className="mx-auto w-full max-w-5xl landing-reveal px-4 py-14">
+        <Eyebrow>The problem</Eyebrow>
         <h2 className="mb-2 text-center text-2xl font-semibold tracking-tight">
           The URL is an API. Most apps type it by hand.
         </h2>
@@ -264,7 +282,8 @@ export default function HomePage() {
         </p>
       </section>
 
-      <section className="mx-auto w-full max-w-5xl px-4 pb-14">
+      <section className="mx-auto w-full max-w-5xl landing-reveal px-4 pb-14">
+        <Eyebrow>Features</Eyebrow>
         <h2 className="mb-2 text-center text-2xl font-semibold tracking-tight">
           Why paramour
         </h2>
@@ -276,6 +295,7 @@ export default function HomePage() {
             <Card
               description={feature.description}
               href={href(docsRoute, { params: { slug: feature.slug } })}
+              icon={feature.icon}
               key={feature.title}
               title={feature.title}
             />
@@ -283,8 +303,9 @@ export default function HomePage() {
         </Cards>
       </section>
 
-      <section className="border-y border-fd-border bg-fd-secondary/50 px-4 py-12">
+      <section className="landing-reveal border-y border-fd-border bg-fd-secondary/50 px-4 py-12">
         <div className="mx-auto w-full max-w-5xl">
+          <Eyebrow>Ecosystem</Eyebrow>
           <h2 className="mb-2 text-center text-2xl font-semibold tracking-tight">
             One route definition, the whole toolchain
           </h2>
@@ -295,7 +316,7 @@ export default function HomePage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {ECOSYSTEM.map((pkg) => (
               <Link
-                className="rounded-lg border border-fd-border bg-fd-card p-4 text-left transition-colors hover:bg-fd-accent"
+                className="rounded-lg border border-fd-border bg-fd-card p-4 text-left transition-colors hover:border-fd-primary/40 hover:bg-fd-accent"
                 href={href(docsRoute, { params: { slug: pkg.slug } })}
                 key={pkg.name}
               >
@@ -309,7 +330,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-5xl px-4 py-14" id="compare">
+      <section
+        className="mx-auto w-full max-w-5xl landing-reveal px-4 py-14"
+        id="compare"
+      >
+        <Eyebrow>Comparison</Eyebrow>
         <h2 className="mb-2 text-center text-2xl font-semibold tracking-tight">
           How it compares
         </h2>
@@ -323,7 +348,10 @@ export default function HomePage() {
                 <th className="px-4 py-3 font-medium" scope="col">
                   <span className="sr-only">Feature</span>
                 </th>
-                <th className="px-4 py-3 font-semibold" scope="col">
+                <th
+                  className="bg-fd-primary/5 px-4 py-3 font-semibold text-fd-primary"
+                  scope="col"
+                >
                   paramour
                 </th>
                 <th
@@ -349,7 +377,7 @@ export default function HomePage() {
                   <td className="px-4 py-3 text-fd-muted-foreground">
                     {row.feature}
                   </td>
-                  <ComparisonCell value={row.paramour} />
+                  <ComparisonCell highlight value={row.paramour} />
                   <ComparisonCell value={row.ntu} />
                   <ComparisonCell value={row.typedRoutes} />
                 </tr>
@@ -363,7 +391,7 @@ export default function HomePage() {
         </p>
       </section>
 
-      <section className="border-y border-fd-border bg-fd-secondary/50 px-4 py-12">
+      <section className="landing-reveal border-y border-fd-border bg-fd-secondary/50 px-4 py-12">
         <div className="mx-auto flex max-w-3xl flex-col items-center gap-4 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">
             Coming from next-typesafe-url?
@@ -400,7 +428,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="flex flex-col items-center gap-5 px-4 py-14 text-center">
+      <section className="flex landing-reveal flex-col items-center gap-5 px-4 py-14 text-center">
         <h2 className="text-2xl font-semibold tracking-tight">
           Start with one route
         </h2>
@@ -442,12 +470,27 @@ export default function HomePage() {
   );
 }
 
-function ComparisonCell({ value }: { value: string }) {
+function ComparisonCell({
+  highlight = false,
+  value,
+}: {
+  highlight?: boolean;
+  value: string;
+}) {
+  const base = highlight ? "bg-fd-primary/5 px-4 py-3" : "px-4 py-3";
   if (value === "✓") {
-    return <td className="px-4 py-3 text-fd-primary">✓</td>;
+    return <td className={`${base} text-fd-primary`}>✓</td>;
   }
   if (value === "—") {
-    return <td className="px-4 py-3 text-fd-muted-foreground/50">—</td>;
+    return <td className={`${base} text-fd-muted-foreground/50`}>—</td>;
   }
-  return <td className="px-4 py-3">{value}</td>;
+  return <td className={base}>{value}</td>;
+}
+
+function Eyebrow({ children }: { children: string }) {
+  return (
+    <p className="mb-3 text-center text-xs font-semibold tracking-[0.2em] text-fd-primary uppercase">
+      {children}
+    </p>
+  );
 }

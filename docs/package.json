@@ -20,6 +20,7 @@
     "fumadocs-mdx": "^15.2.0",
     "fumadocs-twoslash": "^3.3.0",
     "fumadocs-ui": "^16.11.5",
+    "lucide-react": "^1.28.0",
     "next": "^16.2.0",
     "paramour": "workspace:*",
     "react": "^19.2.0",
