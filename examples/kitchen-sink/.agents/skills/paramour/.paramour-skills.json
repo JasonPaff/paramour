@@ -1,0 +1,11 @@
+{
+  "files": {
+    "SKILL.md": "sha256:d7a7e3a0167c0111bd9085dacd106fe25a9c4a0ae42f75a0e19e805e7b332c3a",
+    "references/authoring.md": "sha256:9fd195dfbdb9a6bf2e6cd6c773d250801581f9ea5621679876a1efaf967475d5",
+    "references/migration.md": "sha256:b844a40b2b92ef7bdc1d14df0359aabb6c85f243675176ad75589c09c40ae814",
+    "references/reference.md": "sha256:2dbbc8af79e417eb51477a4e30c4e1f887dc04d6eb8a22d93e2c797d4f4ae7d8",
+    "references/setup.md": "sha256:bca10bef12cd6fa660cade7b4b172da473a33668257a6e9dca68f921f9074dcf"
+  },
+  "skill": "paramour",
+  "version": "0.4.1"
+}

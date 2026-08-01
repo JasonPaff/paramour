@@ -48,6 +48,8 @@ paramour init
   ✔ wrapped next.config.ts with withTypedRoutes
   ✔ added "paramour" script to package.json
   ✔ wrote paramour-env.d.ts (1 route)
+  • no agent tooling detected — skipped agent skills (`paramour skills` installs to the portable .agents/skills/)
+  • no AGENTS.md or CLAUDE.md — skipped agents snippet
 
 setup:
   ✔ route directories: app/
@@ -72,6 +74,13 @@ Four things, each idempotent (rerunning init never clobbers your edits):
    file that teaches the compiler which routes exist. That file is the route
    registry; commit it like a lockfile. The
    [registry page](/docs/concepts/registry) explains how it works.
+
+The two skipped steps are for projects with coding agents in the loop: when
+init detects agent tooling (a `.claude/`, `.cursor/`, `.codex/`, or
+`.agents/` directory, or a root `AGENTS.md`), it also installs the bundled
+[agent skill](/docs/guides/ai-agents) and appends a paramour section to your
+agent instructions file — so your agent learns the library the moment you
+do. On a fresh `create-next-app` there's nothing to detect, hence the skips.
 
 ## Define your first route
 
@@ -326,3 +335,5 @@ found by clicking around are moved into the type checker.
   multiple params, and safe parsing.
 - [CLI workflows](/docs/guides/cli) — `generate`, `check`, `init`, `list`,
   and `doctor` in depth.
+- [AI agents](/docs/guides/ai-agents) — the bundled agent skill
+  (`npx paramour skills`), the AGENTS.md snippet, and llms.txt.

@@ -3,18 +3,21 @@ import { runDoctor } from "./commands/doctor.js";
 import { runGenerate } from "./commands/generate.js";
 import { runInit } from "./commands/init.js";
 import { runList } from "./commands/list.js";
+import { runSkills } from "./commands/skills.js";
 
 export { type CliIo } from "./cli-io.js";
 
 type Command = (argv: readonly string[], io: CliIo) => Promise<number>;
 
-// Alphabetical; the unknown-command message derives from these keys.
-const COMMANDS: Record<string, Command> = {
+// Alphabetical; the unknown-command message derives from these keys, and the
+// skill-drift test pins them against the skill's CLI table.
+export const COMMANDS: Record<string, Command> = {
   check: (argv, io) => runGenerate(argv, io, "check"),
   doctor: runDoctor,
   generate: (argv, io) => runGenerate(argv, io, "generate"),
   init: runInit,
   list: runList,
+  skills: (argv, io) => Promise.resolve(runSkills(argv, io)),
 };
 
 const USAGE = [
@@ -26,6 +29,7 @@ const USAGE = [
   "  generate  generate paramour-env.d.ts from the app and pages directories",
   "  init      set up paramour in this project",
   "  list      print every route with its params/search shape",
+  "  skills    install or verify the bundled agent skill for detected agent tools",
   "",
   "Run `paramour <command> --help` for that command's options.",
 ].join("\n");

@@ -22,4 +22,8 @@ exclude = [
   # Placeholder/example hosts that appear in docs snippets.
   "^https?://example\\.com",
   "^https?://localhost",
+  # Served routes, not content files, so the /docs/* remap can't resolve
+  # them locally; they 404 on the live site until the PR adding them
+  # deploys. Content drift is pinned by a test instead.
+  "^https://paramour\\.dev/llms(-full)?\\.txt$",
 ]

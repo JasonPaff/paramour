@@ -6,6 +6,7 @@ import { NoRouteDirsError, resolveInputs } from "../cli-inputs.js";
 import { type CliIo, message, resolveIo } from "../cli-io.js";
 import { CONFIG_FILE_NAMES, loadConfigFile } from "../config.js";
 import { generate } from "../generate.js";
+import { findAgentsFile, upsertAgentsSection } from "../init/agents-md.js";
 import {
   addPackageScript,
   checkSetup,
@@ -17,23 +18,44 @@ import {
   wrapNextConfigSource,
 } from "../init/wrap-next-config.js";
 import { scanRoutes } from "../scan.js";
+import { loadPackagedSkill } from "../skills/packaged.js";
+import { syncTarget } from "../skills/sync.js";
+import { detectTargets } from "../skills/targets.js";
+import { reportOrphans } from "./skills.js";
 
 const USAGE = [
   "Usage: paramour init [options]",
   "",
   "Set up paramour in this project: scaffold paramour.config.ts, wrap",
-  'next.config with withTypedRoutes, add a "paramour" script, and run the',
-  "first generate. Every step is idempotent and individually skippable.",
+  'next.config with withTypedRoutes, add a "paramour" script, run the',
+  "first generate, install agent skills for detected agent tools, and add",
+  "a paramour section to an existing AGENTS.md/CLAUDE.md. Every step is",
+  "idempotent and individually skippable.",
   "",
   "Options:",
-  "  --dry-run      report every step without writing anything",
-  "  --force        overwrite an existing paramour.config with the scaffold",
-  "  --help, -h     show this help",
-  "  --no-config    skip scaffolding paramour.config.ts",
-  "  --no-generate  skip the first generate",
-  "  --no-script    skip adding the package.json script",
-  "  --no-wrap      skip wrapping next.config",
+  "  --dry-run        report every step without writing anything",
+  "  --force          overwrite an existing paramour.config with the scaffold",
+  "  --help, -h       show this help",
+  "  --no-agents-md   skip the AGENTS.md/CLAUDE.md paramour section",
+  "  --no-config      skip scaffolding paramour.config.ts",
+  "  --no-generate    skip the first generate",
+  "  --no-script      skip adding the package.json script",
+  "  --no-skills      skip installing agent skills",
+  "  --no-wrap        skip wrapping next.config",
 ].join("\n");
+
+/** @internal `paramour init` flags — skill-drift test's source of truth. */
+export const INIT_OPTIONS = {
+  "dry-run": { default: false, type: "boolean" },
+  force: { default: false, type: "boolean" },
+  help: { default: false, short: "h", type: "boolean" },
+  "no-agents-md": { default: false, type: "boolean" },
+  "no-config": { default: false, type: "boolean" },
+  "no-generate": { default: false, type: "boolean" },
+  "no-script": { default: false, type: "boolean" },
+  "no-skills": { default: false, type: "boolean" },
+  "no-wrap": { default: false, type: "boolean" },
+} as const;
 
 /**
  * @internal `paramour init` — non-interactive by design: it runs straight
@@ -47,20 +69,10 @@ export async function runInit(
   io: CliIo,
 ): Promise<number> {
   const { stderr, stdout } = resolveIo(io);
-  const parsed = parseCommandFlags(
-    argv,
-    {
-      "dry-run": { default: false, type: "boolean" },
-      force: { default: false, type: "boolean" },
-      help: { default: false, short: "h", type: "boolean" },
-      "no-config": { default: false, type: "boolean" },
-      "no-generate": { default: false, type: "boolean" },
-      "no-script": { default: false, type: "boolean" },
-      "no-wrap": { default: false, type: "boolean" },
-    },
-    USAGE,
-    { stderr, stdout },
-  );
+  const parsed = parseCommandFlags(argv, INIT_OPTIONS, USAGE, {
+    stderr,
+    stdout,
+  });
   if ("exit" in parsed) return parsed.exit;
   const flags = parsed.values;
 
@@ -216,6 +228,92 @@ export async function runInit(
       } catch (error) {
         stderr(`paramour: ${message(error)}`);
         return 2;
+      }
+    }
+  }
+
+  // 5. Agent skills for detected agent tools. Detection-driven and
+  // non-interactive; init never invents an install location — with no
+  // tooling present, the explicit `paramour skills` command carries the
+  // intent its portable-location fallback needs.
+  if (!flags["no-skills"]) {
+    const detected = detectTargets(projectRoot);
+    if (detected.length === 0) {
+      stdout(
+        "  • no agent tooling detected — skipped agent skills (`paramour skills` installs to the portable .agents/skills/)",
+      );
+    } else {
+      try {
+        const packaged = loadPackagedSkill();
+        for (const target of detected) {
+          const result = syncTarget(target, packaged, { dry, force: false });
+          if (result.written.length > 0) {
+            stdout(
+              `  ✔ ${dry ? "would install" : "installed"} agent skills → ${target.rel}`,
+            );
+          } else if (result.skippedModified.length === 0) {
+            stdout(`  • agent skills already up to date in ${target.rel}`);
+          }
+          if (result.skippedModified.length > 0) {
+            stdout(
+              `  ⚠ ${target.rel}: locally-modified skill files left as-is (\`paramour skills --force\` overwrites)`,
+            );
+          }
+          // A sync can also delete files (managed orphans from a previous
+          // install); those must never happen silently, so reuse the exact
+          // per-orphan wording `paramour skills` prints.
+          reportOrphans(result, dry, stdout);
+        }
+      } catch (error) {
+        // Same stance as the wrap step: a failed nicety degrades to a
+        // printed pointer, never a failed init.
+        stdout(
+          `  ⚠ could not install agent skills (${message(error)}) — run \`paramour skills\``,
+        );
+      }
+    }
+  }
+
+  // 6. Marker-managed paramour section in AGENTS.md/CLAUDE.md, pointing
+  // agents at the skill step 5 installed. Append-only: init never creates
+  // the file — a root AGENTS.md is a detectTargets signal, so inventing one
+  // would change what the skills step sees on the next run. --force is
+  // deliberately not consulted: the markers delimit paramour-owned content,
+  // so refreshing it is unconditionally safe.
+  if (!flags["no-agents-md"]) {
+    const agentsFile = findAgentsFile(projectRoot);
+    if (agentsFile === undefined) {
+      stdout("  • no AGENTS.md or CLAUDE.md — skipped agents snippet");
+    } else {
+      const name = basename(agentsFile);
+      let source: string | undefined;
+      try {
+        source = readFileSync(agentsFile, "utf8");
+      } catch (error) {
+        // The skills-step stance: a failed nicety never fails init.
+        stdout(
+          `  ⚠ could not read ${name} (${message(error)}) — skipped agents snippet`,
+        );
+      }
+      if (source !== undefined) {
+        const result = upsertAgentsSection(source);
+        if (result.status === "added") {
+          write(agentsFile, result.text);
+          stdout(
+            `  ✔ ${dry ? "would append" : "appended"} paramour section to ${name}`,
+          );
+        } else if (result.status === "updated") {
+          write(agentsFile, result.text);
+          stdout(
+            `  ✔ ${dry ? "would update" : "updated"} paramour section in ${name}`,
+          );
+        } else if (result.status === "unchanged") {
+          stdout(`  • ${name} paramour section already up to date — skipped`);
+        } else {
+          stdout(
+            `  ⚠ ${name} has an unterminated paramour marker — left as-is (remove or close the markers, then re-run)`,
+          );
+        }
       }
     }
   }

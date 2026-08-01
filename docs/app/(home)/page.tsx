@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Card, Cards } from "fumadocs-ui/components/card";
 import {
+  Bot,
   Cable,
   Coins,
   PanelsTopLeft,
@@ -108,6 +109,13 @@ const FEATURES = [
   },
   {
     description:
+      "An Agent Skills package ships in the box — paramour skills gives Claude Code, Cursor, and Codex version-accurate instructions, not guesswork.",
+    icon: <Bot />,
+    slug: ["guides", "ai-agents"],
+    title: "Teaches your AI agent",
+  },
+  {
+    description:
       "A TanStack Devtools panel showing wire vs parsed values, codec shapes, and decode issues live as you navigate.",
     icon: <PanelsTopLeft />,
     slug: ["reference", "devtools"],
@@ -187,6 +195,12 @@ const COMPARISON = [
   },
   {
     feature: "CI drift check (check, doctor)",
+    ntu: "—",
+    paramour: "✓",
+    typedRoutes: "—",
+  },
+  {
+    feature: "Bundled agent skill for coding agents",
     ntu: "—",
     paramour: "✓",
     typedRoutes: "—",

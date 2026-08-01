@@ -8,9 +8,9 @@ const USAGE = [
   "Usage: paramour doctor [options]",
   "",
   "Diagnose the project's paramour setup: config validity, artifact",
-  "freshness, next.config wrapping, version alignment, tsconfig coverage,",
-  "and route-definition discovery (which evaluates matched modules, like",
-  "`paramour list`).",
+  "freshness, next.config wrapping, version alignment, installed agent",
+  "skills, tsconfig coverage, and route-definition discovery (which",
+  "evaluates matched modules, like `paramour list`).",
   "",
   "Exit codes: 0 all checks pass (warnings allowed), 1 any check fails.",
   "",
@@ -18,6 +18,12 @@ const USAGE = [
   "  --help, -h  show this help",
   "  --json      machine-readable output",
 ].join("\n");
+
+/** @internal `paramour doctor` flags — skill-drift test's source of truth. */
+export const DOCTOR_OPTIONS = {
+  help: { default: false, short: "h", type: "boolean" },
+  json: { default: false, type: "boolean" },
+} as const;
 
 /**
  * @internal `paramour doctor` — a verification, so its exit codes follow
@@ -29,15 +35,10 @@ export async function runDoctor(
   io: CliIo,
 ): Promise<number> {
   const { stderr, stdout } = resolveIo(io);
-  const parsed = parseCommandFlags(
-    argv,
-    {
-      help: { default: false, short: "h", type: "boolean" },
-      json: { default: false, type: "boolean" },
-    },
-    USAGE,
-    { stderr, stdout },
-  );
+  const parsed = parseCommandFlags(argv, DOCTOR_OPTIONS, USAGE, {
+    stderr,
+    stdout,
+  });
   if ("exit" in parsed) return parsed.exit;
   const flags = parsed.values;
 

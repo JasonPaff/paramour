@@ -1,4 +1,4 @@
 {
-  "pages": ["index", "generate", "check", "init", "list", "doctor"],
+  "pages": ["index", "generate", "check", "init", "list", "doctor", "skills"],
   "title": "CLI"
 }

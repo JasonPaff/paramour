@@ -35,6 +35,15 @@ const USAGE = [
   "  --pages-dir <dir>         pages directory (default: discovered pages/ or src/pages/)",
 ].join("\n");
 
+/** @internal `paramour list` flags — skill-drift test's source of truth. */
+export const LIST_OPTIONS = {
+  "app-dir": { type: "string" },
+  help: { default: false, short: "h", type: "boolean" },
+  json: { default: false, type: "boolean" },
+  "page-extensions": { type: "string" },
+  "pages-dir": { type: "string" },
+} as const;
+
 /**
  * @internal `paramour list`: the filesystem scan is authoritative for WHICH
  * routes exist (same engine as generate); discovered definitions overlay
@@ -47,18 +56,10 @@ export async function runList(
   io: CliIo,
 ): Promise<number> {
   const { stderr, stdout } = resolveIo(io);
-  const parsed = parseCommandFlags(
-    argv,
-    {
-      "app-dir": { type: "string" },
-      help: { default: false, short: "h", type: "boolean" },
-      json: { default: false, type: "boolean" },
-      "page-extensions": { type: "string" },
-      "pages-dir": { type: "string" },
-    },
-    USAGE,
-    { stderr, stdout },
-  );
+  const parsed = parseCommandFlags(argv, LIST_OPTIONS, USAGE, {
+    stderr,
+    stdout,
+  });
   if ("exit" in parsed) return parsed.exit;
   const flags = parsed.values;
 

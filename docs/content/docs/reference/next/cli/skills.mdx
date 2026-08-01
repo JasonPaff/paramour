@@ -1,0 +1,97 @@
+---
+title: paramour skills
+description: Install or verify the bundled agent skill for detected agent tools.
+---
+
+Agentic coding tools know nothing about paramour — it is too new to be in
+any model's training data. `@paramour-js/next` therefore ships an [Agent
+Skills](https://agentskills.io)–format skill inside the package itself
+(`SKILL.md` plus four reference files), and `paramour skills` installs it
+into your project so Claude Code, Cursor, Codex, and any other
+skills-reading tool can work with paramour correctly — and verify their own
+work with `paramour check`. Because the skill ships in the npm package, its
+content always matches the installed API version. The
+[AI agents guide](/docs/guides/ai-agents) covers the skill's contents and
+the surrounding agent story; this page documents the command.
+
+```bash
+npx paramour skills
+```
+
+```txt
+paramour skills
+  ✔ .claude/skills/paramour — installed (5 files)
+  ✔ .cursor/skills/paramour — installed (5 files)
+```
+
+The installer detects agent tooling by presence at the project root —
+the `.agents/`, `.claude/`, `.codex/`, and `.cursor/` directories, plus a
+root `AGENTS.md` file, which counts as detecting the `.agents/` target
+(so a repo with only an `AGENTS.md` gets `.agents/skills/paramour`) — and
+writes the skill into each detected tool's `skills/` directory. With
+nothing detected it installs to the portable `.agents/skills/` location
+and says so. Commit the installed files: they diff cleanly and version with your
+lockfile.
+
+## Safe re-syncs
+
+Every install writes a `.paramour-skills.json` manifest next to the skill
+recording the package version and a content hash per file. On a re-run
+(after upgrading `@paramour-js/next`, say):
+
+- files you never touched are updated in place,
+- files you edited locally are **left as-is** — re-run with `--force` to
+  overwrite them,
+- files the package no longer ships are removed when untouched, kept (and
+  untracked) when edited.
+
+A re-run that changes nothing writes nothing. Deleting the skill directory
+(or the whole tool directory) is a clean uninstall.
+
+## Flags
+
+| Flag           | Default   | Description                                                                                     |
+| -------------- | --------- | ------------------------------------------------------------------------------------------------ |
+| `--check`      | off       | Verify installed skills instead of writing; exit `1` when any copy is missing or stale.          |
+| `--dry-run`    | off       | Report what would be written without writing.                                                    |
+| `--force`      | off       | Overwrite locally-modified skill files.                                                          |
+| `--json`       | off       | Machine-readable output.                                                                         |
+| `--tool <t>`   | detection | Target tool(s): `agents`, `claude`, `codex`, `cursor`. Repeatable or comma-separated; overrides detection. |
+| `--help`, `-h` | —         | Show usage.                                                                                      |
+
+`--check` never writes, so combining it with `--dry-run` or `--force`
+is a usage error (exit `2`).
+
+## `--check` in CI
+
+`skills --check` verifies that every detected target has an up-to-date
+copy — add it to CI next to `paramour check` if you want skill drift to
+fail builds after package upgrades. With no agent tooling detected there
+is nothing to verify, so the check passes — a project that never opted
+into skills can carry it in CI without a permanently red gate:
+
+```bash
+npx paramour skills --check
+```
+
+Locally-modified files are reported as warnings but do not fail the check —
+tailoring the skill to your project is legitimate. Files that are missing
+or stale (the packaged content changed since the last sync) exit `1`.
+
+In a repo where only some detected tools should carry the skill (say
+`.cursor/` exists but only Claude skills are installed), scope the CI
+invocation with `--tool claude` so the unused tool does not read as
+missing.
+
+[`paramour doctor`](/docs/reference/next/cli/doctor) reports the same
+staleness as a warn-level check — advisory, never build-failing — and
+[`paramour init`](/docs/reference/next/cli/init) installs the skill
+automatically when it detects agent tooling (`--no-skills` opts out).
+
+## Exit codes
+
+| Code | When                                                                                                  |
+| ---- | ------------------------------------------------------------------------------------------------------ |
+| `0`  | Install/re-sync succeeded — including when locally-modified files were skipped (the refusal is printed). |
+| `1`  | `--check` only: an installed copy is missing or stale.                                                  |
+| `2`  | Usage errors (unknown `--tool`, `--check` with a write flag), unreadable bundled content, I/O failures. |

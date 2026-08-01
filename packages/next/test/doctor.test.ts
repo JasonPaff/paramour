@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -232,5 +232,55 @@ describe("paramour doctor", () => {
     const run = await doctor(["--help"]);
     expect(run.code).toBe(0);
     expect(run.out.join("\n")).toContain("Usage: paramour doctor");
+  });
+
+  it("skills: no agent tooling reads as a skipped pass", async () => {
+    makeHealthyProject();
+    const run = await doctor();
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toContain(
+      "✔ skills: no agent tooling detected — skipped",
+    );
+  });
+
+  it("skills: tooling without an install is a pass with a pointer", async () => {
+    const root = makeHealthyProject();
+    makeTree(root, [".claude/"]);
+    const run = await doctor();
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toContain(
+      "✔ skills: not installed (`paramour skills` installs agent skills for .claude/)",
+    );
+  });
+
+  it("skills: a fresh install passes; local edits and staleness warn (exit 0)", async () => {
+    const root = makeHealthyProject();
+    makeTree(root, [".claude/"]);
+    await runCli(["skills"], {
+      stderr: () => undefined,
+      stdout: () => undefined,
+    });
+    const fresh = await doctor();
+    expect(fresh.code).toBe(0);
+    expect(fresh.out.join("\n")).toContain(
+      "✔ skills: .claude/skills/paramour is up to date",
+    );
+
+    const skillPath = join(root, ".claude", "skills", "paramour", "SKILL.md");
+    writeFileSync(skillPath, "local tailoring\n");
+    const modified = await doctor();
+    expect(modified.code).toBe(0);
+    const modifiedText = modified.out.join("\n");
+    expect(modifiedText).toContain(
+      "⚠ skills: .claude/skills/paramour has local edits",
+    );
+    expect(modifiedText).toContain("SKILL.md: locally modified");
+
+    rmSync(skillPath);
+    const stale = await doctor();
+    expect(stale.code).toBe(0);
+    const staleText = stale.out.join("\n");
+    expect(staleText).toContain("⚠ skills: .claude/skills/paramour is stale");
+    expect(staleText).toContain("SKILL.md: missing — run `paramour skills`");
   });
 });

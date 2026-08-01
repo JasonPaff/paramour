@@ -3,7 +3,7 @@
 The Next.js integration for [paramour](https://paramour.dev):
 `withTypedRoutes` (build-time registry generation and drift checking),
 typed client hooks for both routers, and the `paramour` CLI
-(`generate` / `check` / `init` / `list` / `doctor`).
+(`generate` / `check` / `init` / `list` / `doctor` / `skills`).
 
 ```sh
 pnpm add paramour @paramour-js/next
