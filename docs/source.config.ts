@@ -4,7 +4,12 @@ import { transformerTwoslash } from "fumadocs-twoslash";
 import { createFileSystemTypesCache } from "fumadocs-twoslash/cache-fs";
 import { JsxEmit } from "typescript";
 
-export const docs = defineDocs({ dir: "content/docs" });
+export const docs = defineDocs({
+  dir: "content/docs",
+  // Compiled-markdown copies of every page, for /llms-full.txt — agents get
+  // clean markdown instead of raw MDX with JSX component tags.
+  docs: { postprocess: { includeProcessedMarkdown: true } },
+});
 
 export default defineConfig({
   mdxOptions: {
