@@ -1,5 +1,16 @@
 # docs
 
+## 0.0.5
+
+### Patch Changes
+
+- [#38](https://github.com/JasonPaff/paramour/pull/38) [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Add the AI agents guide (bundled agent skill, AGENTS.md snippet, llms.txt), surface the feature on the landing page (feature card + comparison row), and update Getting Started's init transcript to show the agent-related steps.
+
+- [#38](https://github.com/JasonPaff/paramour/pull/38) [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Serve `/llms.txt` (per-page index) and `/llms-full.txt` (the full docs corpus as processed markdown, MDX components compiled away) for agents doing web lookups without the bundled skill installed. Both are statically rendered at build time.
+
+- Updated dependencies [[`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4), [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4), [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4)]:
+  - @paramour-js/next@0.5.0
+
 ## 0.0.4
 
 ### Patch Changes

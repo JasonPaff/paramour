@@ -1,5 +1,17 @@
 # @paramour-js/next
 
+## 0.5.0
+
+### Minor Changes
+
+- [#38](https://github.com/JasonPaff/paramour/pull/38) [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Ship a bundled Agent Skills–format skill (`skills/paramour/`: SKILL.md router plus setup/migration/authoring/reference files) and a new `paramour skills` command that installs it into each detected agent tool's skills directory (`.agents/`, `.claude/`, `.codex/`, `.cursor/`, portable fallback), stamping installs with a `.paramour-skills.json` content-hash manifest so re-syncs never overwrite local edits without `--force`. `skills --check` verifies freshness for CI (exit 1 on missing/stale), `paramour doctor` gains a warn-level skills staleness check, and `paramour init` auto-installs skills when agent tooling is detected (`--no-skills` opts out).
+
+- [#38](https://github.com/JasonPaff/paramour/pull/38) [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `paramour init` gains a sixth step: append a marker-delimited (`<!-- paramour:start -->` … `<!-- paramour:end -->`) paramour section to an existing `AGENTS.md` (or, failing that, `CLAUDE.md`), pointing agents at the installed skill and the generate/check/list verify loop. Append-only — init never creates the file (a root `AGENTS.md` is a skills-detection signal); re-runs refresh the section in place without touching surrounding prose; `--no-agents-md` opts out.
+
+### Patch Changes
+
+- [#38](https://github.com/JasonPaff/paramour/pull/38) [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Pin the bundled agent skill's load-bearing facts to their sources with a CI drift test: barrel export/type rosters, `@paramour-js/next` entry-point exports, CLI commands and flags, `p.*` builders, `paramour.config` fields, wire-rule citations, and version-floor claims now fail `pnpm test` when the skill files and the package disagree. Internal-only export hoists (`*_OPTIONS` flag tables, `COMMANDS`, `PARAMOUR_CONFIG_KEYS`) — no behavior change.
+
 ## 0.4.1
 
 ### Patch Changes

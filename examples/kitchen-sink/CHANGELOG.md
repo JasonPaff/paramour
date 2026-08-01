@@ -1,5 +1,15 @@
 # example-kitchen-sink
 
+## 0.0.10
+
+### Patch Changes
+
+- [#38](https://github.com/JasonPaff/paramour/pull/38) [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Commit an installed copy of the bundled agent skill (`.agents/skills/paramour`, written by `paramour skills`) and gate it in CI with `paramour skills --check`, so editing the skill source in `packages/next/skills/` without re-syncing the example fails the build.
+
+- Updated dependencies [[`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4), [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4), [`edcb3cf`](https://github.com/JasonPaff/paramour/commit/edcb3cfd5572081ad83b3be9ef888bc93637bdd4)]:
+  - @paramour-js/next@0.5.0
+  - @paramour-js/devtools@6.0.0
+
 ## 0.0.9
 
 ### Patch Changes
