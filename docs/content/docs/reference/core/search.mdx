@@ -33,7 +33,15 @@ const fromUrl = decodeSearch(config, new URLSearchParams("?page=2"));
 //    ^?
 
 const fromProps = decodeSearch(config, { page: "2", q: "socks" });
+
+// Optional third argument: anchor a thrown SearchDecodeError to a route.
+decodeSearch(config, { page: "x" }, "/products");
 ```
+
+The third argument, `routePath`, sets a thrown `SearchDecodeError`'s
+`route` field and its message header (`Failed to decode search params for
+/products:`). The route methods pass `route.path` automatically; a bare
+`decodeSearch` call without it throws a route-less error.
 
 Decode semantics, per key:
 

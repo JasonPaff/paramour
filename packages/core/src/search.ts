@@ -2,12 +2,15 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { AnyCodec, OutputOf, PresenceOf } from "./codec.js";
 
+import { codecShapeLabel } from "./describe.js";
 import {
   describeType,
   foreignMessage,
   type Issue,
+  type IssueReason,
   ParamourError,
   ParseError,
+  parseIssueReason,
   rebrandForeign,
   SearchDecodeError,
   SearchSourceError,
@@ -132,14 +135,23 @@ export function buildSearchString(
  * A `RawSearch` config (SS2) branches to the whole-object schema
  * path instead: every source key reaches the schema (P8 does not apply
  * there — the schema owns stripping or passing through extras).
+ *
+ * `routePath` anchors a thrown {@link SearchDecodeError} to the owning
+ * route's path pattern — route-level surfaces pass `route.path`; standalone
+ * callers (nuqs, devtools) omit it and the error stays route-less.
  */
 export function decodeSearch<S extends SearchSlot>(
   config: S,
   source: SearchSource,
+  routePath?: string,
 ): SearchOutputOf<S> {
   requireSearchConfig(config);
   if (isRawSearch(config)) {
-    return decodeRawSearch(config, source) as SearchOutputOf<S>;
+    return decodeRawSearch(
+      config,
+      source,
+      routePath ?? null,
+    ) as SearchOutputOf<S>;
   }
   // The conditional SearchSlot doesn't narrow inside the generic body once
   // the RawSearch branch returns (S stays a generic type parameter); this
@@ -165,11 +177,22 @@ export function decodeSearch<S extends SearchSlot>(
     error: unknown,
     key: string,
     codec: AnyCodec,
+    wire?: string,
+    reason?: IssueReason,
   ): void => {
     if (error instanceof ParseError && codec["~catchValue"] !== undefined) {
       entries.push([key, codec["~catchValue"]()]);
     } else if (error instanceof ParseError) {
-      issues.push({ key, message: error.message });
+      issues.push({
+        expected: codecShapeLabel(codec),
+        key,
+        message: error.message,
+        // An explicitly passed reason (the duplicate-scalar rejection) wins;
+        // otherwise the ParseError's own selfDescribing flag decides
+        // "parse" vs "validate" — structural, never message sniffing.
+        reason: reason ?? parseIssueReason(error),
+        ...(wire === undefined ? {} : { wire }),
+      });
     } else {
       throw error;
     }
@@ -182,10 +205,16 @@ export function decodeSearch<S extends SearchSlot>(
       // Array codecs consume all values in wire order; absent → [] (P6).
       // Presence modifiers are banned on array codecs, so no absence
       // handling exists here.
+      let offending: string | undefined;
       try {
-        entries.push([key, values.map((raw) => codec["~parseElement"](raw))]);
+        const parsed: unknown[] = [];
+        for (const raw of values) {
+          offending = raw;
+          parsed.push(codec["~parseElement"](raw));
+        }
+        entries.push([key, parsed]);
       } catch (error) {
-        recoverParseError(error, key, codec);
+        recoverParseError(error, key, codec, offending);
       }
       continue;
     }
@@ -202,7 +231,12 @@ export function decodeSearch<S extends SearchSlot>(
           entries.push([key, undefined]);
           break;
         case "required":
-          issues.push({ key, message: "required search param is missing" });
+          issues.push({
+            expected: codecShapeLabel(codec),
+            key,
+            message: "required search param is missing",
+            reason: "missing",
+          });
           break;
       }
       continue;
@@ -220,12 +254,21 @@ export function decodeSearch<S extends SearchSlot>(
       }
       entries.push([key, codec["~parseElement"](first)]);
     } catch (error) {
-      recoverParseError(error, key, codec);
+      // The duplicate-scalar rejection (P5) has no SINGLE offending value —
+      // only a genuine one-value parse cites its wire form — and its reason
+      // is passed explicitly: duplication is what failed, not the grammar.
+      recoverParseError(
+        error,
+        key,
+        codec,
+        values.length > 1 ? undefined : first,
+        values.length > 1 ? "duplicate" : undefined,
+      );
     }
   }
 
   if (issues.length > 0) {
-    throw new SearchDecodeError(issues);
+    throw new SearchDecodeError(issues, routePath ?? null);
   }
   return Object.fromEntries(entries) as SearchOutputOf<S>;
 }
@@ -478,6 +521,7 @@ export function serializeValue(
 function decodeRawSearch(
   config: RawSearch<StandardSchemaV1>,
   source: SearchSource,
+  routePath: null | string,
 ): unknown {
   const record = readAllValues(source);
   const result = rebrandForeign(
@@ -505,9 +549,15 @@ function decodeRawSearch(
       const key = Array.from(issue.path ?? [], (seg) =>
         String(typeof seg === "object" ? seg.key : seg),
       ).join(".");
-      return { key: key === "" ? "<search>" : key, message: issue.message };
+      // "validate": the prose belongs to the user's whole-object schema —
+      // same classification as a per-key schema failure.
+      return {
+        key: key === "" ? "<search>" : key,
+        message: issue.message,
+        reason: "validate",
+      };
     });
-    throw new SearchDecodeError(issues);
+    throw new SearchDecodeError(issues, routePath);
   }
   return result.value;
 }

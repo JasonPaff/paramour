@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import {
   type AnyCodec,
   decodeSearch,
+  type Issue,
   type SearchConfig,
   SearchDecodeError,
 } from "paramour";
@@ -18,7 +19,7 @@ import { RuleLink } from "./rule-link";
 
 type Result =
   | { decoded: Record<string, unknown>; kind: "ok" }
-  | { issues: readonly { key: string; message: string }[]; kind: "issues" }
+  | { issues: readonly Issue[]; kind: "issues" }
   | { kind: "other"; message: string };
 
 /**
@@ -116,11 +117,22 @@ export function DecodePane({
           </p>
           <ul className="mt-1 flex flex-col gap-0.5 font-mono text-xs">
             {result.issues.map((issue, index) => (
-              <li key={index}>
-                <span className="font-semibold">{issue.key}</span>
+              <li className="flex flex-wrap items-baseline gap-x-2" key={index}>
+                {/* colon lives inside the key span so the flex gap can't split "key" from ":" */}
+                <span className="font-semibold">{issue.key}:</span>
                 <span className="text-fd-muted-foreground">
-                  : {issue.message}
+                  {issue.message}
                 </span>
+                {issue.expected === undefined ? null : (
+                  <span className="text-fd-primary">
+                    expected: {issue.expected}
+                  </span>
+                )}
+                {issue.wire === undefined ? null : (
+                  <span className="text-fd-muted-foreground">
+                    wire: {JSON.stringify(issue.wire)}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

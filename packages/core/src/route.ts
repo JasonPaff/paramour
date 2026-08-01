@@ -449,7 +449,7 @@ export function defineAppRoute<
       const decodedParams = decodeParams(route, paramsSource ?? {});
       return {
         params: decodedParams,
-        search: decodeSearch(route["~search"], searchSource ?? {}),
+        search: decodeSearch(route["~search"], searchSource ?? {}, route.path),
       };
     },
     async parseParams(props: ParamsPropsInput) {
@@ -458,7 +458,7 @@ export function defineAppRoute<
     },
     async parseSearch(props: SearchPropsInput) {
       const source = await awaitProp(props.searchParams);
-      return decodeSearch(route["~search"], source ?? {});
+      return decodeSearch(route["~search"], source ?? {}, route.path);
     },
     safeParse(props: RoutePropsInput) {
       return safely(() => route.parse(props));
@@ -517,7 +517,7 @@ export function definePagesRoute<
       });
       return {
         params: decodedParams,
-        search: decodeSearch(route["~search"], searchSource),
+        search: decodeSearch(route["~search"], searchSource, route.path),
       };
     },
     safeParseContext(context: PagesContext) {

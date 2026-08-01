@@ -213,7 +213,7 @@ describe("vendor-owned arrays are never mapped in place", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(SearchDecodeError);
       expect((error as SearchDecodeError).issues).toEqual([
-        { key: "<search>", message: "root failed" },
+        { key: "<search>", message: "root failed", reason: "validate" },
       ]);
     }
   });

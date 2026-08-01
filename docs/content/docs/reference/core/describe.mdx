@@ -85,10 +85,11 @@ results) — reflection only needs the data core. The pieces:
 
 ## formatCodecDescription
 
-Renders a `CodecDescription` as a one-line label, in one of two styles.
+Renders a `CodecDescription` as a one-line label, in one of three styles.
 This is *the* shared walk over a description's fields — `paramour list`'s
-annotations and the devtools panel's shape column both call it, so every
-consumer renders the same structure.
+annotations, the devtools panel's shape column, and decode-issue
+`expected` labels all call it, so every consumer renders the same
+structure.
 
 ```ts twoslash
 import { describeCodec, formatCodecDescription, p } from "paramour";
@@ -114,6 +115,11 @@ formatCodecDescription(sort, "verbose");
   string[]
   ```
 
+- **`"shape"`** — the bare shape label with no presence/default/catch
+  annotations: `enum(asc|desc)`, `csv<integer>`, `string[]`. This is the
+  form a decode error cites as an issue's
+  [`expected`](/docs/reference/core/errors#related-types) field.
+
 - **`"verbose"`** — parenthesized annotations in fixed order (presence,
   default, catch): `enum(asc, desc) (optional) (default: asc) (catch)`.
 
@@ -129,8 +135,8 @@ carries it, so `array<csv<E>>` renders as `csv<E>[]`.
   `enumMembers`.
 - **`CodecDefaultDescription`** — the `defaultValue` union:
   `{ kind: "value"; wire: string }` or `{ kind: "factory" }`.
-- **`CodecFormatStyle`** — `"compact" | "verbose"`, the styles accepted by
-  `formatCodecDescription`.
+- **`CodecFormatStyle`** — `"compact" | "shape" | "verbose"`, the styles
+  accepted by `formatCodecDescription`.
 - **`ParamDescription`** — a `CodecDescription` plus the `segmentKind` of
   the dynamic segment hosting it.
 - **`RouteDescription`** — the reflected route: `path`, `router`, `params`,

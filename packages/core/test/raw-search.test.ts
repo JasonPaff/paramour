@@ -65,8 +65,12 @@ describe("rawSearch decode (SS3/SS4)", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(SearchDecodeError);
       expect((error as SearchDecodeError).issues).toEqual([
-        { key: "<search>", message: "q is required" },
-        { key: "filters.min", message: "min must be a number" },
+        { key: "<search>", message: "q is required", reason: "validate" },
+        {
+          key: "filters.min",
+          message: "min must be a number",
+          reason: "validate",
+        },
       ]);
     }
   });
@@ -92,7 +96,11 @@ describe("rawSearch decode (SS3/SS4)", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(SearchDecodeError);
       expect((error as SearchDecodeError).issues).toEqual([
-        { key: "filters.min", message: "min must be a number" },
+        {
+          key: "filters.min",
+          message: "min must be a number",
+          reason: "validate",
+        },
       ]);
     }
   });
@@ -113,7 +121,11 @@ describe("rawSearch decode (SS3/SS4)", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(SearchDecodeError);
       expect((error as SearchDecodeError).issues).toEqual([
-        { key: "<search>", message: "at least one filter is required" },
+        {
+          key: "<search>",
+          message: "at least one filter is required",
+          reason: "validate",
+        },
       ]);
     }
   });
@@ -210,7 +222,7 @@ describe("rawSearch decode (SS3/SS4)", () => {
       expect.unreachable();
     } catch (error) {
       expect((error as SearchDecodeError).issues).toEqual([
-        { key: "items.0", message: "not a number" },
+        { key: "items.0", message: "not a number", reason: "validate" },
       ]);
     }
   });

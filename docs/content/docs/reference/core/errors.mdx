@@ -103,6 +103,30 @@ both. Thrown by `decodeSearch`, `route.parseSearch`, the search half of
 `standardSearchSchema` converts it to spec-shaped issues instead of
 throwing.
 
+## The message is the pretty printout
+
+Both aggregate errors also carry `route` — the owning route's path
+pattern, or `null` when the decode ran outside a route (a bare
+`decodeSearch` call) — and their `message` renders the whole failure,
+one `✖` line per issue:
+
+```txt
+Failed to decode search params for /users/[id]:
+  ✖ page: required search param is missing (expected integer)
+  ✖ sort: "up" is not one of: asc, desc
+```
+
+There is no separate prettify step on purpose: an unhandled decode error
+reaches a Next error boundary or the dev overlay as `error.message`, so
+the default message is the one tuned for that moment. `(expected …)` is
+keyed on the issue's structured `reason`: it is appended exactly where the
+message cannot name the expected shape itself — a `"missing"` key has no
+value to describe, and a `"validate"` failure carries validator prose that
+may name neither the value nor the grammar. Core's own `"parse"` grammar
+messages already quote the value and name the grammar, and a `"duplicate"`
+or `"shape"` message states a problem that isn't about the grammar at all,
+so none of those take the suffix.
+
 ## SearchSourceError
 
 A search source violated its wire-shape contract: the source isn't an
@@ -144,7 +168,32 @@ written once:
 
 ```ts
 interface Issue {
+  readonly expected?: string;
   readonly key: string;
   readonly message: string;
+  readonly reason?: IssueReason;
+  readonly wire?: string;
 }
+
+type IssueReason = "duplicate" | "missing" | "parse" | "shape" | "validate";
 ```
+
+`message` is the human prose; `expected`, `reason`, and `wire` are its
+structured halves for custom rendering. `reason` says what *kind* of
+failure the issue records — `"missing"` (no wire value for a required
+key), `"duplicate"` (multiple values for a single-value param),
+`"shape"` (source shape mismatch: an array where a segment belongs, a
+non-string element), `"parse"` (the codec's own wire grammar rejected the
+value), or `"validate"` (user-supplied code rejected it: a Standard Schema
+validator or a custom codec's parse). Core always sets it; it is optional
+only so prose-only issues built outside core remain representable.
+`expected` is the codec's bare shape label
+(`integer`, `enum(asc|desc)`, `csv<integer>[]` —
+[`formatCodecDescription`](/docs/reference/core/describe#formatcodecdescription)'s
+`"shape"` style), absent when no codec owns the key (a `rawSearch` schema
+issue). `wire` is the offending value as the codec grammar saw it — the
+value-layer string after percent-decoding, not the raw URL text (search
+sources arrive platform-decoded; route segments are decoded by core
+first, so a segment `1%20x` records `wire: "1 x"`). Absent when there
+isn't exactly one offending value: a missing key, a non-string source
+value, or the duplicate-scalar rejection.

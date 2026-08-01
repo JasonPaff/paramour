@@ -317,14 +317,17 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
     // literal-zero prod cost; the bundler keeps exactly one branch.
     () => {
       if (process.env.NODE_ENV === "production") {
-        return decodeSearch(route["~search"], searchParams) as SearchOutputOf<
-          R["~search"]
-        >;
+        return decodeSearch(
+          route["~search"],
+          searchParams,
+          route.path,
+        ) as SearchOutputOf<R["~search"]>;
       }
       try {
         const data = decodeSearch(
           route["~search"],
           searchParams,
+          route.path,
         ) as SearchOutputOf<R["~search"]>;
         if (spec !== undefined) {
           emitter.observe(spec, { data, status: "success" });

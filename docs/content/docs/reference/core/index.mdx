@@ -33,8 +33,8 @@ anything to see what the compiler sees.
 
 ## The paramour/internal entry
 
-The package also ships a `paramour/internal` subpath exposing `parseValue`
-and `foreignMessage`. It exists for derived tooling — the devtools panel,
+The package also ships a `paramour/internal` subpath exposing `parseValue`,
+`foreignMessage`, and `codecShapeLabel`. It exists for derived tooling — the devtools panel,
 adapters — so reflection-driven consumers can share core's implementation
 instead of re-deriving it. It is not for app authors, it is deliberately
 undocumented beyond this paragraph, and it carries no stability guarantees:
