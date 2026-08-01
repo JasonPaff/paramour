@@ -3,6 +3,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { type AnyCodec, type Codec, createCodec } from "./codec.js";
 import {
   foreignMessage,
+  grammarParseError,
   ParamourError,
   ParseError,
   rebrandForeign,
@@ -48,22 +49,22 @@ function joinIssues(issues: readonly StandardSchemaV1.Issue[]): string {
 
 function parseIntegerElement(raw: string): number {
   if (!INTEGER_RE.test(raw)) {
-    throw new ParseError(`"${raw}" is not an integer`);
+    throw grammarParseError(`"${raw}" is not an integer`);
   }
   const value = Number(raw);
   if (!Number.isSafeInteger(value)) {
-    throw new ParseError(`"${raw}" is outside the safe integer range`);
+    throw grammarParseError(`"${raw}" is outside the safe integer range`);
   }
   return value;
 }
 
 function parseNumberElement(raw: string): number {
   if (!NUMBER_RE.test(raw)) {
-    throw new ParseError(`"${raw}" is not a number`);
+    throw grammarParseError(`"${raw}" is not a number`);
   }
   const value = Number(raw);
   if (!Number.isFinite(value)) {
-    throw new ParseError(`"${raw}" is not a finite number`);
+    throw grammarParseError(`"${raw}" is not a finite number`);
   }
   return value;
 }
@@ -74,6 +75,9 @@ function refine<Out>(
 ): Out {
   const result = runStandardSchemaSync(schema, value);
   if (result.issues) {
+    // Plain ParseError, NOT grammarParseError: the joined issue prose comes
+    // from the user's validator and is not guaranteed to quote the value or
+    // name the grammar, so renderers must add that context themselves.
     throw new ParseError(
       `Schema validation failed: ${joinIssues(result.issues)}`,
     );
@@ -215,7 +219,7 @@ export const p = {
       parseElement: (raw) => {
         if (raw === "true") return true;
         if (raw === "false") return false;
-        throw new ParseError(`"${raw}" is not "true" or "false"`);
+        throw grammarParseError(`"${raw}" is not "true" or "false"`);
       },
       serializeElement: (value) => {
         if (typeof value !== "boolean") {
@@ -265,7 +269,7 @@ export const p = {
           // CV3: strict grammar — "a,,b", trailing "a,", and a lone "," are
           // ParseErrors, recoverable via the LIST's .catch() (D2).
           if (segment === "") {
-            throw new ParseError(`"${raw}" contains an empty list element`);
+            throw grammarParseError(`"${raw}" contains an empty list element`);
           }
           // CV3: the first element failure aborts the list parse — the
           // element codec's own ParseError propagates unwrapped.
@@ -331,6 +335,9 @@ export const p = {
       parseElement: (raw) =>
         rebrandForeign(
           () => codec.parse(raw),
+          // Not grammarParseError: foreign prose may name neither the value
+          // nor the grammar, so decode issues classify it "validate" and
+          // renderers append the expected shape themselves.
           (error) => new ParseError(foreignMessage(error), { cause: error }),
         ),
       serializeElement: (value) =>
@@ -351,7 +358,9 @@ export const p = {
       kind: "enum",
       parseElement: (raw) => {
         if (!set.has(raw)) {
-          throw new ParseError(`"${raw}" is not one of: ${members.join(", ")}`);
+          throw grammarParseError(
+            `"${raw}" is not one of: ${members.join(", ")}`,
+          );
         }
         return raw;
       },
@@ -385,7 +394,9 @@ export const p = {
       parseElement: (raw) => {
         const wire = parseIntegerElement(raw);
         if (wire < 1) {
-          throw new ParseError(`"${raw}" is below the 1-based wire floor of 1`);
+          throw grammarParseError(
+            `"${raw}" is below the 1-based wire floor of 1`,
+          );
         }
         const value = wire - 1;
         return schema ? refine(schema, value) : value;
@@ -427,7 +438,7 @@ export const p = {
       kind: "isoDate",
       parseElement: (raw) => {
         if (!ISO_DATE_RE.test(raw)) {
-          throw new ParseError(`"${raw}" is not a YYYY-MM-DD date`);
+          throw grammarParseError(`"${raw}" is not a YYYY-MM-DD date`);
         }
         // ISO-string construction, not Date.UTC: the latter maps years 0-99
         // to 1900+year. The round-trip comparison rejects days the engine
@@ -437,7 +448,7 @@ export const p = {
           Number.isNaN(date.getTime()) ||
           date.toISOString().slice(0, 10) !== raw
         ) {
-          throw new ParseError(`"${raw}" is not a real calendar date`);
+          throw grammarParseError(`"${raw}" is not a real calendar date`);
         }
         return date;
       },
@@ -456,7 +467,7 @@ export const p = {
         try {
           parsed = JSON.parse(raw);
         } catch {
-          throw new ParseError(`"${raw}" is not valid JSON`);
+          throw grammarParseError(`"${raw}" is not valid JSON`);
         }
         return refine(schema, parsed);
       },
@@ -510,11 +521,11 @@ export const p = {
       kind: "timestamp",
       parseElement: (raw) => {
         if (!TIMESTAMP_RE.test(raw)) {
-          throw new ParseError(`"${raw}" is not an ISO 8601 UTC timestamp`);
+          throw grammarParseError(`"${raw}" is not an ISO 8601 UTC timestamp`);
         }
         const date = new Date(raw);
         if (Number.isNaN(date.getTime())) {
-          throw new ParseError(`"${raw}" is not a real instant`);
+          throw grammarParseError(`"${raw}" is not a real instant`);
         }
         // The engine silently normalizes impossible fields (Feb 30 → Mar 1,
         // 24:00 → next day). Pad the input to canonical millisecond form and
@@ -524,7 +535,7 @@ export const p = {
           (_match, ms: string | undefined) => `.${(ms ?? "").padEnd(3, "0")}Z`,
         );
         if (date.toISOString() !== canonical) {
-          throw new ParseError(`"${raw}" is not a real instant`);
+          throw grammarParseError(`"${raw}" is not a real instant`);
         }
         return date;
       },

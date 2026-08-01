@@ -1,8 +1,52 @@
 /** One failed key in an aggregate decode error (shared by both surfaces). */
 export interface Issue {
+  /**
+   * Bare shape label of the codec the key expected (`integer`,
+   * `enum(asc|desc)`, `csv<integer>[]`). Absent when no codec owns the key:
+   * rawSearch schema issues and foreign throws carry only prose.
+   */
+  readonly expected?: string;
   readonly key: string;
   readonly message: string;
+  /**
+   * What KIND of failure this issue records — the structured discriminant
+   * renderers key on instead of sniffing `message` prose (see
+   * {@link IssueReason} for the members). Core's decoders always set it;
+   * it is optional only so prose-only issues built outside core (derived
+   * tooling, hand-built test fixtures) remain representable — an absent
+   * reason means "unclassified", and renderers must not infer one.
+   */
+  readonly reason?: IssueReason;
+  /**
+   * The offending value as the codec grammar saw it — the value-layer
+   * string AFTER byte-layer percent-decoding, not the raw URL text. Search
+   * sources (`URLSearchParams` / Next's `searchParams`) arrive
+   * platform-decoded; route params are decoded by core (R5) before the
+   * grammar runs — so a segment `1%20x` records `wire: "1 x"` on both
+   * surfaces. Present only when a single offending value exists: absent
+   * for missing keys, non-string source values, and the duplicate-scalar
+   * rejection — absence there is the point, not a data gap.
+   */
+  readonly wire?: string;
 }
+
+/**
+ * The failure kinds an {@link Issue} can record:
+ *
+ * - `"duplicate"` — a single-value param received multiple wire values (P5).
+ * - `"missing"` — a required key had no wire value at all (including a
+ *   required catch-all whose array arrived empty: the values are missing
+ *   even though the key exists).
+ * - `"parse"` — the codec's OWN wire grammar rejected the value; core's
+ *   grammar messages quote the value and name the grammar themselves.
+ * - `"shape"` — the source value's shape doesn't match the param kind (an
+ *   array where a single segment belongs, a non-string element, …).
+ * - `"validate"` — user-supplied code rejected the value (a Standard Schema
+ *   validator, a custom codec's parse): its prose is not authored by core
+ *   and may name neither the value nor the expected shape.
+ */
+export type IssueReason =
+  "duplicate" | "missing" | "parse" | "shape" | "validate";
 
 /** The single error type surfaced by a full route parse failure. */
 export type RouteDecodeError = ParamsDecodeError | SearchDecodeError;
@@ -49,10 +93,13 @@ export class ParamsDecodeError extends ParamourError {
   }
 
   readonly issues: readonly Issue[];
+  /** The failed route's path pattern; null when decoded outside a route. */
+  readonly route: null | string;
 
-  constructor(issues: readonly Issue[]) {
-    super(`Failed to decode route params: ${formatIssues(issues)}`);
+  constructor(issues: readonly Issue[], route: null | string = null) {
+    super(formatDecodeMessage("route params", issues, route));
     this.issues = issues;
+    this.route = route;
   }
 
   static override [Symbol.hasInstance](
@@ -71,6 +118,26 @@ export class ParseError extends ParamourError {
     brandPrototype(this, parseErrorBrand);
   }
 
+  /**
+   * True when the message follows core's grammar-authoring convention —
+   * it quotes the offending wire value and names the grammar it failed
+   * (`'"x" is not an integer'`). Only core's own grammar throw sites set
+   * it (via {@link grammarParseError}); schema-validation failures and
+   * rebranded foreign/custom throws stay false, the safe default: an
+   * unknown message is assumed to name neither, so renderers supply the
+   * expected-shape context themselves. This flag — never message sniffing
+   * — is what issue producers key `reason: "parse" | "validate"` on.
+   */
+  readonly selfDescribing: boolean;
+
+  constructor(
+    message: string,
+    options?: { cause?: unknown; selfDescribing?: boolean },
+  ) {
+    super(message, options);
+    this.selfDescribing = options?.selfDescribing ?? false;
+  }
+
   static override [Symbol.hasInstance](value: unknown): value is ParseError {
     return hasBrand(value, parseErrorBrand);
   }
@@ -83,10 +150,13 @@ export class SearchDecodeError extends ParamourError {
   }
 
   readonly issues: readonly Issue[];
+  /** The failed route's path pattern; null when decoded outside a route. */
+  readonly route: null | string;
 
-  constructor(issues: readonly Issue[]) {
-    super(`Failed to decode search params: ${formatIssues(issues)}`);
+  constructor(issues: readonly Issue[], route: null | string = null) {
+    super(formatDecodeMessage("search params", issues, route));
     this.issues = issues;
+    this.route = route;
   }
 
   static override [Symbol.hasInstance](
@@ -158,6 +228,30 @@ export function foreignMessage(error: unknown): string {
 }
 
 /**
+ * A {@link ParseError} whose message follows core's grammar-authoring
+ * convention: it quotes the offending wire value and names the expected
+ * grammar (`'"x" is not an integer'`). The one sanctioned way to mint a
+ * self-describing ParseError — every `p.*` grammar throw site goes through
+ * it, so the convention is enforced by structure, not by prose review.
+ * Not exported from the package.
+ */
+export function grammarParseError(message: string): ParseError {
+  return new ParseError(message, { selfDescribing: true });
+}
+
+/**
+ * Maps a caught {@link ParseError} to its {@link Issue} reason: core's
+ * grammar-authored messages are `"parse"`, everything else — schema
+ * validators, rebranded custom-codec throws — is `"validate"`. Keyed on the
+ * structural `selfDescribing` flag, never on message sniffing; shared by
+ * search.ts and path.ts so both surfaces classify identically. Not exported
+ * from the package.
+ */
+export function parseIssueReason(error: ParseError): IssueReason {
+  return error.selfDescribing ? "parse" : "validate";
+}
+
+/**
  * Runs user (or platform) code, letting paramour's own errors pass through
  * and branding any foreign throw via `wrap` — the shared chokepoint for the
  * "every throw is a ParamourError" contract. Not exported from the package.
@@ -194,8 +288,36 @@ function brandPrototype(ctor: { prototype: object }, brand: symbol): void {
   Object.defineProperty(ctor.prototype, brand, { value: true });
 }
 
-function formatIssues(issues: readonly Issue[]): string {
-  return issues.map((issue) => `[${issue.key}] ${issue.message}`).join("; ");
+/**
+ * The aggregate decode message: a route-anchored header plus one `✖` line
+ * per issue. Multi-line and pretty BY DEFAULT because the unhandled-throw
+ * surfaces that matter (Next's dev overlay, terminal stacks) render
+ * `error.message` verbatim — an opt-in `.pretty()` helper would never be
+ * reached there. `(expected …)` is keyed on the issue's structured `reason`,
+ * never on message/wire sniffing: it renders exactly where the message
+ * cannot name the expected shape itself — a `"missing"` key has no value to
+ * describe, and a `"validate"` failure carries foreign prose (schema
+ * validators, custom parsers) with no authoring convention. Core's own
+ * `"parse"` grammar messages already quote the value and name the grammar,
+ * a `"duplicate"` or `"shape"` message states a problem that isn't about
+ * the grammar at all, and a reason-less issue is unclassified prose — none
+ * of those take the suffix.
+ */
+function formatDecodeMessage(
+  subject: string,
+  issues: readonly Issue[],
+  route: null | string,
+): string {
+  const target = route === null ? subject : `${subject} for ${route}`;
+  const lines = issues.map((issue) => {
+    const expected =
+      issue.expected !== undefined &&
+      (issue.reason === "missing" || issue.reason === "validate")
+        ? ` (expected ${issue.expected})`
+        : "";
+    return `  ✖ ${issue.key}: ${issue.message}${expected}`;
+  });
+  return [`Failed to decode ${target}:`, ...lines].join("\n");
 }
 
 function hasBrand(value: unknown, brand: symbol): boolean {

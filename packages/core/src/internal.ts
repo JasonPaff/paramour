@@ -3,9 +3,10 @@
  * (devtools, adapters), NOT for app authors and NOT covered by the public
  * API's stability expectations. These live off the main barrel on purpose —
  * the docs' Reference section documents the app-author surface, and these
- * two exist solely so reflection-driven consumers (the devtools panel's
- * catch-attribution probe and edit preview) share core's implementation
- * instead of re-deriving it.
+ * exist solely so reflection-driven consumers (the devtools panel's
+ * catch-attribution probe, edit preview, and synthesized-issue labels)
+ * share core's implementation instead of re-deriving it.
  */
+export { codecShapeLabel } from "./describe.js";
 export { foreignMessage } from "./errors.js";
 export { parseValue } from "./search.js";

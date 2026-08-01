@@ -20,6 +20,7 @@ export {
 } from "./describe.js";
 export {
   type Issue,
+  type IssueReason,
   ParamourError,
   ParamsDecodeError,
   ParseError,

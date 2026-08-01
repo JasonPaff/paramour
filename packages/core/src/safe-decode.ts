@@ -49,9 +49,11 @@ export function safeDecodeSearch<R extends AnyRoute>(
     // annotation side stays deferred. The cast bridges that inference gap to
     // the SAME (correct) type.
     return {
-      data: decodeSearch(route["~search"], source) as SearchOutputOf<
-        R["~search"]
-      >,
+      data: decodeSearch(
+        route["~search"],
+        source,
+        route.path,
+      ) as SearchOutputOf<R["~search"]>,
       status: "success",
     };
   } catch (error) {

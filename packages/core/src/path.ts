@@ -8,12 +8,14 @@ import type {
   SingleParamNames,
 } from "./route.js";
 
+import { codecShapeLabel } from "./describe.js";
 import {
   describeType,
   type Issue,
   ParamourError,
   ParamsDecodeError,
   ParseError,
+  parseIssueReason,
   SerializeError,
 } from "./errors.js";
 import { encodeComponent, readInputValue, serializeValue } from "./search.js";
@@ -147,6 +149,12 @@ export function decodeParams<R extends AnyRoute>(
   for (const segment of routeSegments(route)) {
     if (segment.kind === "static") continue;
     const codec = requireCodec(config, segment.name, route.path);
+    // One "expected" label per param, whatever the failure mode: a
+    // catch-all's codec describes ONE element, but the param's shape is the
+    // array, so every catch-all issue — missing, wrong shape, or a single
+    // failing element — cites the repeated form (integer[]), matching
+    // decodeSearch's array-element issues.
+    const expected = codecShapeLabel(codec, segment.kind !== "single");
     // Own properties only: unknown keys are never read, and inherited
     // Object.prototype members must not count as present values.
     const value = Object.hasOwn(source, segment.name)
@@ -156,15 +164,19 @@ export function decodeParams<R extends AnyRoute>(
     if (segment.kind === "single") {
       if (value === undefined) {
         issues.push({
+          expected,
           key: segment.name,
           message: "required route param is missing",
+          reason: "missing",
         });
       } else if (typeof value !== "string") {
         // Shape mismatches are recorded issues, never ParseErrors —
         // .catch() cannot recover them.
         issues.push({
+          expected,
           key: segment.name,
           message: `expected a single segment value, got ${Array.isArray(value) ? "an array" : typeof value}`,
+          reason: "shape",
         });
       } else {
         // R5: App-Router surfaces arrive percent-encoded; core decodes before
@@ -182,7 +194,18 @@ export function decodeParams<R extends AnyRoute>(
           ) {
             entries.push([segment.name, codec["~catchValue"]()]);
           } else if (error instanceof ParseError) {
-            issues.push({ key: segment.name, message: error.message });
+            issues.push({
+              expected,
+              key: segment.name,
+              message: error.message,
+              // "parse" vs "validate" comes from the ParseError's own
+              // selfDescribing flag — structural, never message sniffing.
+              reason: parseIssueReason(error),
+              // Issue.wire is the codec-grammar-layer value — the DECODED
+              // segment, not the raw URL text — matching decodeSearch,
+              // whose sources arrive platform-decoded.
+              wire: decoded,
+            });
           } else {
             throw error;
           }
@@ -197,25 +220,33 @@ export function decodeParams<R extends AnyRoute>(
         entries.push([segment.name, []]);
       } else {
         issues.push({
+          expected,
           key: segment.name,
           message: "required route param is missing",
+          reason: "missing",
         });
       }
       continue;
     }
     if (!Array.isArray(value)) {
       issues.push({
+        expected,
         key: segment.name,
         message: `expected catch-all values (an array), got ${typeof value}`,
+        reason: "shape",
       });
       continue;
     }
     if (segment.kind === "catchall" && value.length === 0) {
       // No URL produces a present-but-empty required catch-all; only
-      // hand-built props can — mirrors R3's encode-side stance.
+      // hand-built props can — mirrors R3's encode-side stance. Reason
+      // "missing", not "shape": the key exists but its VALUES are missing,
+      // so pointing at the expected form is what helps.
       issues.push({
+        expected,
         key: segment.name,
         message: "required catch-all received no segment values",
+        reason: "missing",
       });
       continue;
     }
@@ -228,8 +259,10 @@ export function decodeParams<R extends AnyRoute>(
     for (const [index, element] of elements.entries()) {
       if (typeof element !== "string") {
         issues.push({
+          expected,
           key: segment.name,
           message: `element ${String(index)}: expected a string, got ${typeof element}`,
+          reason: "shape",
         });
         failed = true;
         continue;
@@ -248,8 +281,13 @@ export function decodeParams<R extends AnyRoute>(
           parsed.push(codec["~catchValue"]());
         } else if (error instanceof ParseError) {
           issues.push({
+            expected,
             key: segment.name,
             message: `element ${String(index)}: ${error.message}`,
+            // Classified from the flag, as in the single-param branch.
+            reason: parseIssueReason(error),
+            // Grammar-layer (decoded) value, as in the single-param branch.
+            wire: decoded,
           });
           failed = true;
         } else {
@@ -261,7 +299,7 @@ export function decodeParams<R extends AnyRoute>(
   }
 
   if (issues.length > 0) {
-    throw new ParamsDecodeError(issues);
+    throw new ParamsDecodeError(issues, route.path);
   }
   return Object.fromEntries(entries) as InferRouteParams<R>;
 }

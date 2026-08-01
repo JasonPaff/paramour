@@ -1,5 +1,8 @@
 // @vitest-environment happy-dom
+import type { AnyCodec } from "paramour";
+
 import { p } from "paramour";
+import { codecShapeLabel } from "paramour/internal";
 import { describe, expect, it } from "vitest";
 
 import { previewDecode } from "../src/inference.js";
@@ -30,6 +33,60 @@ describe("previewDecode foreign-throw hardening", () => {
     expect(result.status).toBe("error");
     if (result.status === "error") {
       expect(typeof result.issues[0]?.message).toBe("string");
+    }
+  });
+});
+
+/**
+ * Drift guard: the `expected` label previewDecode synthesizes for a foreign
+ * throw must be core's own label for the same codec in the same position —
+ * a whole-codec search-position decode, so no forceMany (the codec's own
+ * arity carries any `[]`), exactly as decodeSearch's issues render it. The
+ * foreign-throwing json schema is the lever: it fails every codec that
+ * embeds it, letting one probe walk scalar, csv, array, and the deepest
+ * legal composite (array<csv<json>>).
+ */
+describe("previewDecode synthesized issue labels", () => {
+  const throwing = {
+    "~standard": {
+      validate: (): never => {
+        throw new Error("foreign failure");
+      },
+      vendor: "paramour-tests",
+      version: 1 as const,
+    },
+  };
+
+  const cases: readonly {
+    readonly codec: AnyCodec;
+    readonly draft: readonly string[] | string;
+    readonly name: string;
+  }[] = [
+    { codec: p.json(throwing), draft: "1", name: "scalar json" },
+    { codec: p.csv(p.json(throwing)), draft: "1", name: "csv<json>" },
+    { codec: p.array(p.json(throwing)), draft: ["1"], name: "json[]" },
+    {
+      codec: p.array(p.csv(p.json(throwing))),
+      draft: ["1"],
+      name: "csv<json>[]",
+    },
+  ];
+
+  for (const { codec, draft, name } of cases) {
+    it(`matches core's codecShapeLabel for ${name}`, () => {
+      const result = previewDecode(codec, "k", draft);
+      expect(result.status).toBe("error");
+      if (result.status === "error") {
+        expect(result.issues[0]?.expected).toBe(codecShapeLabel(codec));
+      }
+    });
+  }
+
+  it("renders the repeated form for an array codec (arity from the codec itself)", () => {
+    const result = previewDecode(p.array(p.json(throwing)), "k", ["1"]);
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.issues[0]?.expected).toBe("json[]");
     }
   });
 });

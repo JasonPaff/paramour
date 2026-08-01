@@ -33,7 +33,7 @@ export interface CodecDescription {
 }
 
 /** Rendering styles accepted by {@link formatCodecDescription}. */
-export type CodecFormatStyle = "compact" | "verbose";
+export type CodecFormatStyle = "compact" | "shape" | "verbose";
 
 /** A param codec plus the dynamic-segment kind that hosts it. */
 export interface ParamDescription extends CodecDescription {
@@ -60,6 +60,22 @@ export type SearchDescription =
     }
   | { readonly kind: "none" }
   | { readonly kind: "raw" };
+
+/**
+ * A codec's `"shape"`-style label for decode-issue enrichment. `forceMany`
+ * renders the repeated form (`integer[]`) for segment-level catch-all
+ * issues, whose codec describes ONE element (the same forced-arity move as
+ * render.ts's catch-all params). Exported for path.ts/search.ts and — via
+ * the `paramour/internal` tooling entry — for devtools' synthesized issues,
+ * never from the package barrel.
+ */
+export function codecShapeLabel(codec: AnyCodec, forceMany = false): string {
+  const description = describeCodec(codec);
+  return formatCodecDescription(
+    forceMany ? { ...description, arity: "many" } : description,
+    "shape",
+  );
+}
 
 /**
  * Reflects a codec into plain data. This is the public face of the
@@ -120,6 +136,8 @@ export function describeRoute(route: AnyRoute): RouteDescription {
  * - `"compact"`: `enum(asc|desc)? =asc catch`, `csv<enum(a|b)>`, `string[]`
  *   — `?` for optional presence, the default's wire form (`=3`) or `=ƒ()`
  *   for a factory default, bare `catch`.
+ * - `"shape"`: the bare shape label with no presence/default/catch
+ *   annotations — the form decode errors cite as an issue's `expected`.
  * - `"verbose"`: `enum(asc, desc) (optional) (default: asc) (catch)` —
  *   parenthesized annotations in fixed order: presence, default, catch.
  */
@@ -127,7 +145,7 @@ export function formatCodecDescription(
   description: CodecDescription,
   style: CodecFormatStyle,
 ): string {
-  const memberSeparator = style === "compact" ? "|" : ", ";
+  const memberSeparator = style === "verbose" ? ", " : "|";
   const kindLabel = (
     part: Pick<CodecDescription, "enumMembers" | "kind">,
   ): string =>
@@ -151,6 +169,7 @@ export function formatCodecDescription(
     return part.arity === "many" ? `${base}[]` : base;
   };
   let label = shapeLabel(description);
+  if (style === "shape") return label;
   if (style === "compact") {
     if (description.presence === "optional") label += "?";
     if (description.defaultValue !== undefined) {

@@ -40,6 +40,12 @@ describe("issues rendering", () => {
     expect(issues?.textContent).toContain("page");
     expect(issues?.textContent).toContain("q");
     expect(issues?.textContent).toContain("required search param is missing");
+    // Structured columns: page's wire value renders JSON-quoted next to its
+    // expected shape label; q's absent wire renders an em dash.
+    expect(issues?.textContent).toContain('"abc"');
+    expect(issues?.textContent).toContain("integer");
+    expect(issues?.textContent).toContain("string");
+    expect(issues?.textContent).toContain("—");
   });
 
   it('renders the raw-search root sentinel "<search>" as a whole-search row', () => {
