@@ -45,9 +45,9 @@ jobs:
         # the same React peer range.
         next:
           # renovate: datasource=npm depName=next
-          - "15.5.20"
+          - "15.5.22"
           # renovate: datasource=npm depName=next
-          - "16.2.10"
+          - "16.3.0"
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
