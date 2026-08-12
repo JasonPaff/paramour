@@ -50,15 +50,15 @@ rules: { "paramour/no-raw-hrefs": "error" }
 
 ## Rules
 
-- [`no-raw-hrefs`](https://paramour.dev/docs/reference/eslint-plugin#no-raw-hrefs) — raw string paths flowing into `<Link href>`, `router.push`/`replace`/`prefetch`, and `redirect`/`permanentRedirect`.
+- [`no-raw-hrefs`](https://paramour.dev/docs/reference/eslint-plugin#no-raw-hrefs) — raw string paths flowing into `<Link href>`, `router.push`/`replace`/`prefetch` (both routers), `redirect`/`permanentRedirect`, `<Form action>`, and `NextResponse.redirect`/`rewrite`.
 - [`no-raw-param-reads`](https://paramour.dev/docs/reference/eslint-plugin#no-raw-param-reads) — raw reads through `useSearchParams()`/`useParams()` from `next/navigation` and `router.query` from `next/router`.
 - [`no-href-arithmetic`](https://paramour.dev/docs/reference/eslint-plugin#no-href-arithmetic) — string content appended after an `href()` result; the pure-hash case is autofixed to `href()`'s `hash` option.
 
 ### no-raw-hrefs
 
-Reports string literals (and expression-free template literals) starting with `/` in three Next.js App Router surfaces: the `href` attribute of `Link` imported from `next/link` (any local name — imports are tracked, not names matched); the first argument of `push`, `replace`, and `prefetch` on a router obtained from `next/navigation`'s `useRouter()` — including the destructured form `const { push } = useRouter()`; and arguments to `redirect` and `permanentRedirect` imported from `next/navigation`.
+Reports string literals (and expression-free template literals) starting with `/` in six Next.js surfaces spanning both routers: the `href` attribute of `Link` imported from `next/link` (any local name — imports are tracked, not names matched), including the `UrlObject` form `href={{ pathname: "/foo" }}`; the first argument of `push`, `replace`, and `prefetch` on a router obtained from `useRouter()` — `next/navigation` or `next/router`, destructured forms included; the static `Router.push` form on the `next/router` default export; arguments to `redirect` and `permanentRedirect` imported from `next/navigation`; string `action` values on `Form` from `next/form`; and `NextResponse.redirect`/`rewrite` from `next/server`, both as a direct string and inside an inline `new URL("/path", base)` first argument. The `linkComponents` option (`{ name, source, prop? }` entries, `name` being the _imported_ name) extends the `Link` surface to design-system wrappers.
 
-External URLs (`https://…`, protocol-relative `//…`), fragments (`#…`), `mailto:`/`tel:`, relative paths, and empty strings are ignored. `ignorePaths` (path-segment prefixes, not substrings or globs) exempts sections a migration has not reached yet:
+External URLs (`https://…`, protocol-relative `//…`), fragments (`#…`), `mailto:`/`tel:`, relative paths, and empty strings are ignored, as are function-valued `Form` actions and `URL`-typed variables at `NextResponse`. `ignorePaths` (path-segment prefixes, not substrings or globs) exempts sections a migration has not reached yet:
 
 ```js
 rules: {
