@@ -28,7 +28,7 @@
     "eslint": "^10.6.0",
     "typescript": "^6.0.3"
   },
-  "description": "ESLint plugin for paramour — flags raw string hrefs in Next.js navigation APIs that bypass paramour's typed href() building",
+  "description": "ESLint plugin for paramour — flags raw hrefs, raw param reads, and href() arithmetic that bypass paramour's typed routing",
   "author": "Jason Paff <jasonpaff@gmail.com>",
   "keywords": [
     "eslint",

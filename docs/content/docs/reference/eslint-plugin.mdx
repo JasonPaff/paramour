@@ -1,16 +1,17 @@
 ---
 title: "@paramour-js/eslint-plugin"
-description: The ESLint plugin — find every raw string href paramour never sees.
+description: The ESLint plugin — find every place paramour never sees, in both directions.
 ---
 
 `@paramour-js/eslint-plugin` exists because paramour's value proposition —
 validated params, typed path building, explicit serialization — evaporates
 silently the moment someone writes `<Link href="/users/123">` or
-`router.push("/shop?page=2")`. The code compiles, the navigation works, and
-the route's codecs simply never run. In a codebase mid-migration this is
-the default failure mode, not an edge case: every pre-existing link is a
-raw string, and every new one written from habit is too. The plugin's one
-rule finds them all.
+`useSearchParams()`. The code compiles, the page renders, and the route's
+codecs simply never run. In a codebase mid-migration this is the default
+failure mode, not an edge case. The plugin audits the bypass in both
+directions — raw writes (`no-raw-hrefs`), raw reads
+(`no-raw-param-reads`) — and guards the integrity of what `href()` builds
+(`no-href-arithmetic`).
 
 ## Install
 
@@ -34,7 +35,7 @@ export default [
 ];
 ```
 
-Or wire the rule manually:
+Or wire the rules manually:
 
 ```js title="eslint.config.js"
 import paramour from "@paramour-js/eslint-plugin";
@@ -43,15 +44,18 @@ export default [
   {
     plugins: { paramour },
     rules: {
+      "paramour/no-href-arithmetic": "warn",
       "paramour/no-raw-hrefs": "warn",
+      "paramour/no-raw-param-reads": "warn",
     },
   },
 ];
 ```
 
-The preset registers the rule at `warn` on purpose: a raw string href is
-*working* code, and this is a nudge toward migration, not a correctness
-gate. Once your routes are migrated, promote it in one line:
+The preset registers every rule at `warn` on purpose: a raw string href or
+a raw param read is *working* code, and this is a nudge toward migration,
+not a correctness gate. Once your routes are migrated, promote any rule
+individually:
 
 ```js
 rules: { "paramour/no-raw-hrefs": "error" }
@@ -79,6 +83,7 @@ that start with `/`, in three Next.js App Router surfaces:
 ```tsx
 import Link from "next/link";
 import { redirect, useRouter } from "next/navigation";
+import { href } from "paramour";
 
 <Link href="/users/123" />; // ✗ flagged
 redirect("/login"); // ✗ flagged
@@ -86,7 +91,7 @@ redirect("/login"); // ✗ flagged
 const router = useRouter();
 router.push("/shop?page=2"); // ✗ flagged
 
-<Link href={usersRoute.href({ id: 123 })} />; // ✓ what the rule nudges toward
+<Link href={href(usersRoute, { params: { id: 123 } })} />; // ✓ what the rule nudges toward
 ```
 
 There is no autofix and no suggestion: a correct fix requires knowing
@@ -144,3 +149,155 @@ Recorded so the omissions read as decisions, not oversights:
   rule is purely syntactic by design: no type information, no
   `parserOptions.project` requirement, works in any parser setup that
   produces JSX nodes.
+
+## no-raw-param-reads
+
+The read-side twin of `no-raw-hrefs`: reports the Next.js read APIs whose
+results paramour's codecs never validate, in two surfaces:
+
+1. **`useSearchParams()` / `useParams()`** — calls of either hook imported
+   from `next/navigation`, under any local name, including the namespace
+   form (`nav.useParams()`). Imports are tracked through scope resolution,
+   so the same-named hooks from `react-router-dom` (or anywhere else)
+   never fire. The message nudges the like-for-like replacement:
+   `useSearch(route)` for `useSearchParams()`, `useRouteParams(route)` for
+   `useParams()`, both from `@paramour-js/next/app`.
+2. **`router.query`** — `.query` access on a router obtained from
+   `next/router`'s `useRouter()` (the extensionful `next/router.js`
+   spelling counts too), in the variable form
+   (`const router = useRouter()`), the direct form
+   (`useRouter().query`), and the destructured form
+   (`const { query } = useRouter()`, including renames and nested
+   patterns). The nudge is `useRouteParams(route)` and `useSearch(route)`
+   from `@paramour-js/next/pages`.
+
+```tsx
+import { useParams, useSearchParams } from "next/navigation";
+import { useRouteParams, useSearch } from "@paramour-js/next/app";
+
+const params = useParams(); // ✗ flagged
+const search = useSearchParams(); // ✗ flagged
+
+const result = useRouteParams(productRoute); // ✓ what the rule nudges toward
+const query = useSearch(productRoute); // ✓
+```
+
+There is no autofix and no suggestion: a correct fix requires knowing
+which route object the component belongs to — not mechanically derivable
+from the call site.
+
+### What is exempt
+
+Only reads through the tracked imports fire. `useParams` from
+`react-router-dom`, a locally defined `useParams`, and type-only imports
+never fire. `useRouter().query` where `useRouter` comes from
+`next/navigation` never fires either — the App Router's router has no
+`query`. Computed access (`router["query"]`) and a router crossing a
+function or prop boundary escape detection — the rule is purely
+syntactic, same as `no-raw-hrefs`.
+
+Other `next/navigation` reads (`usePathname`, `useSelectedLayoutSegment`)
+are not paramour's territory and are never flagged.
+
+### Options
+
+| Option  | Type                                                  | Default | Description                        |
+| ------- | ----------------------------------------------------- | ------- | ---------------------------------- |
+| `allow` | `("routerQuery" \| "useParams" \| "useSearchParams")[]` | `[]`    | Surfaces to switch off wholesale. |
+
+`allow` is the escape hatch for a codebase that deliberately keeps one
+surface untyped — for example an app that reads `useParams()` only in a
+handful of not-yet-migrated components:
+
+```js
+rules: {
+  "paramour/no-raw-param-reads": ["warn", { allow: ["useParams"] }],
+}
+```
+
+For a *single* legitimate raw read — say, forwarding ad-hoc `utm_*`
+params the app deliberately leaves out of its route definitions — prefer
+a targeted disable comment over switching off the whole surface:
+
+```ts
+// eslint-disable-next-line paramour/no-raw-param-reads -- untyped utm_* forwarding
+const search = useSearchParams();
+```
+
+### Deliberately out of scope (v1)
+
+Recorded so the omissions read as decisions, not oversights:
+
+- **Direct `props.searchParams` / `props.params` access** in `page.tsx` /
+  `layout.tsx` — the noisiest surface and the only one needing filename
+  awareness; it follows once the hook surfaces prove the false-positive
+  policy, mirroring how `no-raw-hrefs` sequenced dynamic strings out of
+  its v1.
+- **Routers crossing boundaries** — same accepted cost as `no-raw-hrefs`.
+- **Computed access** — `router["query"]` is invisible to a syntactic
+  rule.
+
+## no-href-arithmetic
+
+Reports string arithmetic that appends content *after* an `href()` result
+— the exact thing explicit serialization exists to prevent — in two
+surfaces:
+
+1. **`+` concatenation** — `href(route) + "?tab=1"`, including chained
+   forms (`href(route) + "#a" + x`). The `href` import from `paramour` is
+   tracked through scope resolution, aliased and namespace forms
+   included.
+2. **Template literals** — content after `${href(route)}`:
+   `` `${href(route)}?page=2` ``, `` `${href(route)}/${child}` ``.
+
+Prepending is fine: `origin + href(route)` and
+`` `${origin}${href(route)}` `` are the legitimate way to build absolute
+URLs for metadata, emails, and redirects, and never fire.
+
+```ts
+import { href } from "paramour";
+
+const a = href(route) + "?tab=1"; // ✗ flagged — declare tab in the route's search codecs
+const b = `${href(route)}/reviews`; // ✗ flagged
+const c = href(route) + "#reviews"; // ✗ flagged, autofixed ↓
+
+const fixed = href(route, { hash: "reviews" }); // ✓ what the autofix produces
+const url = "https://example.com" + href(route); // ✓ prefixing is legitimate
+```
+
+This is the plugin's first fixable rule, and the fixer is deliberately
+narrow: it rewrites only the pure hash case — a single appended
+`"#fragment"` literal on a call whose options provably have no `hash`
+(absent, or an object literal without one). The rewrite is exactly
+semantics-preserving: `href()` renders `hash` as a trailing `#fragment`,
+byte-identical to the concatenation it replaces. `?` suffixes are never
+autofixed — the appended query needs a codec key in the route's `search`
+config, which no fixer can invent — so the message points at the `search`
+option instead.
+
+### What is exempt
+
+Prefix-only concatenation and interpolation, as above. `href` from any
+other module, shadowed locals, and type-only imports never fire. Tagged
+templates (`` sql`${href(route)}#x` ``) are skipped — the tag's semantics
+are unknown.
+
+### Options
+
+No options in v1. One-off exceptions use a standard
+`// eslint-disable-next-line paramour/no-href-arithmetic` comment.
+
+### Deliberately out of scope (v1)
+
+Recorded so the omissions read as decisions, not oversights:
+
+- **Method-style flows** — `href(route).concat("#a")`,
+  `[href(route), "#a"].join("")`, and `+=` accumulation.
+- **Values crossing bindings** — `const base = href(route); base + "#a"`
+  escapes detection; same purely-syntactic boundary as the other rules.
+- **The prefix-template autofix** — `` `${origin}${href(route)}#top` ``
+  gets the hash message but no fix; the fixer only rewrites expressions
+  that *are* the call plus a suffix.
+- **A `route.href()` method form** — not an omission but a fact: paramour
+  has no such method. `href()` is a standalone import, which is what makes
+  the scope-resolved detection precise.
