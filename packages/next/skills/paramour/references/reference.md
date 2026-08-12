@@ -43,7 +43,7 @@ Key types: `Codec`, `AnyCodec`, `OutputOf`, `ParamCodec`, `Presence`, `PresenceO
 | `@paramour-js/next/app`           | `useRouteParams`, `useRouteParamsOrThrow`, `useSearch`, `useSearchOrThrow` (all `(route, options?)` with `options: { select, equality?: "shallow" }`), type `SelectOptions` |
 | `@paramour-js/next/pages`         | `useRouteParams`, `useSearch` (return `RouterResult` = `SafeResult` + `{ status: "pending" }`), types `RouterResult`, `SelectOptions`                                       |
 | `@paramour-js/next/testing`       | `ParamourTestingProvider`, `withParamourTesting(options?)`, type `ParamourTestingOptions` (`isReady, mounted, onReplace, params, pathname, search`)                         |
-| `@paramour-js/next/devtools-seam` | Types-only seam contract consumed by `@paramour-js/devtools`; not needed in app code                                                                                        |
+| `@paramour-js/next/devtools-seam` | Types-only seam contract consumed by `@paramour-js/devtools-panel`; not needed in app code                                                                                  |
 
 ## CLI (`paramour <command>`, bin shipped by `@paramour-js/next`)
 

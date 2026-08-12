@@ -5,10 +5,21 @@
     { "repo": "JasonPaff/paramour" }
   ],
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "paramour",
+      "@paramour-js/next",
+      "@paramour-js/devtools-panel",
+      "@paramour-js/nuqs",
+      "@paramour-js/eslint-plugin"
+    ]
+  ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": []
+  "ignore": [],
+  "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
+    "onlyUpdatePeerDependentsWhenOutOfRange": true
+  }
 }

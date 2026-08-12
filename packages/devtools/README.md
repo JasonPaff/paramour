@@ -1,4 +1,4 @@
-# @paramour-js/devtools
+# @paramour-js/devtools-panel
 
 A [TanStack Devtools](https://tanstack.com/devtools) panel for
 [paramour](https://paramour.dev): watch your routes decode in real time.
@@ -9,7 +9,7 @@ in, and editable search inputs that navigate the app to the URL you
 compose.
 
 ```sh
-pnpm add @paramour-js/devtools @tanstack/react-devtools
+pnpm add @paramour-js/devtools-panel @tanstack/react-devtools
 ```
 
 You own the TanStack shell; paramour is a plugin in it. Mount it once,
@@ -18,7 +18,7 @@ dev-conditionally:
 ```tsx
 "use client";
 
-import { paramourDevtoolsPlugin } from "@paramour-js/devtools";
+import { paramourDevtoolsPlugin } from "@paramour-js/devtools-panel";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 
 export function Devtools() {

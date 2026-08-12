@@ -3,7 +3,7 @@ title: Devtools Panel
 description: Observe route parsing live with the TanStack Devtools panel.
 ---
 
-`@paramour-js/devtools` is a [TanStack Devtools](https://tanstack.com/devtools)
+`@paramour-js/devtools-panel` is a [TanStack Devtools](https://tanstack.com/devtools)
 panel that watches your routes decode in real time. Every
 [hook](/docs/guides/hooks) call reports what it saw — which route, the raw
 wire values, the decoded result, or the exact `issues[]` when a decode
@@ -19,7 +19,7 @@ page's edge cases without hand-editing the address bar.
 ## Setup
 
 ```package-install
-@paramour-js/devtools @tanstack/react-devtools
+@paramour-js/devtools-panel @tanstack/react-devtools
 ```
 
 You own the TanStack shell; paramour is a plugin in it. Mount it once,
@@ -28,7 +28,7 @@ dev-conditionally:
 ```tsx twoslash title="app/devtools.tsx"
 "use client";
 
-import { paramourDevtoolsPlugin } from "@paramour-js/devtools";
+import { paramourDevtoolsPlugin } from "@paramour-js/devtools-panel";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 
 export function Devtools() {
@@ -41,7 +41,7 @@ export function Devtools() {
 // @filename: app/devtools.tsx
 "use client";
 
-import { paramourDevtoolsPlugin } from "@paramour-js/devtools";
+import { paramourDevtoolsPlugin } from "@paramour-js/devtools-panel";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 
 export function Devtools() {

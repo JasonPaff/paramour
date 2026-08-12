@@ -146,7 +146,7 @@ const ECOSYSTEM = [
   {
     blurb:
       "TanStack Devtools panel: wire vs parsed values and decode issues, live.",
-    name: "@paramour-js/devtools",
+    name: "@paramour-js/devtools-panel",
     slug: ["reference", "devtools"],
   },
   {

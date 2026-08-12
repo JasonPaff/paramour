@@ -3,7 +3,7 @@ import type { AnyRoute, ParamsSource, RouterKind, SafeResult } from "paramour";
 /**
  * The devtools observation seam: a dependency-free global
  * slot the hooks push decode observations into and the devtools panel
- * (`@paramour-js/devtools`) reads out of. This module's JSDoc is the
+ * (`@paramour-js/devtools-panel`) reads out of. This module's JSDoc is the
  * CONTRACT OF RECORD for the slot — the panel never imports runtime code
  * from this package (its `./devtools-seam` exports entry is types-only, so
  * a runtime import fails module resolution); it attaches to the same
