@@ -1,6 +1,6 @@
 {
-  "name": "@paramour-js/devtools",
-  "version": "6.0.0",
+  "name": "@paramour-js/devtools-panel",
+  "version": "0.6.0",
   "type": "module",
   "exports": {
     ".": {
@@ -17,9 +17,9 @@
     "node": ">=22.13.0"
   },
   "peerDependencies": {
-    "@paramour-js/next": "workspace:^",
+    "@paramour-js/next": ">=0.6.0",
     "@tanstack/react-devtools": ">=0.10.0",
-    "paramour": "workspace:^",
+    "paramour": ">=0.6.0",
     "react": ">=18.2.0"
   },
   "peerDependenciesMeta": {

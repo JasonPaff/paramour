@@ -34,12 +34,12 @@ href(productRoute, { params: { id: "42" } });
 
 ## Packages
 
-| Package                                        | What it is                                                            | Docs                                                      |
-| ---------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------- |
-| [`paramour`](./packages/core)                  | Core: codecs (`p.*`), route objects, `href`, the wire format          | [reference](https://paramour.dev/docs/reference/core)     |
-| [`@paramour-js/next`](./packages/next)         | Next.js integration: `withTypedRoutes`, hooks, and the `paramour` CLI | [reference](https://paramour.dev/docs/reference/next)     |
-| [`@paramour-js/nuqs`](./packages/nuqs)         | Derive [nuqs](https://nuqs.dev) parsers from a route's search codecs  | [reference](https://paramour.dev/docs/reference/nuqs)     |
-| [`@paramour-js/devtools`](./packages/devtools) | TanStack Devtools panel: watch routes decode live                     | [reference](https://paramour.dev/docs/reference/devtools) |
+| Package                                              | What it is                                                            | Docs                                                      |
+| ---------------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------- |
+| [`paramour`](./packages/core)                        | Core: codecs (`p.*`), route objects, `href`, the wire format          | [reference](https://paramour.dev/docs/reference/core)     |
+| [`@paramour-js/next`](./packages/next)               | Next.js integration: `withTypedRoutes`, hooks, and the `paramour` CLI | [reference](https://paramour.dev/docs/reference/next)     |
+| [`@paramour-js/nuqs`](./packages/nuqs)               | Derive [nuqs](https://nuqs.dev) parsers from a route's search codecs  | [reference](https://paramour.dev/docs/reference/nuqs)     |
+| [`@paramour-js/devtools-panel`](./packages/devtools) | TanStack Devtools panel: watch routes decode live                     | [reference](https://paramour.dev/docs/reference/devtools) |
 
 ## Why
 

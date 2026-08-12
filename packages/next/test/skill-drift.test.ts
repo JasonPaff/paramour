@@ -301,7 +301,7 @@ describe("skill drift: `@paramour-js/next` entry points", () => {
 
   it("keeps the types-only devtools-seam row enumerating nothing", () => {
     // The seam's exports map has no runtime condition and the row
-    // deliberately points consumers at @paramour-js/devtools instead —
+    // deliberately points consumers at @paramour-js/devtools-panel instead —
     // naming seam exports here means wiring a real check first.
     expect(citedIn("@paramour-js/next/devtools-seam")).toEqual(new Set());
   });

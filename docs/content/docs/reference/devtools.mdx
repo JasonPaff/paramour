@@ -1,9 +1,9 @@
 ---
-title: "@paramour-js/devtools"
+title: "@paramour-js/devtools-panel"
 description: Devtools panel API and the observation-seam contract.
 ---
 
-`@paramour-js/devtools` is a [TanStack Devtools](https://tanstack.com/devtools)
+`@paramour-js/devtools-panel` is a [TanStack Devtools](https://tanstack.com/devtools)
 panel that observes the hooks in `@paramour-js/next` as they decode routes.
 The public surface is deliberately tiny — the plugin-entry helper and the
 panel component — because the panel never re-implements decoding: it
@@ -35,7 +35,7 @@ dev-conditionally, and pass paramour as a plugin:
 ```tsx twoslash title="app/devtools.tsx"
 "use client";
 
-import { paramourDevtoolsPlugin } from "@paramour-js/devtools";
+import { paramourDevtoolsPlugin } from "@paramour-js/devtools-panel";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 
 export function Devtools() {
@@ -77,7 +77,7 @@ read-only with a stale marker.
 ```tsx twoslash
 "use client";
 
-import { ParamourDevtoolsPanel } from "@paramour-js/devtools";
+import { ParamourDevtoolsPanel } from "@paramour-js/devtools-panel";
 
 export function CustomShellPanel({ theme }: { theme: "dark" | "light" }) {
   return <ParamourDevtoolsPanel theme={theme} />;
@@ -109,7 +109,7 @@ Declared *structurally* — the shell's contract is just
 type is certified by the package's type tests.
 
 ```ts twoslash
-import { paramourDevtoolsPlugin } from "@paramour-js/devtools";
+import { paramourDevtoolsPlugin } from "@paramour-js/devtools-panel";
 
 const entry = paramourDevtoolsPlugin({ defaultOpen: true });
 //    ^?

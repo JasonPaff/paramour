@@ -1,5 +1,5 @@
 /**
- * `@paramour-js/devtools` — a TanStack Devtools panel for paramour routes.
+ * `@paramour-js/devtools-panel` — a TanStack Devtools panel for paramour routes.
  * The public surface is deliberately tiny: the panel component and the
  * plugin-entry helper. The observation seam's types stay internal — their
  * contract of record is `@paramour-js/next/devtools-seam`.
