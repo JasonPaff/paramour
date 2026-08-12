@@ -1,5 +1,14 @@
 # example-basic
 
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies []:
+  - paramour@0.8.0
+  - @paramour-js/next@0.8.0
+  - @paramour-js/devtools-panel@0.8.0
+
 ## 0.0.11
 
 ### Patch Changes
