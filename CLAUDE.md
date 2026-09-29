@@ -24,7 +24,7 @@ pnpm monorepo (pnpm 11, Node >= 24.18). Run from the repo root:
 - `pnpm format` / `pnpm format:check` — Prettier
 - `pnpm changeset` — add a changeset (changesets is the release mechanism)
 
-CI runs, in order: `format:check`, `build`, `check:publish`, `lint`, `typecheck`, `test`, `test:types`, `test:types:devtools`, `test:types:next`, `test:types:nuqs`, `test:types:registry`. All eleven must pass (`build` precedes `check:publish`, `lint`, and `typecheck` so the packed-tarball checks, the type-checked sources, and the example resolve the packages' dist types).
+CI runs, in order: `format:check`, `build`, `check:publish`, `lint`, `typecheck`, `pnpm --filter example-type-errors run check`, `pnpm --filter example-kitchen-sink exec paramour skills --check`, `test`, `test:types`, `test:types:devtools`, `test:types:next`, `test:types:nuqs`, `test:types:registry`. All thirteen must pass (`build` precedes `check:publish`, `lint`, and `typecheck` so the packed-tarball checks, the type-checked sources, and the example resolve the packages' dist types). The skills check fails whenever `packages/next/skills/` changes without re-running `pnpm --filter example-kitchen-sink exec paramour skills`, which refreshes the committed copy in `examples/kitchen-sink/.agents/skills/paramour`.
 
 ## Two kinds of tests
 
