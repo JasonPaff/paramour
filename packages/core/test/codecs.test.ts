@@ -208,15 +208,67 @@ describe("p.timestamp", () => {
     ).toBe(Date.UTC(2026, 6, 4, 12, 34, 56));
   });
 
-  it("rejects offsets, epochs, and invalid instants", () => {
+  it("accepts ±HH:MM offsets, decoding to the same instant", () => {
+    const utc = Date.UTC(2026, 6, 4, 10, 34, 56);
     for (const raw of [
       "2026-07-04T12:34:56+02:00",
-      "1720000000",
-      "2026-07-04",
-      "",
+      "2026-07-04T05:04:56-05:30",
+      "2026-07-04T10:34:56+00:00",
+      "2026-07-04T10:34:56-00:00",
+      "2026-07-04T10:34:56.000Z",
+    ]) {
+      expect((parse(p.timestamp(), raw) as Date).getTime()).toBe(utc);
+    }
+    // Offsets never survive re-serialization: one instant, one URL.
+    const decoded = parse(p.timestamp(), "2026-07-04T12:34:56.5+02:00");
+    expect(serialize(p.timestamp(), decoded)).toBe("2026-07-04T10:34:56.500Z");
+  });
+
+  it("offsets can cross calendar days and years", () => {
+    expect(
+      (parse(p.timestamp(), "2026-01-01T01:00:00+02:00") as Date).getTime(),
+    ).toBe(Date.UTC(2025, 11, 31, 23));
+    expect(
+      (parse(p.timestamp(), "2025-12-31T23:30:00-01:00") as Date).getTime(),
+    ).toBe(Date.UTC(2026, 0, 1, 0, 30));
+  });
+
+  it("rejects malformed and impossible offsets", () => {
+    for (const raw of [
+      "2026-07-04T12:34:56+24:00",
+      "2026-07-04T12:34:56+02:60",
+      "2026-07-04T12:34:56+0200",
+      "2026-07-04T12:34:56+02",
+      "2026-07-04T12:34:56 +02:00",
+      "2026-07-04T12:34:56Z+02:00",
     ]) {
       expect(() => parse(p.timestamp(), raw)).toThrow(ParseError);
     }
+  });
+
+  it("rejects an offset that pushes the instant outside 0000-9999", () => {
+    expect(() => parse(p.timestamp(), "0000-01-01T00:30:00+01:00")).toThrow(
+      ParseError,
+    );
+    expect(() => parse(p.timestamp(), "9999-12-31T23:30:00-01:00")).toThrow(
+      ParseError,
+    );
+    // The boundaries themselves are fine.
+    expect(
+      (parse(p.timestamp(), "0000-01-01T00:00:00Z") as Date).getUTCFullYear(),
+    ).toBe(0);
+  });
+
+  it("rejects epochs, dates, and empty input", () => {
+    for (const raw of ["1720000000", "2026-07-04", ""]) {
+      expect(() => parse(p.timestamp(), raw)).toThrow(ParseError);
+    }
+  });
+
+  it("parses two-digit years literally (no 19xx mapping)", () => {
+    expect(
+      (parse(p.timestamp(), "0042-03-01T00:00:00Z") as Date).getUTCFullYear(),
+    ).toBe(42);
   });
 
   it("rejects impossible calendar days the engine would normalize", () => {

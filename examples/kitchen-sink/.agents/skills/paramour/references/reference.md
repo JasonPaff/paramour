@@ -89,7 +89,7 @@ Precedence: CLI flags → config file → discovery. Unknown keys are rejected (
 Facts agents trip on:
 
 - Booleans serialize as exactly `true`/`false`; anything else fails to parse.
-- Dates: `p.isoDate` is `YYYY-MM-DD`; `p.timestamp` is full ISO UTC (`Z` only, offsets rejected); both reject impossible calendar dates.
+- Dates: `p.isoDate` is `YYYY-MM-DD`; `p.timestamp` is a full ISO instant (`Z` or `±HH:MM` on input, always UTC on output); both reject impossible calendar dates.
 - Integers reject `1e3`, hex, whitespace, and unsafe-range values.
 - Arrays: `p.array` repeats the key (`?t=a&t=b`); `p.csv` packs one key (`?t=a,b`). Same in-memory `string[]`, two deliberate wire spellings — do not swap them casually.
 - Value-form `.default()` elides: building a URL with the default value emits nothing for that key; decoding the bare URL restores the default. Factory defaults never elide.

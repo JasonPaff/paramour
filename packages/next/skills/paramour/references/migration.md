@@ -77,7 +77,7 @@ export default async function ProductPage(props: RouteProps) {
 - "May be absent, no fallback" (`typeof sp.x === "string" ? sp.x : undefined`) → `.optional()`. Decoded as `T | undefined`.
 - Silent-coercion tolerance (old code shrugged off garbage, e.g. `Number(...)` producing `NaN` handled downstream) → add `.catch(fallback)` so a malformed PRESENT value falls back instead of failing the decode. `.catch()` never covers absence — combine with `.default()`/`.optional()` for that.
 - Multi-value keys (`sp.tags` handled as `string | string[]`) → `p.array()` for repeated keys (`?tags=a&tags=b`) or `p.csv()` for one comma-joined key (`?tags=a,b`). Match whichever wire form the app already emits.
-- Enumerated strings → `p.enum(["a", "b"])`; numbers → `p.number()`; booleans (`sp.flag === "true"`) → `p.boolean()`; dates → `p.isoDate()` (YYYY-MM-DD) or `p.timestamp()` (ISO UTC).
+- Enumerated strings → `p.enum(["a", "b"])`; numbers → `p.number()`; booleans (`sp.flag === "true"`) → `p.boolean()`; dates → `p.isoDate()` (YYYY-MM-DD) or `p.timestamp()` (ISO instant; emits UTC).
 
 ### Behavior change to decide explicitly
 
