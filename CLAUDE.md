@@ -12,7 +12,7 @@ pnpm monorepo (pnpm 11, Node >= 24.18). Run from the repo root:
 
 - `pnpm test` — runtime tests (vitest, matches `packages/*/test/**/*.test.ts`)
 - `pnpm test packages/core/test/codecs.test.ts` — single test file; add `-t "name"` to filter by test name
-- `pnpm test:types` — type tests (tstyche, matches `packages/core/test/**/*.tst.*`); pass a path fragment to filter, e.g. `pnpm test:types codec-api`
+- `pnpm test:types` — type tests (tstyche, matches `packages/core/test/**/*.tst.*`); pass a path fragment to filter, e.g. `pnpm test:types codec-api`. Every tstyche config targets `5.4 || *` — the documented TypeScript floor plus the installed version — so type-level code must compile on TS 5.4
 - `pnpm test:types:devtools` — type tests for `packages/devtools` (`packages/devtools/test/**/*.tst.*`, own tstyche/tsconfig pair)
 - `pnpm test:types:next` — type tests for `packages/next` (`packages/next/test/**/*.tst.*`, own tstyche/tsconfig pair)
 - `pnpm test:types:nuqs` — type tests for `packages/nuqs` (same pattern: own tstyche/tsconfig pair)

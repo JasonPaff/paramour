@@ -1,5 +1,6 @@
 {
   "$schema": "https://tstyche.org/schemas/config.json",
+  "target": "5.4 || *",
   "testFileMatch": ["packages/next/test/**/*.tst.*"],
   "tsconfig": "./packages/next/tsconfig.tstyche.json"
 }
