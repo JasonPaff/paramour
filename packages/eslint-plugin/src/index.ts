@@ -1,6 +1,8 @@
 import type { TSESLint } from "@typescript-eslint/utils";
 
 import { noHrefArithmetic } from "./rules/no-href-arithmetic.js";
+import { noImpureValueDefaults } from "./rules/no-impure-value-defaults.js";
+import { noParseContextInGetStaticProps } from "./rules/no-parse-context-in-get-static-props.js";
 import { noRawHrefs } from "./rules/no-raw-hrefs.js";
 import { noRawParamReads } from "./rules/no-raw-param-reads.js";
 
@@ -15,6 +17,8 @@ const plugin = {
   },
   rules: {
     "no-href-arithmetic": noHrefArithmetic,
+    "no-impure-value-defaults": noImpureValueDefaults,
+    "no-parse-context-in-get-static-props": noParseContextInGetStaticProps,
     "no-raw-hrefs": noRawHrefs,
     "no-raw-param-reads": noRawParamReads,
   },
@@ -27,6 +31,8 @@ const recommended: TSESLint.FlatConfig.Config = {
   },
   rules: {
     "paramour/no-href-arithmetic": "warn",
+    "paramour/no-impure-value-defaults": "warn",
+    "paramour/no-parse-context-in-get-static-props": "warn",
     "paramour/no-raw-hrefs": "warn",
     "paramour/no-raw-param-reads": "warn",
   },
