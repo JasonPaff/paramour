@@ -183,9 +183,12 @@ never round-trip).
 
 ## p.timestamp
 
-Full ISO-8601 UTC instants, decoded to a `Date`. Canonical output is
-`Date#toISOString()` — milliseconds always present — while parsing tolerates
-absent or 1–3-digit milliseconds. UTC (`Z`) only: offsets are rejected.
+Full ISO-8601 instants, decoded to a `Date`. Canonical output is always
+UTC `Date#toISOString()` — milliseconds always present — while parsing
+tolerates absent or 1–3-digit milliseconds and accepts either `Z` or a
+`±HH:MM` offset, so links from systems that emit local-offset timestamps
+decode to the same instant. The offset never survives: re-serializing emits
+UTC, so every instant still has exactly one URL.
 
 ```ts twoslash
 import { decodeSearch, p } from "paramour";
@@ -203,13 +206,17 @@ search.at;
 | --------------------------- | ------------------------------------ |
 | `2026-07-18T12:30:00.000Z`  | `Date` (canonical form)              |
 | `2026-07-18T12:30:00Z`      | `Date` (milliseconds optional on parse) |
-| `2026-07-18T12:30:00+02:00` | `ParseError` — UTC `Z` only          |
+| `2026-07-18T14:30:00+02:00` | `Date` — the same instant as `12:30:00Z` |
+| `2026-07-18T14:30:00+0200`  | `ParseError` — the offset needs its colon |
 | `2026-02-30T00:00:00Z`      | `ParseError` — not a real instant    |
 | `2026-07-18`                | `ParseError` — use `p.isoDate` for dates |
 
 Like `p.isoDate`, impossible instants the engine would normalize (`Feb 30`,
-hour `24`) are rejected via an exact round-trip check, and serialization
-applies the same valid-`Date`, year-0000–9999 guards.
+hour `24`) and impossible offsets (`+24:00`, `+02:60`) are rejected, and
+serialization applies the same valid-`Date`, year-0000–9999 guards. Parsing
+enforces that range too, after applying the offset:
+`0000-01-01T00:30:00+01:00` is year −1 in UTC, and is rejected rather than
+decoded to a value that could never re-serialize.
 
 ## p.json
 

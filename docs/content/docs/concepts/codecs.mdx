@@ -63,9 +63,9 @@ a [Standard Schema](/docs/concepts/standard-schema) for domain refinement.
 
 **Temporal.** `p.isoDate()` decodes `2026-07-18` into a UTC-midnight `Date`
 and rejects dates that don't exist on a calendar (`2026-02-30` fails rather
-than silently becoming March 2nd). `p.timestamp()` handles full ISO-8601 UTC
-instants (`2026-07-18T12:30:00.000Z`) with the same no-silent-normalization
-stance.
+than silently becoming March 2nd). `p.timestamp()` handles full ISO-8601
+instants (`2026-07-18T12:30:00.000Z`, or with a `±HH:MM` offset on input)
+with the same no-silent-normalization stance, always emitting UTC.
 
 **Lists.** Two first-class wire shapes for the same in-memory type:
 `p.array()` repeats the key (`?tags=a&tags=b`), while `p.csv()` packs one

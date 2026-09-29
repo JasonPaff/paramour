@@ -17,9 +17,12 @@ import { runStandardSchemaSync } from "./schema.js";
 const INTEGER_RE = /^-?\d+$/;
 const NUMBER_RE = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-// Canonical emit is Date#toISOString (milliseconds always); parse tolerates
-// missing milliseconds. UTC (`Z`) only — offsets are rejected in v0.1.
-const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+// Canonical emit is Date#toISOString (UTC, milliseconds always); parse
+// tolerates missing milliseconds and accepts a `Z` or `±HH:MM` offset, so
+// links from systems that emit local-offset timestamps decode to the same
+// instant. The emit side never produces an offset: one instant, one URL.
+const TIMESTAMP_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 
 /**
  * Serialize-side Date guard. Years outside 0000–9999 are rejected:
@@ -520,22 +523,48 @@ export const p = {
     return createCodec<Date>({
       kind: "timestamp",
       parseElement: (raw) => {
-        if (!TIMESTAMP_RE.test(raw)) {
-          throw grammarParseError(`"${raw}" is not an ISO 8601 UTC timestamp`);
+        const match = TIMESTAMP_RE.exec(raw);
+        if (!match) {
+          throw grammarParseError(`"${raw}" is not an ISO 8601 timestamp`);
         }
-        const date = new Date(raw);
-        if (Number.isNaN(date.getTime())) {
+        const [year, month, day, hour, minute, second] = match
+          .slice(1, 7)
+          .map(Number) as [number, number, number, number, number, number];
+        const millis = Number((match[7] ?? "").padEnd(3, "0"));
+        const sign = match[8] === "-" ? -1 : 1;
+        const offsetHours = Number(match[9] ?? "0");
+        const offsetMinutes = Number(match[10] ?? "0");
+        if (offsetHours > 23 || offsetMinutes > 59) {
+          throw grammarParseError(`"${raw}" has an impossible UTC offset`);
+        }
+        // Built field by field — Date.UTC maps years 0–99 to 1900–1999 —
+        // then checked field by field: the engine silently normalizes
+        // impossible fields (Feb 30 → Mar 1, 24:00 → next day), which must
+        // be rejected, not reinterpreted.
+        const local = new Date(0);
+        local.setUTCFullYear(year, month - 1, day);
+        local.setUTCHours(hour, minute, second, millis);
+        if (
+          local.getUTCFullYear() !== year ||
+          local.getUTCMonth() !== month - 1 ||
+          local.getUTCDate() !== day ||
+          local.getUTCHours() !== hour ||
+          local.getUTCMinutes() !== minute ||
+          local.getUTCSeconds() !== second
+        ) {
           throw grammarParseError(`"${raw}" is not a real instant`);
         }
-        // The engine silently normalizes impossible fields (Feb 30 → Mar 1,
-        // 24:00 → next day). Pad the input to canonical millisecond form and
-        // require an exact round-trip instead.
-        const canonical = raw.replace(
-          /(?:\.(\d{1,3}))?Z$/,
-          (_match, ms: string | undefined) => `.${(ms ?? "").padEnd(3, "0")}Z`,
+        const date = new Date(
+          local.getTime() - sign * (offsetHours * 60 + offsetMinutes) * 60_000,
         );
-        if (date.toISOString() !== canonical) {
-          throw grammarParseError(`"${raw}" is not a real instant`);
+        // An offset can push the instant outside what the canonical UTC form
+        // can represent (0000-01-01T00:30+01:00 is year -1); every decoded
+        // value must re-serialize, so reject it here rather than at encode.
+        const utcYear = date.getUTCFullYear();
+        if (utcYear < 0 || utcYear > 9999) {
+          throw grammarParseError(
+            `"${raw}" is outside the representable 0000-9999 range in UTC`,
+          );
         }
         return date;
       },
