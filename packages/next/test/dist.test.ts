@@ -21,6 +21,9 @@ const distSeamJs = fileURLToPath(
 const distSeamDts = fileURLToPath(
   new URL("../dist/devtools-seam.d.ts", import.meta.url),
 );
+const distEmitJs = fileURLToPath(
+  new URL("../dist/devtools-emit.js", import.meta.url),
+);
 const distTestingJs = fileURLToPath(
   new URL("../dist/testing.js", import.meta.url),
 );
@@ -114,12 +117,20 @@ describe.skipIf(!existsSync(distPagesJs))(
 describe.skipIf(!existsSync(distSeamJs))(
   "dist devtools-seam entry (packaging)",
   () => {
-    it("dist/devtools-seam.js imports NOTHING (erasability precondition)", () => {
+    it("dist/devtools-emit.js imports NOTHING (erasability precondition)", () => {
       // Every consumer call site sits behind a constant-folded NODE_ENV
       // guard; with sideEffects:false the module drops from prod bundles
       // only if its own emitted JS pulls in nothing else.
-      const specifiers = reachableSpecifiers(distSeamJs);
-      expect(specifiers.size).toBe(0);
+      expect(reachableSpecifiers(distEmitJs).size).toBe(0);
+      expect(reachableSpecifiers(distSeamJs).size).toBe(0);
+    });
+
+    it("dist/devtools-seam.d.ts declares types only (a value import can't type-check)", () => {
+      const content = readFileSync(distSeamDts, "utf8");
+      expect(content).not.toMatch(/\bdeclare (?:const|function|let|class)\b/);
+      expect(content).not.toMatch(/\bexport (?:const|function|let|class)\b/);
+      // Sanity: the file does carry the contract's types.
+      expect(content).toMatch(/\bexport interface ParamourDevtoolsSeam\b/);
     });
 
     it("dist/devtools-seam.d.ts references only paramour types (hermeticity)", () => {

@@ -1,3 +1,9 @@
+import { ParamourError } from "paramour";
+
+const routeCollisionErrorBrand = Symbol.for(
+  "paramour.errors.RouteCollisionError",
+);
+
 /** A scanned route path labeled with the router that produced it. */
 export interface ScannedRoute {
   path: string;
@@ -12,8 +18,27 @@ export interface ScannedRoute {
  * collision mid-`--watch` is usually a file mid-move, so the last good
  * artifact stays on disk).
  */
-export class RouteCollisionError extends Error {
-  override name = "RouteCollisionError";
+export class RouteCollisionError extends ParamourError {
+  static {
+    // Same cross-copy identity brand scheme as core's error classes: a
+    // realm-global Symbol.for() key on the prototype, so `instanceof`
+    // recognizes instances from a second physical copy of this package.
+    Object.defineProperty(this.prototype, routeCollisionErrorBrand, {
+      value: true,
+    });
+  }
+
+  override readonly name = "RouteCollisionError" as const;
+
+  static override [Symbol.hasInstance](
+    value: unknown,
+  ): value is RouteCollisionError {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      (value as Record<symbol, unknown>)[routeCollisionErrorBrand] === true
+    );
+  }
 }
 
 /**

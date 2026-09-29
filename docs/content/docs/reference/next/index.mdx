@@ -14,10 +14,10 @@ The main entry exports the Next config wrapper and its supporting types:
 [`withTypedRoutes`](/docs/reference/next/with-typed-routes) generates and
 validates the `paramour-env.d.ts` registry artifact during `next dev` and
 `next build`, with [`WithTypedRoutesOptions`](/docs/reference/next/with-typed-routes#withtypedroutesoptions)
-(`outFile`, `strict`) controlling where the artifact lives and whether drift
-fails the build. It also exports
+(`strict`) controlling whether drift fails the build. It also exports
 [`ParamourConfig`](/docs/reference/next/with-typed-routes#paramourconfig),
-the type of the `paramour.config.ts` file the CLI reads, and
+the type of the `paramour.config.ts` file both the CLI and the wrapper
+read, and
 [`RouteCollisionError`](/docs/reference/next/with-typed-routes#routecollisionerror),
 thrown when two files resolve to one URL. These four are the entry's entire
 public surface.

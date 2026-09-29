@@ -36,16 +36,10 @@ async function doctor(
 
 function fakeInstall(
   root: string,
-  versions: { core: string; declared?: string; next: string },
+  versions: { core: string; next: string },
 ): void {
-  // Default: @paramour-js/next declares exactly the installed core, the
-  // shape every correct install has (workspace:* publishes as an exact pin).
-  const declared = versions.declared ?? versions.core;
   const entries: [string, Record<string, unknown>][] = [
-    [
-      "node_modules/@paramour-js/next/package.json",
-      { dependencies: { paramour: declared }, version: versions.next },
-    ],
+    ["node_modules/@paramour-js/next/package.json", { version: versions.next }],
     ["node_modules/paramour/package.json", { version: versions.core }],
   ];
   for (const [file, fields] of entries) {
@@ -88,7 +82,7 @@ describe("paramour doctor", () => {
       "✔ next.config: next.config.ts wraps withTypedRoutes",
     );
     expect(text).toContain(
-      "✔ versions: paramour 1.0.0 satisfies @paramour-js/next 1.0.0's declared dependency",
+      "✔ versions: paramour and @paramour-js/next are both 1.0.0",
     );
     expect(text).toContain("0 failed, 0 warnings");
     expect(text).not.toContain("✖");
@@ -133,39 +127,13 @@ describe("paramour doctor", () => {
     expect(text).toContain("1 warning");
   });
 
-  it("installed core != the declared dependency warns but exits 0", async () => {
+  it("a lockstep mismatch (a half-upgraded app) warns but exits 0", async () => {
     const root = makeHealthyProject();
-    fakeInstall(root, { core: "1.0.0", declared: "1.2.0", next: "1.1.0" });
+    fakeInstall(root, { core: "1.0.0", next: "1.1.0" });
     const run = await doctor();
     expect(run.code).toBe(0);
     expect(run.out.join("\n")).toContain(
-      "⚠ versions: installed paramour 1.0.0 != 1.2.0, the version @paramour-js/next 1.1.0 depends on",
-    );
-  });
-
-  it("independently-versioned packages pass when the declared dependency matches", async () => {
-    // The real npm shape (e.g. paramour 0.4.0 + @paramour-js/next 0.2.1):
-    // the versions differ by design; only the declared pin has to hold.
-    const root = makeHealthyProject();
-    fakeInstall(root, { core: "0.4.0", next: "0.2.1" });
-    const run = await doctor();
-    expect(run.code).toBe(0);
-    expect(run.out.join("\n")).toContain(
-      "✔ versions: paramour 0.4.0 satisfies @paramour-js/next 0.2.1's declared dependency",
-    );
-  });
-
-  it("a non-exact declared dependency (workspace/range) is left to the package manager", async () => {
-    const root = makeHealthyProject();
-    fakeInstall(root, {
-      core: "1.0.0",
-      declared: "workspace:*",
-      next: "1.1.0",
-    });
-    const run = await doctor();
-    expect(run.code).toBe(0);
-    expect(run.out.join("\n")).toContain(
-      "✔ versions: paramour 1.0.0 satisfies @paramour-js/next 1.1.0's declared dependency",
+      "⚠ versions: paramour 1.0.0 != @paramour-js/next 1.1.0",
     );
   });
 
@@ -197,7 +165,7 @@ describe("paramour doctor", () => {
     process.chdir(app);
     const run = await doctor();
     expect(run.out.join("\n")).toContain(
-      "✔ versions: paramour 1.0.0 satisfies @paramour-js/next 1.0.0's declared dependency",
+      "✔ versions: paramour and @paramour-js/next are both 1.0.0",
     );
   });
 

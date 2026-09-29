@@ -2,9 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Shape of `paramour.config.{ts,mjs,json}` — the CLI's config file. Every
- * field is optional; the CLI's precedence is flags → this file → inference.
- * `.ts`/`.mjs` files default-export this object.
+ * Shape of `paramour.config.{ts,mjs,json}` — read by the CLI and by
+ * `withTypedRoutes`. Every field is optional; the CLI's precedence is flags →
+ * this file → inference. `.ts`/`.mjs` files default-export this object.
  */
 export interface ParamourConfig {
   /** App dir, relative to the project root; default: joint discovery. */

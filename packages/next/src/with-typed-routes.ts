@@ -1,6 +1,6 @@
-import { resolve } from "node:path";
-
+import { NoRouteDirsError, resolveInputs } from "./cli-inputs.js";
 import { RouteCollisionError } from "./collisions.js";
+import { loadConfigFile } from "./config.js";
 import {
   diffGenerated,
   formatRouteDiff,
@@ -13,17 +13,15 @@ import {
   watcherLockPath,
 } from "./lock.js";
 import { DEFAULT_PAGE_EXTENSIONS } from "./scan-app.js";
-import { resolveRouteDirs, type RouteDirs } from "./scan.js";
+import { type RouteDirs } from "./scan.js";
 import { watchRouteDirs } from "./watch.js";
 
-/** Options for {@link withTypedRoutes}. */
+/**
+ * Options for {@link withTypedRoutes}. Where routes and the artifact live is
+ * NOT configured here: the wrapper reads `paramour.config.*` exactly as the
+ * CLI does, so the two writers can never produce different artifacts.
+ */
 export interface WithTypedRoutesOptions {
-  /**
-   * Artifact location, for monorepos where the Next app root isn't where the
-   * file should live — the escape hatch. Relative paths resolve against the
-   * project root. Default: `paramour-env.d.ts` at the project root.
-   */
-  outFile?: string;
   /**
    * Upgrade build-phase drift from a loud warning to a build failure — for
    * teams that want the committed artifact to be the law. Default `false`,
@@ -111,19 +109,30 @@ export function withTypedRoutes<C extends object>(
       return resolved;
 
     // The dev server and every build worker evaluate the config with the
-    // project root as cwd; the CLI flags are the home for anything more
-    // configurable than this.
+    // project root as cwd — the same root the CLI resolves against.
     const projectRoot = process.cwd();
-    const artifactPath = resolve(
-      projectRoot,
-      options.outFile ?? "paramour-env.d.ts",
-    );
+    // A malformed paramour.config throws here, like the populated-ignored-dir
+    // discovery error: both are configuration mistakes, not incidental
+    // generation failures, so they stay loud (see above).
+    const file = (await loadConfigFile(projectRoot))?.config;
+    // Next's pageExtensions is authoritative inside Next — it decides what is
+    // a page. A config file that disagrees would make the CLI scan a
+    // different route set, so say so once.
     const pageExtensions =
       (resolved as NextConfigLike).pageExtensions ?? DEFAULT_PAGE_EXTENSIONS;
-    // May throw the populated-ignored-dir config error — deliberately not
-    // caught (see above).
-    const dirs = resolveRouteDirs(projectRoot, pageExtensions);
-    if (dirs.appDir === undefined && dirs.pagesDir === undefined) {
+    if (
+      file?.pageExtensions !== undefined &&
+      file.pageExtensions.join(",") !== pageExtensions.join(",")
+    ) {
+      warnOnce(
+        `paramour: paramour.config pageExtensions (${file.pageExtensions.join(", ")}) differ from Next's (${pageExtensions.join(", ")}); generation inside Next uses Next's — align the config file so \`paramour generate\` agrees`,
+      );
+    }
+    let inputs;
+    try {
+      inputs = await resolveInputs({}, projectRoot, file, pageExtensions);
+    } catch (error) {
+      if (!(error instanceof NoRouteDirsError)) throw error;
       // Codegen is never load-bearing — a config wrapper must not take down
       // `next dev`/`next build` over a missing route dir.
       warnOnce(
@@ -131,6 +140,11 @@ export function withTypedRoutes<C extends object>(
       );
       return resolved;
     }
+    const { artifactPath } = inputs;
+    const dirs: RouteDirs = {
+      appDir: inputs.appDir,
+      pagesDir: inputs.pagesDir,
+    };
 
     if (phase === PHASE_PRODUCTION_BUILD) {
       generateForBuild(

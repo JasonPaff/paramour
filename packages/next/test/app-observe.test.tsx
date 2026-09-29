@@ -22,7 +22,7 @@ import {
   useSearch,
   useSearchOrThrow,
 } from "../src/app.js";
-import { getParamourSeam } from "../src/devtools-seam.js";
+import { getParamourSeam } from "../src/devtools-emit.js";
 import { useStableResult } from "../src/select.js";
 import { ParamourTestingProvider } from "../src/testing.js";
 

@@ -37,13 +37,13 @@ Key types: `Codec`, `AnyCodec` (optionally narrowed to one output type: any code
 
 ## `@paramour-js/next` exports
 
-| Entry point                       | Exports                                                                                                                                                                     |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@paramour-js/next`               | `withTypedRoutes(config, options?)` (`options: { outFile?, strict? }`), `RouteCollisionError`, types `WithTypedRoutesOptions`, `ParamourConfig`                             |
-| `@paramour-js/next/app`           | `useRouteParams`, `useRouteParamsOrThrow`, `useSearch`, `useSearchOrThrow` (all `(route, options?)` with `options: { select, equality?: "shallow" }`), type `SelectOptions` |
-| `@paramour-js/next/pages`         | `useRouteParams`, `useSearch` (return `RouterResult` = `SafeResult` + `{ status: "pending" }`), types `RouterResult`, `SelectOptions`                                       |
-| `@paramour-js/next/testing`       | `ParamourTestingProvider`, `withParamourTesting(options?)`, type `ParamourTestingOptions` (`isReady, mounted, onReplace, params, pathname, search`)                         |
-| `@paramour-js/next/devtools-seam` | Types-only seam contract consumed by `@paramour-js/devtools-panel`; not needed in app code                                                                                  |
+| Entry point                       | Exports                                                                                                                                                                             |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@paramour-js/next`               | `withTypedRoutes(config, options?)` (`options: { strict? }`; everything else comes from `paramour.config`), `RouteCollisionError`, types `WithTypedRoutesOptions`, `ParamourConfig` |
+| `@paramour-js/next/app`           | `useRouteParams`, `useRouteParamsOrThrow`, `useSearch`, `useSearchOrThrow` (all `(route, options?)` with `options: { select, equality?: "shallow" }`), type `SelectOptions`         |
+| `@paramour-js/next/pages`         | `useRouteParams`, `useSearch` (return `RouterResult` = `SafeResult` + `{ status: "pending" }`), types `RouterResult`, `SelectOptions`                                               |
+| `@paramour-js/next/testing`       | `ParamourTestingProvider`, `withParamourTesting(options?)`, type `ParamourTestingOptions` (`isReady, mounted, onReplace, params, pathname, search`)                                 |
+| `@paramour-js/next/devtools-seam` | Types-only seam contract consumed by `@paramour-js/devtools-panel`; not needed in app code                                                                                          |
 
 ## CLI (`paramour <command>`, bin shipped by `@paramour-js/next`)
 
@@ -68,7 +68,7 @@ Precedence: CLI flags → config file → discovery. Unknown keys are rejected (
 | ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `appDir`         | discovered `app/`/`src/app` | App directory, relative to project root                                                                |
 | `pagesDir`       | discovered `pages/`…        | Pages directory                                                                                        |
-| `outFile`        | `paramour-env.d.ts`         | Artifact path (monorepo escape hatch); also settable on `withTypedRoutes`                              |
+| `outFile`        | `paramour-env.d.ts`         | Artifact path (monorepo escape hatch); honored by the CLI and `withTypedRoutes` alike                  |
 | `pageExtensions` | `["tsx","ts","jsx","js"]`   | No leading dots                                                                                        |
 | `routeFiles`     | automatic content scan      | Globs of modules exporting route definitions — used by `list`/`doctor` only; generation never reads it |
 

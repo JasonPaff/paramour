@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
+import { ParamourError } from "paramour";
 
 import { loadConfigFile, type ParamourConfig } from "./config.js";
 import { type GenerateInputs } from "./generate.js";
@@ -22,7 +23,9 @@ export interface InputFlags {
  * treat it like any other exit-2 error, but `init` downgrades it to a
  * warn-and-skip — a fresh project legitimately has no app/ or pages/ yet.
  */
-export class NoRouteDirsError extends Error {}
+export class NoRouteDirsError extends ParamourError {
+  override readonly name = "NoRouteDirsError" as const;
+}
 
 /**
  * Precedence lives in exactly this function: flags → config file → joint
@@ -33,15 +36,21 @@ export class NoRouteDirsError extends Error {}
  * exists is that an error: app-only and pages-only projects are both fine.
  *
  * Commands that already loaded the config file (for fields beyond these,
- * e.g. `list`'s routeFiles) pass it as `preloaded` so jiti runs once.
+ * e.g. `list`'s routeFiles) pass it as `preloaded` so jiti runs once. The
+ * `withTypedRoutes` wrapper resolves through here too, with no flags, so
+ * the CLI and `next dev`/`next build` always agree on dirs and artifact.
  */
 export async function resolveInputs(
   flags: InputFlags,
   projectRoot: string,
   preloaded?: ParamourConfig,
+  pageExtensionsOverride?: readonly string[],
 ): Promise<GenerateInputs> {
   const file = preloaded ?? (await loadConfigFile(projectRoot))?.config;
+  // The override is withTypedRoutes' Next-authoritative extension list:
+  // inside `next dev`/`next build`, what Next routes on wins over the file.
   const pageExtensions =
+    pageExtensionsOverride ??
     parsePageExtensions(flags["page-extensions"]) ??
     file?.pageExtensions ??
     DEFAULT_PAGE_EXTENSIONS;

@@ -10,7 +10,7 @@ import type {
   ParamourSearchWire,
 } from "./devtools-seam.js";
 
-import { emitObservation } from "./devtools-seam.js";
+import { emitObservation } from "./devtools-emit.js";
 
 /**
  * Shared devtools seam wiring for the six read hooks: the navigate builders

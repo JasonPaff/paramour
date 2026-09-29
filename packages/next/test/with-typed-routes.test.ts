@@ -72,6 +72,11 @@ function silenceWarn(): ReturnType<typeof vi.fn> {
   return spy;
 }
 
+/** Writes `paramour.config.json` into the project — the one config source. */
+function writeConfig(root: string, config: Record<string, unknown>): void {
+  writeFileSync(join(root, "paramour.config.json"), JSON.stringify(config));
+}
+
 describe("withTypedRoutes phase dispatch", () => {
   it("passes through phases other than build and dev untouched", async () => {
     const root = makeProject(["app/page.tsx"]);
@@ -195,14 +200,12 @@ describe("withTypedRoutes build phase", () => {
   it("strict: true still resolves when generation itself fails (only drift may fail a strict build)", async () => {
     // outFile pointing at an existing DIRECTORY makes the artifact write
     // throw (EISDIR) — an incidental generation failure, not drift.
-    makeProject(["app/page.tsx", "artifact-dir/"]);
+    const root = makeProject(["app/page.tsx", "artifact-dir/"]);
+    writeConfig(root, { outFile: "artifact-dir" });
     const warn = silenceWarn();
     const config = { reactStrictMode: true as const };
     await expect(
-      withTypedRoutes(config, { outFile: "artifact-dir", strict: true })(
-        PHASE_BUILD,
-        {},
-      ),
+      withTypedRoutes(config, { strict: true })(PHASE_BUILD, {}),
     ).resolves.toBe(config);
     expect(warn).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining("stale route types"),
@@ -231,17 +234,43 @@ describe("withTypedRoutes build phase", () => {
     expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
   });
 
-  it("honors the wrapped config's pageExtensions and the outFile option", async () => {
+  it("honors the wrapped config's pageExtensions and paramour.config's outFile", async () => {
     const root = makeProject(["app/page.mdx", "app/skipped/page.tsx"]);
+    writeConfig(root, { outFile: join("types", "routes.d.ts") });
     silenceWarn();
-    await withTypedRoutes(
-      { pageExtensions: ["mdx"] },
-      { outFile: join("types", "routes.d.ts") },
-    )(PHASE_BUILD, {});
+    await withTypedRoutes({ pageExtensions: ["mdx"] })(PHASE_BUILD, {});
     expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
     expect(readFileSync(join(root, "types", "routes.d.ts"), "utf8")).toBe(
       emitApp(["/"]),
     );
+  });
+
+  it("honors paramour.config's appDir, like the CLI", async () => {
+    const root = makeProject(["web/app/page.tsx", "web/app/about/page.tsx"]);
+    writeConfig(root, { appDir: "web/app" });
+    silenceWarn();
+    await withTypedRoutes({})(PHASE_BUILD, {});
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitApp(["/", "/about"]),
+    );
+  });
+
+  it("warns once when paramour.config's pageExtensions disagree with Next's", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    writeConfig(root, { pageExtensions: ["tsx", "mdx"] });
+    const warn = silenceWarn();
+    await withTypedRoutes({})(PHASE_BUILD, {});
+    await withTypedRoutes({})(PHASE_BUILD, {});
+    const mismatch = warn.mock.calls.filter(([message]) =>
+      String(message).includes("pageExtensions"),
+    );
+    expect(mismatch).toHaveLength(1);
+  });
+
+  it("throws on a malformed paramour.config (configuration errors stay loud)", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    writeConfig(root, { outFile: "" });
+    await expect(withTypedRoutes({})(PHASE_BUILD, {})).rejects.toThrow();
   });
 });
 
@@ -294,12 +323,11 @@ describe("withTypedRoutes dev phase", { retry: 2 }, () => {
   it("continues (config resolves) when dev-phase generation fails", async () => {
     // Same directory-as-artifact trick as the build-phase test: the write
     // throws, dev must keep going in stale-types mode.
-    makeProject(["app/page.tsx", "artifact-dir/"]);
+    const root = makeProject(["app/page.tsx", "artifact-dir/"]);
+    writeConfig(root, { outFile: "artifact-dir" });
     const warn = silenceWarn();
     const config = { reactStrictMode: true as const };
-    await expect(
-      withTypedRoutes(config, { outFile: "artifact-dir" })(PHASE_DEV, {}),
-    ).resolves.toBe(config);
+    await expect(withTypedRoutes(config)(PHASE_DEV, {})).resolves.toBe(config);
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("dev continues with stale route types"),
       expect.anything(),
