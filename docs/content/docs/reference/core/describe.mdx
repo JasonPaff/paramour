@@ -48,9 +48,11 @@ Details worth knowing:
   `element` — a nested `CodecDescription` of the per-segment/per-key
   scalar. The recursion is bounded by construction: the deepest legal chain
   is `array<csv<scalar>>`.
-- **`kind` is reflection-only.** It names the builder (`"integer"`,
-  `"enum"`, …; `p.custom` uses its `label` or `"custom"`) and is never
-  consulted by parse/serialize.
+- **`kind` is reflection-only.** It names the builder — a `CodecKind`
+  (`"integer"`, `"enum"`, …) — and is never consulted by parse/serialize.
+  A `p.custom` codec is always `"custom"`, so it can never pass itself off
+  as a built-in; its `label`, when given, is reported separately as
+  `label` and is what the formatted forms render.
 
 ## describeRoute
 

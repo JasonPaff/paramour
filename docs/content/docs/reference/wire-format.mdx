@@ -349,12 +349,12 @@ The encode side accepts the raw wire record; the decode side returns the
 schema's own inferred output. The types simply state what SS3/SS5 do.
 
 ```ts twoslash
-import { rawSearch, type SearchOutputOf } from "paramour";
+import { rawSearch, type InferSearchOutput } from "paramour";
 import { z } from "zod";
 
 const raw = rawSearch(z.object({ q: z.string(), tags: z.array(z.string()) }));
 
-type Out = SearchOutputOf<typeof raw>;
+type Out = InferSearchOutput<typeof raw>;
 //   ^?
 ```
 

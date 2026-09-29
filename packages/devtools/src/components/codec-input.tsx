@@ -131,7 +131,7 @@ export function CodecInput({
         // also carry an element (PP1) but never reach this input: arity
         // "many" takes the textarea above.
         description.element !== undefined
-        ? `${description.element.kind},…`
+        ? `${description.element.label ?? description.element.kind},…`
         : "";
 
   return (

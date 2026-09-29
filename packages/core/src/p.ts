@@ -242,8 +242,8 @@ export const p = {
     // CV2: presence, catch, and arity-many inners are excluded by the
     // parameter type (the same type-state philosophy); resolveListElement
     // mirrors that type-state for JS consumers. Nesting is detected
-    // structurally via ~element (never via ~kind, which is reflection-only
-    // and free-form for p.custom labels). Comma-emitting p.custom inners are
+    // structurally via ~element (never via ~kind, which is reflection-only).
+    // Comma-emitting p.custom inners are
     // undetectable here and are caught by the CV4 serialize guard instead.
     const inner = resolveListElement(element, "p.csv");
     // The shared guard ran first: p.array also carries ~element (PP1), and
@@ -331,7 +331,7 @@ export const p = {
     // aggregation. .catch() recovers foreign parse failures only, which
     // rebrandForeign normalizes to ParseError so recovery sees them.
     return createCodec<Out>({
-      ...(codec.label === undefined ? {} : { kind: codec.label }),
+      ...(codec.label === undefined ? {} : { label: codec.label }),
       parseElement: (raw) =>
         rebrandForeign(
           () => codec.parse(raw),

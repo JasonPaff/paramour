@@ -25,11 +25,13 @@ in render to your nearest client error boundary. The
 Decoded route params as a `SafeResult`, discriminated on `status`.
 
 ```ts
-function useRouteParams<R extends AnyAppRoute>(route: R): SafeResult<InferRouteParams<R>>;
+function useRouteParams<R extends AnyAppRoute>(
+  route: R,
+): SafeResult<InferRouteParams<R>, ParamsDecodeError>;
 function useRouteParams<R extends AnyAppRoute, U>(
   route: R,
   options: SelectOptions<InferRouteParams<R>, U>,
-): SafeResult<U>;
+): SafeResult<U, ParamsDecodeError>;
 ```
 
 ```tsx twoslash title="app/product/[id]/product-badge.tsx"
@@ -115,11 +117,13 @@ reset error boundary gets a fresh decode.
 Decoded search params as a `SafeResult`, discriminated on `status`.
 
 ```ts
-function useSearch<R extends AnyAppRoute>(route: R): SafeResult<SearchOutputOf<R["~search"]>>;
+function useSearch<R extends AnyAppRoute>(
+  route: R,
+): SafeResult<InferRouteSearch<R>, SearchDecodeError>;
 function useSearch<R extends AnyAppRoute, U>(
   route: R,
-  options: SelectOptions<SearchOutputOf<R["~search"]>, U>,
-): SafeResult<U>;
+  options: SelectOptions<InferRouteSearch<R>, U>,
+): SafeResult<U, SearchDecodeError>;
 ```
 
 ```tsx twoslash title="app/products/filter-summary.tsx"
@@ -165,10 +169,10 @@ Decoded search params directly, or a thrown `SearchDecodeError` (from
 `paramour`) to the nearest client error boundary.
 
 ```ts
-function useSearchOrThrow<R extends AnyAppRoute>(route: R): SearchOutputOf<R["~search"]>;
+function useSearchOrThrow<R extends AnyAppRoute>(route: R): InferRouteSearch<R>;
 function useSearchOrThrow<R extends AnyAppRoute, U>(
   route: R,
-  options: SelectOptions<SearchOutputOf<R["~search"]>, U>,
+  options: SelectOptions<InferRouteSearch<R>, U>,
 ): U;
 ```
 

@@ -75,7 +75,12 @@ export class ParamourError extends Error {
 
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
-    this.name = new.target.name;
+    // Paramour's own classes pin a literal `name` field (which runs after
+    // this and wins) — a minifier that drops class names would otherwise
+    // rename them in production. User subclasses fall back to their class
+    // name.
+    this.name =
+      new.target === ParamourError ? "ParamourError" : new.target.name;
   }
 
   // Each class checks its OWN brand: an inherited base check would make
@@ -93,6 +98,8 @@ export class ParamsDecodeError extends ParamourError {
   }
 
   readonly issues: readonly Issue[];
+
+  override readonly name = "ParamsDecodeError" as const;
   /** The failed route's path pattern; null when decoded outside a route. */
   readonly route: null | string;
 
@@ -119,7 +126,15 @@ export class ParseError extends ParamourError {
   }
 
   /**
-   * True when the message follows core's grammar-authoring convention —
+   * Literal per class, so the decode errors stay structurally distinct
+   * (the `SafeResult` error parameter relies on it) and `error.name`
+   * survives minification.
+   */
+  override readonly name = "ParseError" as const;
+
+  /**
+   * Internal, outside semver: true when the message follows core's
+   * grammar-authoring convention —
    * it quotes the offending wire value and names the grammar it failed
    * (`'"x" is not an integer'`). Only core's own grammar throw sites set
    * it (via {@link grammarParseError}); schema-validation failures and
@@ -128,15 +143,7 @@ export class ParseError extends ParamourError {
    * expected-shape context themselves. This flag — never message sniffing
    * — is what issue producers key `reason: "parse" | "validate"` on.
    */
-  readonly selfDescribing: boolean;
-
-  constructor(
-    message: string,
-    options?: { cause?: unknown; selfDescribing?: boolean },
-  ) {
-    super(message, options);
-    this.selfDescribing = options?.selfDescribing ?? false;
-  }
+  readonly "~selfDescribing": boolean = false;
 
   static override [Symbol.hasInstance](value: unknown): value is ParseError {
     return hasBrand(value, parseErrorBrand);
@@ -150,6 +157,8 @@ export class SearchDecodeError extends ParamourError {
   }
 
   readonly issues: readonly Issue[];
+
+  override readonly name = "SearchDecodeError" as const;
   /** The failed route's path pattern; null when decoded outside a route. */
   readonly route: null | string;
 
@@ -181,6 +190,8 @@ export class SearchSourceError extends ParamourError {
   /** The offending source key, or null when the source itself is malformed. */
   readonly key: null | string;
 
+  override readonly name = "SearchSourceError" as const;
+
   constructor(message: string, key: null | string) {
     super(message);
     this.key = key;
@@ -198,6 +209,8 @@ export class SerializeError extends ParamourError {
   static {
     brandPrototype(this, serializeErrorBrand);
   }
+
+  override readonly name = "SerializeError" as const;
 
   static override [Symbol.hasInstance](
     value: unknown,
@@ -236,19 +249,22 @@ export function foreignMessage(error: unknown): string {
  * Not exported from the package.
  */
 export function grammarParseError(message: string): ParseError {
-  return new ParseError(message, { selfDescribing: true });
+  const error = new ParseError(message);
+  // The one setter: the flag is readonly to everyone else.
+  (error as { "~selfDescribing": boolean })["~selfDescribing"] = true;
+  return error;
 }
 
 /**
  * Maps a caught {@link ParseError} to its {@link Issue} reason: core's
  * grammar-authored messages are `"parse"`, everything else — schema
  * validators, rebranded custom-codec throws — is `"validate"`. Keyed on the
- * structural `selfDescribing` flag, never on message sniffing; shared by
+ * structural `~selfDescribing` flag, never on message sniffing; shared by
  * search.ts and path.ts so both surfaces classify identically. Not exported
  * from the package.
  */
 export function parseIssueReason(error: ParseError): IssueReason {
-  return error.selfDescribing ? "parse" : "validate";
+  return error["~selfDescribing"] ? "parse" : "validate";
 }
 
 /**

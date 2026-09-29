@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { href, type InferSearchInput, type SearchOutputOf } from "paramour";
+import { href, type InferSearchInput, type InferSearchOutput } from "paramour";
 import type { FormEvent } from "react";
 
 import { findRoute, findSearch } from "../lib/routes";
@@ -13,7 +13,7 @@ import { findRoute, findSearch } from "../lib/routes";
 export function FindForm({
   current,
 }: {
-  current: SearchOutputOf<typeof findSearch>;
+  current: InferSearchOutput<typeof findSearch>;
 }) {
   const router = useRouter();
 

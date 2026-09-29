@@ -6,12 +6,16 @@ import {
 } from "./errors.js";
 
 /**
- * `any` is deliberate: `~out` appears in inferred method parameter positions
- * (`.default(value: Out)`), which are contravariant under strictFunctionTypes;
- * the `unknown` form would reject every concrete codec.
+ * Any codec, optionally narrowed to one output type: `AnyCodec<number>` is
+ * the supported spelling of "a codec producing numbers" in any presence,
+ * catch, or arity state — only `Codec`'s first type parameter is public API;
+ * the type-state parameters after it may change in minor releases. The
+ * `any` default is deliberate: `~out` appears in inferred method parameter
+ * positions (`.default(value: Out)`), which are contravariant under
+ * strictFunctionTypes; the `unknown` form would reject every concrete codec.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyCodec = Codec<any, Presence, boolean, Arity>;
+export type AnyCodec<Out = any> = Codec<Out, Presence, boolean, Arity>;
 
 /** "single" = one wire value per key; "many" = repeated keys (arrays). */
 export type Arity = "many" | "single";
@@ -99,11 +103,14 @@ export interface Codec<
   /** Members of a `p.enum` codec; undefined for every other kind. */
   readonly "~enumMembers": readonly string[] | undefined;
   /**
-   * Which builder produced the codec (`"integer"`, `"enum"`, …; `p.custom`
-   * uses its `label` or `"custom"`). Reflection metadata for describeCodec —
-   * never consulted by parse/serialize.
+   * Which builder produced the codec. Reflection metadata for describeCodec
+   * — never consulted by parse/serialize. `p.custom` is always `"custom"`,
+   * so a custom codec can never pass itself off as a built-in; its
+   * user-chosen name lives in `~label`.
    */
-  readonly "~kind": string;
+  readonly "~kind": CodecKind;
+  /** `p.custom`'s display label; undefined for every other codec. */
+  readonly "~label": string | undefined;
   /** phantom — carries `Out` for inference; never set at runtime */
   readonly "~out": Out;
 
@@ -112,7 +119,25 @@ export interface Codec<
   readonly "~serializeElement": (value: unknown) => string;
 }
 
-export type OutputOf<C extends AnyCodec> = C["~out"];
+/**
+ * Which builder produced a codec. New builders add members in minor
+ * releases, so exhaustive switches over it need a default branch.
+ */
+export type CodecKind =
+  | "array"
+  | "boolean"
+  | "csv"
+  | "custom"
+  | "enum"
+  | "index"
+  | "integer"
+  | "isoDate"
+  | "json"
+  | "number"
+  | "string"
+  | "timestamp";
+
+export type InferCodecOutput<C extends AnyCodec> = C["~out"];
 
 /** Codecs legal in a `params:` config — no presence modifiers (D5). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,7 +158,8 @@ interface CodecState<Out> {
   readonly defaultValue: (() => Out) | undefined;
   readonly element: AnyCodec | undefined;
   readonly enumMembers: readonly string[] | undefined;
-  readonly kind: string;
+  readonly kind: CodecKind;
+  readonly label: string | undefined;
   readonly parseElement: (raw: string) => unknown;
   readonly presence: Presence;
   readonly serializeElement: (value: unknown) => string;
@@ -158,7 +184,8 @@ export function createCodec<Out, A extends Arity = "single">(impl: {
   arity?: A;
   element?: AnyCodec;
   enumMembers?: readonly string[];
-  kind?: string;
+  kind?: CodecKind;
+  label?: string;
   parseElement: (raw: string) => unknown;
   serializeElement: (value: unknown) => string;
 }): Codec<Out, "required", false, A> {
@@ -170,6 +197,7 @@ export function createCodec<Out, A extends Arity = "single">(impl: {
     element: impl.element,
     enumMembers: impl.enumMembers,
     kind: impl.kind ?? "custom",
+    label: impl.label,
     parseElement: impl.parseElement,
     presence: "required",
     serializeElement: impl.serializeElement,
@@ -234,6 +262,7 @@ function build<Out>(state: CodecState<Out>): Codec<Out> {
     "~element": state.element,
     "~enumMembers": state.enumMembers,
     "~kind": state.kind,
+    "~label": state.label,
 
     "~parseElement": state.parseElement,
     "~presence": state.presence,

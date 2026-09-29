@@ -8,8 +8,10 @@ import {
 } from "./path.js";
 import {
   decodeSearch,
-  type SearchOutputOf,
+  type InferSearchOutput,
+  type SearchSlot,
   type SearchSource,
+  type SlotOf,
 } from "./search.js";
 
 /**
@@ -28,7 +30,7 @@ export function safeDecodeParams<R extends AnyRoute>(
   route: R,
   source: ParamsSource,
   options?: DecodeParamsOptions,
-): SafeResult<InferRouteParams<R>> {
+): SafeResult<InferRouteParams<R>, ParamsDecodeError> {
   try {
     return { data: decodeParams(route, source, options), status: "success" };
   } catch (error) {
@@ -37,25 +39,16 @@ export function safeDecodeParams<R extends AnyRoute>(
   }
 }
 
-/** Decoded search params as a `SafeResult` (discriminated on `status`). */
-export function safeDecodeSearch<R extends AnyRoute>(
-  route: R,
+/**
+ * Decoded search params as a `SafeResult` (discriminated on `status`).
+ * `target` is a route or a bare `search:` slot, as for {@link decodeSearch}.
+ */
+export function safeDecodeSearch<T extends AnyRoute | SearchSlot>(
+  target: T,
   source: SearchSource,
-): SafeResult<SearchOutputOf<R["~search"]>> {
+): SafeResult<InferSearchOutput<SlotOf<T>>, SearchDecodeError> {
   try {
-    // decodeSearch is keyed on SearchOutputOf (SS6) — the correct
-    // public type — but AnyRoute erases its SC to `any`, so for a still-
-    // generic R the call's value side reduces to `unknown` while the
-    // annotation side stays deferred. The cast bridges that inference gap to
-    // the SAME (correct) type.
-    return {
-      data: decodeSearch(
-        route["~search"],
-        source,
-        route.path,
-      ) as SearchOutputOf<R["~search"]>,
-      status: "success",
-    };
+    return { data: decodeSearch(target, source), status: "success" };
   } catch (error) {
     if (error instanceof SearchDecodeError) return { error, status: "error" };
     throw error;

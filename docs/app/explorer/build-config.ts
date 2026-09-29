@@ -1,9 +1,14 @@
-import { type AnyCodec, type Codec, p, type SearchConfig } from "paramour";
+import {
+  type AnyCodec,
+  type Codec,
+  p,
+  parseValue,
+  type SearchConfig,
+} from "paramour";
 // parseValue is the sanctioned raw-parse probe for reflection-driven tooling
 // (the same entry the devtools panel uses); the explorer qualifies — it turns
 // descriptor wire strings into typed modifier values through the described
 // codec itself, never a second value syntax.
-import { parseValue } from "paramour/internal";
 import { z } from "zod";
 
 import { messageOf, show } from "@/lib/show-value";

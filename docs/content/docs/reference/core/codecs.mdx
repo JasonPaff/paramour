@@ -1,11 +1,11 @@
 ---
 title: Codec & modifiers
-description: The Codec interface, createCodec, the three modifiers, and the type-state rules.
+description: The Codec interface, the three modifiers, and the type-state rules.
 ---
 
 Every value paramour moves across the URL boundary is described by a codec.
-This page documents the `Codec` interface itself, the low-level `createCodec`
-factory, the three chainable modifiers, and the type-state rules that make
+This page documents the `Codec` interface itself, the three chainable
+modifiers, and the type-state rules that make
 illegal modifier chains fail to compile. For the catalog of built-in
 builders, see [`p.*` builders](./p-builders); for the conceptual tour, see
 [Codecs & the type-state API](/docs/concepts/codecs).
@@ -41,23 +41,16 @@ const page = p.integer().default(1).catch(0);
 //    ^?
 ```
 
+Only `Out` is stable API: the type-state parameters after it may gain
+members or change shape in a minor release, so don't spell them out —
+write `AnyCodec<number>` for "a codec producing numbers in any state", and
+read state through the utility types below.
+
 Properties prefixed `~` (`~kind`, `~presence`, `~parseElement`, …) are
-internal machinery, not public API — user code reads codecs through
-[`describeCodec`](./describe#describecodec) and the utility types below.
-`~out` in particular is a phantom property: it carries `Out` for inference
-and is never set at runtime.
-
-## createCodec
-
-The low-level factory the `p.*` builders themselves use. It exists mainly
-for advanced and internal use — **`p.custom` is the app-author path**.
-
-`createCodec<Out>({ kind?, parseElement, serializeElement, … })` returns a
-fresh `Codec<Out, "required", false>`. The practical difference from
-`p.custom`: `createCodec` does *not* rebrand foreign exceptions, so your
-`parseElement`/`serializeElement` must throw paramour's own `ParseError`/
-`SerializeError` to participate in `.catch()` recovery and per-key error
-aggregation. `p.custom` wraps that bookkeeping for you.
+internal machinery, not public API and not covered by semver — user code
+reads codecs through [`describeCodec`](./describe#describecodec) and the
+utility types below. `~out` in particular is a phantom property: it
+carries `Out` for inference and is never set at runtime.
 
 ## .optional()
 
@@ -198,10 +191,13 @@ is a compile-time mirror of real constraints.
 
 ## Related types
 
-- **`AnyCodec`** — the wildcard codec type (`Codec<any, …>` across all
-  states); the constraint to use when writing generic code over codecs.
-- **`OutputOf<C>`** — the decoded type of a codec:
-  `OutputOf<ReturnType<typeof p.integer>>` is `number`.
+- **`AnyCodec<Out = any>`** — any codec, in any presence/catch/arity
+  state; `AnyCodec<number>` narrows it to codecs producing `number`. The
+  constraint to use when writing generic code over codecs.
+- **`CodecKind`** — which builder produced a codec (`"integer"`,
+  `"csv"`, `"custom"`, …), as reported by `describeCodec`.
+- **`InferCodecOutput<C>`** — the decoded type of a codec:
+  `InferCodecOutput<ReturnType<typeof p.integer>>` is `number`.
 - **`ParamCodec`** — the codecs legal in a route's `params:` config: no
   presence modifiers (a path segment can't be absent), `.catch()` allowed.
 - **`Presence`** — `"defaulted" | "optional" | "required"`.
@@ -210,11 +206,11 @@ is a compile-time mirror of real constraints.
 
 ```ts twoslash
 import { p } from "paramour";
-import type { OutputOf, PresenceOf } from "paramour";
+import type { InferCodecOutput, PresenceOf } from "paramour";
 
 const page = p.integer().default(1);
 
-type Page = OutputOf<typeof page>;
+type Page = InferCodecOutput<typeof page>;
 //   ^?
 
 type PagePresence = PresenceOf<typeof page>;

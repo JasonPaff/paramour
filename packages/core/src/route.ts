@@ -1,4 +1,4 @@
-import type { AnyCodec, OutputOf, ParamCodec } from "./codec.js";
+import type { AnyCodec, InferCodecOutput, ParamCodec } from "./codec.js";
 
 import {
   describeType,
@@ -15,8 +15,8 @@ import {
   tokenizePath,
 } from "./path.js";
 import {
-  decodeSearch,
-  type SearchOutputOf,
+  decodeSearchSlot,
+  type InferSearchOutput,
   type SearchSlot,
 } from "./search.js";
 
@@ -55,26 +55,26 @@ export interface AppRoute<
    * FIRST — a params grammar failure means the URL doesn't denote this
    * route at all (morally a 404), so it throws before search is decoded.
    */
-  parse(props: RoutePropsInput): Promise<{
+  parse(props: RoutePropsLike): Promise<{
     params: ParamsOutput<Path, PC>;
-    search: SearchOutputOf<SC>;
+    search: InferSearchOutput<SC>;
   }>;
   /** Bare params object — layout props are structurally assignable. */
-  parseParams(props: ParamsPropsInput): Promise<ParamsOutput<Path, PC>>;
+  parseParams(props: ParamsPropsLike): Promise<ParamsOutput<Path, PC>>;
   /** Bare search object — the search half alone. */
-  parseSearch(props: SearchPropsInput): Promise<SearchOutputOf<SC>>;
-  safeParse(props: RoutePropsInput): Promise<
+  parseSearch(props: SearchPropsLike): Promise<InferSearchOutput<SC>>;
+  safeParse(props: RoutePropsLike): Promise<
     SafeResult<{
       params: ParamsOutput<Path, PC>;
-      search: SearchOutputOf<SC>;
+      search: InferSearchOutput<SC>;
     }>
   >;
   safeParseParams(
-    props: ParamsPropsInput,
-  ): Promise<SafeResult<ParamsOutput<Path, PC>>>;
+    props: ParamsPropsLike,
+  ): Promise<SafeResult<ParamsOutput<Path, PC>, ParamsDecodeError>>;
   safeParseSearch(
-    props: SearchPropsInput,
-  ): Promise<SafeResult<SearchOutputOf<SC>>>;
+    props: SearchPropsLike,
+  ): Promise<SafeResult<InferSearchOutput<SC>, SearchDecodeError>>;
 }
 
 /** Names of `[...name]` catch-all segments in the path literal. */
@@ -100,8 +100,16 @@ export type InferRouteParams<R extends AnyRoute> = ParamsOutput<
 >;
 
 /**
+ * Decoded search object type for a route — the {@link InferRouteParams}
+ * twin, and the public spelling that keeps `~search` out of user code.
+ */
+export type InferRouteSearch<R extends AnyRoute> = InferSearchOutput<
+  R["~search"]
+>;
+
+/**
  * Accepts promised props and plain objects alike. This width lives on
- * the parse INPUT surface ({@link RoutePropsInput} and friends), not on the
+ * the parse INPUT surface ({@link RoutePropsLike} and friends), not on the
  * annotation types: every supported Next (peer `>=15`) delivers page props
  * as promises, and Next 15.5's generated `.next/types` page check requires
  * a page's `params` prop to be `Promise<any> | undefined` — a sync arm in
@@ -165,12 +173,12 @@ export interface PagesRoute<
    */
   parseContext(context: PagesContext): {
     params: ParamsOutput<Path, PC>;
-    search: SearchOutputOf<SC>;
+    search: InferSearchOutput<SC>;
   };
   /** {@link parseContext} in the safe shape — `safely`'s taxonomy. */
   safeParseContext(context: PagesContext): SafeResult<{
     params: ParamsOutput<Path, PC>;
-    search: SearchOutputOf<SC>;
+    search: InferSearchOutput<SC>;
   }>;
 }
 
@@ -188,7 +196,7 @@ export interface ParamourRegister {}
 /** The decoded output type of the codec at key `K`, if one is declared. */
 export type ParamOutput<PC, K extends PropertyKey> = K extends keyof PC
   ? PC[K] extends AnyCodec
-    ? OutputOf<PC[K]>
+    ? InferCodecOutput<PC[K]>
     : never
   : never;
 
@@ -235,7 +243,7 @@ export interface ParamsProps {
  * objects — see {@link MaybePromise} for why the annotation type is
  * promise-only while the parse input stays wide.
  */
-export interface ParamsPropsInput {
+export interface ParamsPropsLike {
   readonly params?: MaybePromise<ParamsSource>;
 }
 
@@ -342,7 +350,7 @@ export type RouteConfig<
 export interface RouteProps extends ParamsProps, SearchProps {}
 
 /** What `parse`/`safeParse` ACCEPT: {@link RouteProps} plus sync props. */
-export interface RoutePropsInput extends ParamsPropsInput, SearchPropsInput {}
+export interface RoutePropsLike extends ParamsPropsLike, SearchPropsLike {}
 
 /** Which router a route belongs to — the value of the `~router` brand. */
 export type RouterKind = "app" | "pages";
@@ -351,10 +359,12 @@ export type RouterKind = "app" | "pages";
  * Status-discriminated result shape, unified with the pages hooks'
  * `RouterResult` (which extends this union by one `pending` member):
  * `if (result.status === "error")` narrows both arms, and both routers'
- * results destructure identically.
+ * results destructure identically. `E` narrows the error arm on surfaces
+ * that can only fail one way — params-only surfaces carry
+ * `ParamsDecodeError`, search-only ones `SearchDecodeError`.
  */
-export type SafeResult<T> =
-  { data: T; status: "success" } | { error: RouteDecodeError; status: "error" };
+export type SafeResult<T, E extends RouteDecodeError = RouteDecodeError> =
+  { data: T; status: "success" } | { error: E; status: "error" };
 
 /**
  * Structural props contract for the search half. The wire record
@@ -364,8 +374,8 @@ export interface SearchProps {
   readonly searchParams?: Promise<ParamsSource>;
 }
 
-/** Sync-accepting twin of {@link SearchProps} — see {@link ParamsPropsInput}. */
-export interface SearchPropsInput {
+/** Sync-accepting twin of {@link SearchProps} — see {@link ParamsPropsLike}. */
+export interface SearchPropsLike {
   readonly searchParams?: MaybePromise<ParamsSource>;
 }
 
@@ -443,31 +453,39 @@ export function defineAppRoute<
 >(path: Path, config: RouteConfig<Path, PC, SC>): AppRoute<Path, PC, SC> {
   const route: AppRoute<Path, PC, SC> = {
     ...routeData("app", path, config),
-    async parse(props: RoutePropsInput) {
+    async parse(props: RoutePropsLike) {
       const [paramsSource, searchSource] = await awaitProps(props);
       // Params first — a params failure throws before search decodes.
       const decodedParams = decodeParams(route, paramsSource ?? {});
       return {
         params: decodedParams,
-        search: decodeSearch(route["~search"], searchSource ?? {}, route.path),
+        search: decodeSearchSlot(
+          route["~search"],
+          searchSource ?? {},
+          route.path,
+        ),
       };
     },
-    async parseParams(props: ParamsPropsInput) {
+    async parseParams(props: ParamsPropsLike) {
       const source = await awaitProp(props.params);
       return decodeParams(route, source ?? {});
     },
-    async parseSearch(props: SearchPropsInput) {
+    async parseSearch(props: SearchPropsLike) {
       const source = await awaitProp(props.searchParams);
-      return decodeSearch(route["~search"], source ?? {}, route.path);
+      return decodeSearchSlot(route["~search"], source ?? {}, route.path);
     },
-    safeParse(props: RoutePropsInput) {
+    safeParse(props: RoutePropsLike) {
       return safely(() => route.parse(props));
     },
-    safeParseParams(props: ParamsPropsInput) {
-      return safely(() => route.parseParams(props));
+    safeParseParams(props: ParamsPropsLike) {
+      return safely<ParamsOutput<Path, PC>, ParamsDecodeError>(() =>
+        route.parseParams(props),
+      );
     },
-    safeParseSearch(props: SearchPropsInput) {
-      return safely(() => route.parseSearch(props));
+    safeParseSearch(props: SearchPropsLike) {
+      return safely<InferSearchOutput<SC>, SearchDecodeError>(() =>
+        route.parseSearch(props),
+      );
     },
   };
   return route;
@@ -517,7 +535,7 @@ export function definePagesRoute<
       });
       return {
         params: decodedParams,
-        search: decodeSearch(route["~search"], searchSource, route.path),
+        search: decodeSearchSlot(route["~search"], searchSource, route.path),
       };
     },
     safeParseContext(context: PagesContext) {
@@ -553,7 +571,7 @@ function awaitProp(
  * into an unhandled rejection.
  */
 function awaitProps(
-  props: RoutePropsInput,
+  props: RoutePropsLike,
 ): Promise<[ParamsSource | undefined, ParamsSource | undefined]> {
   return rebrandRejection(Promise.all([props.params, props.searchParams]));
 }
@@ -650,9 +668,13 @@ function routeData<
 /**
  * Wraps a throwing parse into the status-discriminated shape.
  * Only decode failures become the `error` arm; source-contract violations
- * and rebranded foreign errors stay loud.
+ * and rebranded foreign errors stay loud. `E` is the caller's claim about
+ * which decode error `run` can throw — params-only runs never throw
+ * `SearchDecodeError` and vice versa, which is what makes the cast sound.
  */
-async function safely<T>(run: () => Promise<T>): Promise<SafeResult<T>> {
+async function safely<T, E extends RouteDecodeError = RouteDecodeError>(
+  run: () => Promise<T>,
+): Promise<SafeResult<T, E>> {
   try {
     return { data: await run(), status: "success" };
   } catch (error) {
@@ -660,7 +682,7 @@ async function safely<T>(run: () => Promise<T>): Promise<SafeResult<T>> {
       error instanceof ParamsDecodeError ||
       error instanceof SearchDecodeError
     ) {
-      return { error, status: "error" };
+      return { error: error as E, status: "error" };
     }
     throw error;
   }

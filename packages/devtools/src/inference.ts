@@ -1,7 +1,8 @@
 import type { AnyCodec, CodecDescription, Issue, SearchConfig } from "paramour";
 
 import { decodeSearch, SearchDecodeError } from "paramour";
-import { codecShapeLabel, foreignMessage, parseValue } from "paramour/internal";
+import { parseValue } from "paramour";
+import { codecShapeLabel, foreignMessage } from "paramour/internal";
 
 /**
  * Pure decode/attribution logic. Everything here goes through core's

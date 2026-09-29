@@ -40,14 +40,14 @@ search.page;
 
 The parse surface is three surfaces × throwing/safe, all async:
 
-| Method                  | Accepts       | Resolves to                       |
-| ----------------------- | ------------- | --------------------------------- |
-| `parse(props)`          | `RouteProps`  | `{ params, search }`              |
-| `parseParams(props)`    | `ParamsProps` | the decoded params only           |
-| `parseSearch(props)`    | `SearchProps` | the decoded search only           |
-| `safeParse(props)`      | `RouteProps`  | `SafeResult` of both halves       |
-| `safeParseParams(props)`| `ParamsProps` | `SafeResult` of the params        |
-| `safeParseSearch(props)`| `SearchProps` | `SafeResult` of the search        |
+| Method                  | Accepts           | Resolves to                                          |
+| ----------------------- | ----------------- | ---------------------------------------------------- |
+| `parse(props)`          | `RoutePropsLike`  | `{ params, search }`                                 |
+| `parseParams(props)`    | `ParamsPropsLike` | the decoded params only                              |
+| `parseSearch(props)`    | `SearchPropsLike` | the decoded search only                              |
+| `safeParse(props)`      | `RoutePropsLike`  | `SafeResult` of both halves                          |
+| `safeParseParams(props)`| `ParamsPropsLike` | `SafeResult<…, ParamsDecodeError>` of the params     |
+| `safeParseSearch(props)`| `SearchPropsLike` | `SafeResult<…, SearchDecodeError>` of the search     |
 
 Behavior notes:
 
@@ -157,10 +157,16 @@ The status-discriminated result shape shared by the `safe*` route methods
 and the standalone `safeDecodeParams` / `safeDecodeSearch` helpers:
 
 ```ts
-type SafeResult<T> =
+type SafeResult<T, E extends RouteDecodeError = RouteDecodeError> =
   | { data: T; status: "success" }
-  | { error: RouteDecodeError; status: "error" };
+  | { error: E; status: "error" };
 ```
+
+`E` narrows the error arm on surfaces that can only fail one way:
+`safeParseParams`, `safeDecodeParams`, and the params hooks return
+`SafeResult<T, ParamsDecodeError>`; `safeParseSearch`, `safeDecodeSearch`,
+and the search hooks return `SafeResult<T, SearchDecodeError>`. Only the
+full `safeParse` / `safeParseContext` keep the union.
 
 One `status` check narrows both arms:
 
@@ -183,9 +189,9 @@ if (result.status === "error") {
 }
 ```
 
-Only *decode* failures reach the `error` arm — its type is
+Only *decode* failures reach the `error` arm — a
 [`RouteDecodeError`](/docs/reference/core/errors#related-types), the union
-of the two aggregate decode errors. Contract violations (a malformed source
+of the two aggregate decode errors, or the one side a surface can produce. Contract violations (a malformed source
 handed in from plain JS, a hand-built route missing a codec, a foreign
 throw out of user code) still throw: a bug should stay loud, not render as
 a 404.
@@ -223,7 +229,9 @@ only App routes, `@paramour-js/next/pages` hooks only Pages routes.
 
 The interfaces and helpers behind the values the constructors return. The
 `~`-prefixed members you may notice on a route object are runtime-internal
-— not public API; `path` is the one public data member.
+— not public API, and not covered by semver; `path` is the one public data
+member. Reach for `InferRouteParams` / `InferRouteSearch` instead of
+reading a route's `~` members in types.
 
 | Type                             | What it is                                                                                                         |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -233,6 +241,8 @@ The interfaces and helpers behind the values the constructors return. The
 | `AnyRoute`                       | The bound for helpers that take any route (`R extends AnyRoute`) — what `href` and the standalone decoders accept. |
 | `AnyAppRoute` / `AnyPagesRoute`  | The router-specific bounds — what the App and Pages hook modules accept, respectively.                             |
 | `InferRouteParams<R>`            | The decoded params object type of a route (see below).                                                             |
+| `InferRouteSearch<R>`            | The decoded search object type of a route — what `parseSearch` resolves to and `useSearch` returns.                |
+| `RouteConfig<Path, PC, SC>`      | The `define*Route` config parameter's type. With `SearchSlot`, what a generic wrapper around `define*Route` needs. |
 
 `InferRouteParams` follows the segment kinds: `[id]` contributes `Out`,
 `[...slug]` and `[[...slug]]` contribute `Out[]` — and every key is present
@@ -256,10 +266,49 @@ assignable while core stays framework-agnostic:
 | Type                | Shape                                                                                                    |
 | ------------------- | -------------------------------------------------------------------------------------------------------- |
 | `ParamsConfig<Path>`| The `params:` config shape — one param codec per dynamic segment name in `Path`.                         |
-| `ParamsProps`       | `{ params? }` — plain or promised; the contract of `parseParams`. Layout props are assignable.           |
-| `SearchProps`       | `{ searchParams? }` — plain or promised; the contract of `parseSearch`.                                  |
-| `RouteProps`        | Both members — the contract of `parse` / `safeParse`; Next's generated page props are assignable.        |
+| `ParamsProps`       | `{ params? }` — promised; annotate layouts with it. Layout props are assignable.                         |
+| `SearchProps`       | `{ searchParams? }` — promised.                                                                          |
+| `RouteProps`        | Both members — annotate pages with it; Next's generated page props are assignable.                       |
+| `ParamsPropsLike` / `SearchPropsLike` / `RoutePropsLike` | What the parse methods accept: the matching props type, or the same members as plain (already-awaited) objects. |
 | `PagesContext`      | `{ params?, query }` — the contract of `parseContext`. `query` is required (`getStaticProps` contexts, which have none, fail to compose by design). |
+
+### Wrapping define*Route
+
+`RouteConfig` and `SearchSlot` are exported so a project can wrap the
+constructors without losing inference — mirror their three type parameters
+and pass the config through:
+
+```ts twoslash
+import {
+  defineAppRoute,
+  p,
+  type InferRouteSearch,
+  type ParamsConfig,
+  type RouteConfig,
+  type SearchSlot,
+} from "paramour";
+
+export function defineTrackedRoute<
+  const Path extends string,
+  const PC extends ParamsConfig<Path> = ParamsConfig<Path>,
+  const SC extends SearchSlot = Record<never, never>,
+>(path: Path, config: RouteConfig<Path, PC, SC>) {
+  // ...project-specific bookkeeping here
+  return defineAppRoute(path, config);
+}
+
+const productRoute = defineTrackedRoute("/product/[id]", {
+  params: { id: p.integer() },
+  search: { tab: p.string().optional() },
+});
+
+type ProductSearch = InferRouteSearch<typeof productRoute>;
+//   ^?
+```
+
+Explicit type arguments to `defineAppRoute` / `definePagesRoute` (and
+`href`) are not part of the supported API — their type parameters exist
+for inference and may change in a minor release.
 
 ## Registry types
 

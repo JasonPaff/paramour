@@ -8,7 +8,7 @@ import type {
 import { ParamourError } from "./errors.js";
 import { buildPath, type InferParamsInput } from "./path.js";
 import {
-  type SearchInputOf,
+  type InferSearchInput,
   type SearchSlot,
   searchToString,
 } from "./search.js";
@@ -50,7 +50,7 @@ export type InferHrefInput<R extends AnyRoute> = PartFor<
   "params",
   InferParamsInput<R>
 > &
-  PartFor<"search", SearchInputOf<R["~search"]>> & { hash?: string };
+  PartFor<"search", InferSearchInput<R["~search"]>> & { hash?: string };
 
 /**
  * The string form's options: hash only. `params` is meaningless on a static
@@ -113,7 +113,7 @@ export function href(
   options?: {
     hash?: string;
     params?: InferParamsInput<AnyRoute>;
-    search?: SearchInputOf<SearchSlot>;
+    search?: InferSearchInput<SearchSlot>;
   },
 ): string {
   // S10: the fragment is appended VERBATIM — no encoding, the caller owns

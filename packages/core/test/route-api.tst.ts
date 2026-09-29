@@ -25,12 +25,18 @@ import type {
   InferStaticParams,
   PagesContext,
   ParamsProps,
-  ParamsPropsInput,
+  ParamsPropsLike,
   RegisteredStaticRoutePaths,
+  InferRouteSearch,
+  ParamsConfig,
+  ParamsDecodeError,
+  RouteConfig,
   RouteDecodeError,
   RouteProps,
-  RoutePropsInput,
+  RoutePropsLike,
   SafeResult,
+  SearchDecodeError,
+  SearchSlot,
 } from "../src";
 
 test("pre-generation fallback: any path literal is accepted and retained", () => {
@@ -148,7 +154,7 @@ test("rawSearch: schema output flows into parse/parseSearch/safeParse* (SS6)", (
   const route = defineAppRoute("/about", { search: rawSearch(schema) });
   expect(route.parseSearch({})).type.toBe<Promise<{ page: number }>>();
   expect(route.safeParseSearch({})).type.toBe<
-    Promise<SafeResult<{ page: number }>>
+    Promise<SafeResult<{ page: number }, SearchDecodeError>>
   >();
   expect(route.parse({})).type.toBe<
     Promise<{ params: {}; search: { page: number } }>
@@ -265,14 +271,14 @@ test("parse methods: bare-surface results carry no wrapper", () => {
   });
   expect(route.parseParams({})).type.toBe<Promise<{ id: number }>>();
   expect(route.safeParseParams({})).type.toBe<
-    Promise<SafeResult<{ id: number }>>
+    Promise<SafeResult<{ id: number }, ParamsDecodeError>>
   >();
   // readonly per the const-inferred SC (see the note in the previous test).
   expect(route.parseSearch({})).type.toBe<
     Promise<{ readonly q: string | undefined }>
   >();
   expect(route.safeParseSearch({})).type.toBe<
-    Promise<SafeResult<{ readonly q: string | undefined }>>
+    Promise<SafeResult<{ readonly q: string | undefined }, SearchDecodeError>>
   >();
 });
 
@@ -291,11 +297,11 @@ test("props are structural and promise-only on the annotation types", () => {
   // 15.5's generated `.next/types` page check (see MaybePromise in route.ts).
   expect<{ params: { id: string } }>().type.not.toBeAssignableTo<RouteProps>();
   // Plain sync objects stay legal on the parse INPUT surface instead.
-  expect<{ params: { id: string } }>().type.toBeAssignableTo<RoutePropsInput>();
-  expect<RouteProps>().type.toBeAssignableTo<RoutePropsInput>();
+  expect<{ params: { id: string } }>().type.toBeAssignableTo<RoutePropsLike>();
+  expect<RouteProps>().type.toBeAssignableTo<RoutePropsLike>();
   expect<{
     params: { slug: string[] };
-  }>().type.toBeAssignableTo<ParamsPropsInput>();
+  }>().type.toBeAssignableTo<ParamsPropsLike>();
 });
 
 test("SafeResult: the status discriminant narrows both arms", () => {
@@ -579,4 +585,51 @@ test("encodeStaticParams: input is the typed encode side, not wire strings", () 
     date: "2026-07-10",
   });
   expect(encodeStaticParams).type.not.toBeCallableWith(dates, {});
+});
+
+test("InferRouteSearch: the route-level twin of InferRouteParams", () => {
+  const route = defineAppRoute("/search", {
+    search: { page: p.integer().default(1), q: p.string().optional() },
+  });
+  expect<InferRouteSearch<typeof route>>().type.toBe<{
+    readonly page: number;
+    readonly q: string | undefined;
+  }>();
+  const raw = defineAppRoute("/raw", {
+    search: rawSearch(z.object({ n: z.number() })),
+  });
+  expect<InferRouteSearch<typeof raw>>().type.toBe<{ n: number }>();
+});
+
+test("SafeResult: the error parameter narrows the error arm", () => {
+  const params = {} as SafeResult<number, ParamsDecodeError>;
+  if (params.status === "error") {
+    expect(params.error).type.toBe<ParamsDecodeError>();
+    expect(params.error.name).type.toBe<"ParamsDecodeError">();
+  }
+  expect<SafeResult<number, ParamsDecodeError>>().type.not.toBe<
+    SafeResult<number, SearchDecodeError>
+  >();
+  // The default keeps a bare annotation accepting either narrowed form.
+  expect<SafeResult<number, ParamsDecodeError>>().type.toBeAssignableTo<
+    SafeResult<number>
+  >();
+});
+
+test("RouteConfig + SearchSlot: a generic wrapper around defineAppRoute", () => {
+  function defineTracked<
+    const Path extends string,
+    const PC extends ParamsConfig<Path> = ParamsConfig<Path>,
+    const SC extends SearchSlot = Record<never, never>,
+  >(path: Path, config: RouteConfig<Path, PC, SC>) {
+    return defineAppRoute(path, config);
+  }
+  const route = defineTracked("/product/[id]", {
+    params: { id: p.integer() },
+    search: { tab: p.string().optional() },
+  });
+  expect<InferRouteParams<typeof route>>().type.toBe<{ id: number }>();
+  expect<InferRouteSearch<typeof route>>().type.toBe<{
+    readonly tab: string | undefined;
+  }>();
 });

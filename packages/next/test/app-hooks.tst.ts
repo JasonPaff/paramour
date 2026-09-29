@@ -8,15 +8,20 @@
  *     sites is a COMPILE ERROR — not a runtime surprise. Core's route-api.tst
  *     asserts raw `AnyAppRoute` assignability; these assertions pin the hook
  *     signatures themselves.
- *  2. The `as SearchOutputOf` cast in `useSearchOrThrow` (src/app.ts): a
- *     `rawSearch(schema)` route infers the SCHEMA's output here, not a garbage
- *     `{ "~kind", "~schema" }` marker shape.
+ *  2. `useSearchOrThrow` (src/app.ts) over a `rawSearch(schema)` route
+ *     infers the SCHEMA's output, not a garbage `{ "~kind", "~schema" }`
+ *     marker shape.
  *
  * Plain .ts (not .tsx): hooks are ordinary functions at the type level, no JSX.
  */
 import { expect, test } from "tstyche";
 import { defineAppRoute, definePagesRoute, p, rawSearch } from "paramour";
-import type { InferRouteParams, SafeResult } from "paramour";
+import type {
+  InferRouteParams,
+  ParamsDecodeError,
+  SafeResult,
+  SearchDecodeError,
+} from "paramour";
 import { z } from "zod";
 
 import {
@@ -58,14 +63,18 @@ test("app route is accepted and each hook returns its exact type", () => {
   expect(useSearch).type.toBeCallableWith(appRoute);
   expect(useSearchOrThrow).type.toBeCallableWith(appRoute);
 
-  // useRouteParams → SafeResult<InferRouteParams<R>>; OrThrow → the plain object.
-  expect(useRouteParams(appRoute)).type.toBe<SafeResult<{ id: number }>>();
+  // useRouteParams → SafeResult<InferRouteParams<R>, ParamsDecodeError>;
+  // OrThrow → the plain object.
   expect(useRouteParams(appRoute)).type.toBe<
-    SafeResult<InferRouteParams<typeof appRoute>>
+    SafeResult<{ id: number }, ParamsDecodeError>
+  >();
+  expect(useRouteParams(appRoute)).type.toBe<
+    SafeResult<InferRouteParams<typeof appRoute>, ParamsDecodeError>
   >();
   expect(useRouteParamsOrThrow(appRoute)).type.toBe<{ id: number }>();
 
-  // useSearch → SafeResult<SearchOutputOf<...>>; OrThrow → the plain object.
+  // useSearch → SafeResult<InferRouteSearch<R>, SearchDecodeError>; OrThrow →
+  // the plain object.
   // Optional codecs keep the key PRESENT and add `| undefined` (D4),
   // so it is `q: string | undefined`, not `q?: string`. Mutual assignability
   // pins exact equality: tstyche's `toBe` treats the unexpanded
@@ -74,10 +83,10 @@ test("app route is accepted and each hook returns its exact type", () => {
   // `q: string | undefined` (key required) from `q?: string` (key omittable).
   const search = useSearch(appRoute);
   expect(search).type.toBeAssignableTo<
-    SafeResult<{ page: number; q: string | undefined }>
+    SafeResult<{ page: number; q: string | undefined }, SearchDecodeError>
   >();
   expect<
-    SafeResult<{ page: number; q: string | undefined }>
+    SafeResult<{ page: number; q: string | undefined }, SearchDecodeError>
   >().type.toBeAssignableTo<typeof search>();
 
   const searchOrThrow = useSearchOrThrow(appRoute);
@@ -92,12 +101,12 @@ test("app route is accepted and each hook returns its exact type", () => {
 });
 
 test("select overloads project the result type", () => {
-  // Safe hooks: SafeResult<U>, with U inferred from the selector's return.
+  // Safe hooks: SafeResult<U, E>, with U inferred from the selector's return.
   expect(useSearch(appRoute, { select: (search) => search.page })).type.toBe<
-    SafeResult<number>
+    SafeResult<number, SearchDecodeError>
   >();
   expect(useRouteParams(appRoute, { select: (params) => params.id })).type.toBe<
-    SafeResult<number>
+    SafeResult<number, ParamsDecodeError>
   >();
 
   // OrThrow hooks: bare U.
@@ -119,7 +128,7 @@ test("select overloads project the result type", () => {
 
   // A rawSearch route's selector receives the SCHEMA output (SS6).
   expect(useSearch(rawRoute, { select: (search) => search.q })).type.toBe<
-    SafeResult<string>
+    SafeResult<string, SearchDecodeError>
   >();
 });
 
@@ -138,12 +147,12 @@ test('equality is the literal "shallow" opt-in only', () => {
   });
 });
 
-test("rawSearch route infers the schema output, not the marker shape (app.ts cast)", () => {
-  // useSearchOrThrow's `as SearchOutputOf<R["~search"]>` cast bridges the
-  // AnyAppRoute inference gap to the schema's own output type.
+test("rawSearch route infers the schema output, not the marker shape", () => {
+  // InferRouteSearch resolves a rawSearch slot to the schema's own output
+  // type, through the hook's generic AnyAppRoute bound.
   expect(useSearchOrThrow(rawRoute)).type.toBe<z.infer<typeof rawSchema>>();
   expect(useSearch(rawRoute)).type.toBe<
-    SafeResult<z.infer<typeof rawSchema>>
+    SafeResult<z.infer<typeof rawSchema>, SearchDecodeError>
   >();
 
   // Explicitly: NOT the garbage `{ "~kind", "~schema" }` RawSearch marker shape.

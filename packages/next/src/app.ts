@@ -11,12 +11,12 @@ import {
   decodeParams,
   decodeSearch,
   type InferRouteParams,
+  type InferRouteSearch,
   ParamsDecodeError,
   safeDecodeParams,
   safeDecodeSearch,
   type SafeResult,
   SearchDecodeError,
-  type SearchOutputOf,
 } from "paramour";
 import { useContext } from "react";
 
@@ -113,15 +113,17 @@ export type { SelectOptions } from "./select.js";
  */
 export function useRouteParams<R extends AnyAppRoute>(
   route: R,
-): SafeResult<InferRouteParams<R>>;
+): SafeResult<InferRouteParams<R>, ParamsDecodeError>;
 export function useRouteParams<R extends AnyAppRoute, U>(
   route: R,
   options: SelectOptions<InferRouteParams<R>, U>,
-): SafeResult<U>;
+): SafeResult<U, ParamsDecodeError>;
 export function useRouteParams<R extends AnyAppRoute, U>(
   route: R,
   options?: SelectOptions<InferRouteParams<R>, U>,
-): SafeResult<InferRouteParams<R>> | SafeResult<U> {
+):
+  | SafeResult<InferRouteParams<R>, ParamsDecodeError>
+  | SafeResult<U, ParamsDecodeError> {
   const nav = useAppNavigation();
   const params = nav.useParams() ?? {};
   const router = nav.useRouter();
@@ -227,15 +229,17 @@ export function useRouteParamsOrThrow<R extends AnyAppRoute, U>(
  */
 export function useSearch<R extends AnyAppRoute>(
   route: R,
-): SafeResult<SearchOutputOf<R["~search"]>>;
+): SafeResult<InferRouteSearch<R>, SearchDecodeError>;
 export function useSearch<R extends AnyAppRoute, U>(
   route: R,
-  options: SelectOptions<SearchOutputOf<R["~search"]>, U>,
-): SafeResult<U>;
+  options: SelectOptions<InferRouteSearch<R>, U>,
+): SafeResult<U, SearchDecodeError>;
 export function useSearch<R extends AnyAppRoute, U>(
   route: R,
-  options?: SelectOptions<SearchOutputOf<R["~search"]>, U>,
-): SafeResult<SearchOutputOf<R["~search"]>> | SafeResult<U> {
+  options?: SelectOptions<InferRouteSearch<R>, U>,
+):
+  | SafeResult<InferRouteSearch<R>, SearchDecodeError>
+  | SafeResult<U, SearchDecodeError> {
   const nav = useAppNavigation();
   const searchParams = nav.useSearchParams();
   const router = nav.useRouter();
@@ -277,15 +281,15 @@ export function useSearch<R extends AnyAppRoute, U>(
  */
 export function useSearchOrThrow<R extends AnyAppRoute>(
   route: R,
-): SearchOutputOf<R["~search"]>;
+): InferRouteSearch<R>;
 export function useSearchOrThrow<R extends AnyAppRoute, U>(
   route: R,
-  options: SelectOptions<SearchOutputOf<R["~search"]>, U>,
+  options: SelectOptions<InferRouteSearch<R>, U>,
 ): U;
 export function useSearchOrThrow<R extends AnyAppRoute, U>(
   route: R,
-  options?: SelectOptions<SearchOutputOf<R["~search"]>, U>,
-): SearchOutputOf<R["~search"]> | U {
+  options?: SelectOptions<InferRouteSearch<R>, U>,
+): InferRouteSearch<R> | U {
   const nav = useAppNavigation();
   const searchParams = nav.useSearchParams();
   const router = nav.useRouter();
@@ -306,29 +310,14 @@ export function useSearchOrThrow<R extends AnyAppRoute, U>(
   const value = useStableResult(
     route,
     searchParamsFingerprint(route, searchParams),
-    // decodeSearch is keyed on SearchOutputOf (SS6) — the correct
-    // public type — but AnyAppRoute erases its SC to `any`, so for a still-
-    // generic R the call's SearchOutputOf<R["~search"]> reduces to `unknown`
-    // on the value side while staying deferred on the annotation side. The
-    // cast bridges that inference gap to the SAME (correct) type, so a
-    // rawSearch route now infers its schema output here, not a garbage
-    // {~kind, ~schema} shape. The cast appears in both branches below — the
-    // prod/dev split (and its duplicated decode call) is the price of
+    // The prod/dev split (and its duplicated decode call) is the price of
     // literal-zero prod cost; the bundler keeps exactly one branch.
     () => {
       if (process.env.NODE_ENV === "production") {
-        return decodeSearch(
-          route["~search"],
-          searchParams,
-          route.path,
-        ) as SearchOutputOf<R["~search"]>;
+        return decodeSearch(route, searchParams);
       }
       try {
-        const data = decodeSearch(
-          route["~search"],
-          searchParams,
-          route.path,
-        ) as SearchOutputOf<R["~search"]>;
+        const data = decodeSearch(route, searchParams);
         if (spec !== undefined) {
           emitter.observe(spec, { data, status: "success" });
         }

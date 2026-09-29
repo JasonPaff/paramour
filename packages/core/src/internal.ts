@@ -1,12 +1,13 @@
 /**
- * The `paramour/internal` entry: unstable helpers for derived tooling
- * (devtools, adapters), NOT for app authors and NOT covered by the public
- * API's stability expectations. These live off the main barrel on purpose —
- * the docs' Reference section documents the app-author surface, and these
- * exist solely so reflection-driven consumers (the devtools panel's
- * catch-attribution probe, edit preview, and synthesized-issue labels)
- * share core's implementation instead of re-deriving it.
+ * The `paramour/internal` entry: helpers for derived tooling (devtools,
+ * adapters), NOT for app authors — they live off the main barrel so the
+ * docs' Reference section stays the app-author surface. Covered by semver
+ * within a major all the same (additions only until the next major): the
+ * devtools panel peers on `paramour` with a caret range, so a newer core
+ * must never break an installed panel that imports from here. These exist
+ * so reflection-driven consumers (the panel's synthesized-issue labels and
+ * foreign-error rendering) share core's implementation instead of
+ * re-deriving it.
  */
 export { codecShapeLabel } from "./describe.js";
 export { foreignMessage } from "./errors.js";
-export { parseValue } from "./search.js";

@@ -19,8 +19,8 @@ import {
 import {
   type AnyCodec,
   type AnyRoute,
+  type InferCodecOutput,
   isRawSearch,
-  type OutputOf,
   ParamourError,
   ParseError,
   type SearchConfig,
@@ -72,15 +72,15 @@ export type NuqsParserMap<S extends SearchConfig> = {
  * sets `~presence: "defaulted"` in the same return type.
  */
 export type NuqsParserOf<C extends AnyCodec> = C["~arity"] extends "many"
-  ? OutputOf<C> extends readonly unknown[]
-    ? DefaultedMulti<OutputOf<C>>
+  ? InferCodecOutput<C> extends readonly unknown[]
+    ? DefaultedMulti<InferCodecOutput<C>>
     : never
   : C["~defaultElides"] extends true
-    ? DefaultedSingle<OutputOf<C>>
-    : SingleParserBuilder<OutputOf<C>>;
+    ? DefaultedSingle<InferCodecOutput<C>>
+    : SingleParserBuilder<InferCodecOutput<C>>;
 
 type CompatibleCodec<C extends AnyCodec> =
-  null extends OutputOf<C>
+  null extends InferCodecOutput<C>
     ? NoNuqsTwin<"codec output includes null, which nuqs reserves for absent/unparseable">
     : unknown;
 
@@ -108,7 +108,7 @@ type DefaultedSingle<Out> = ReturnType<SingleParserBuilder<Out>["withDefault"]>;
  * slipped past the types degrades to nuqs's native null semantics.
  */
 type NullOutputKeys<S extends SearchConfig> = {
-  [K in keyof S]: null extends OutputOf<S[K]> ? K : never;
+  [K in keyof S]: null extends InferCodecOutput<S[K]> ? K : never;
 }[keyof S];
 
 type RouteParserMap<R extends AnyRoute> = R["~search"] extends SearchConfig

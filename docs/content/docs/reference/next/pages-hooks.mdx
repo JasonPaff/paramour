@@ -23,7 +23,9 @@ Both accept the same optional [`SelectOptions`](#selectoptions) bag.
 The three-state result type both hooks return.
 
 ```ts
-type RouterResult<T> = SafeResult<T> | { status: "pending" };
+type RouterResult<T, E extends RouteDecodeError = RouteDecodeError> =
+  | SafeResult<T, E>
+  | { status: "pending" };
 ```
 
 It is literally core's `SafeResult<T>` plus a `pending` member, so both
@@ -39,11 +41,13 @@ first render is already populated, so `pending` never surfaces there. The
 Decoded route params as a `RouterResult`.
 
 ```ts
-function useRouteParams<R extends AnyPagesRoute>(route: R): RouterResult<InferRouteParams<R>>;
+function useRouteParams<R extends AnyPagesRoute>(
+  route: R,
+): RouterResult<InferRouteParams<R>, ParamsDecodeError>;
 function useRouteParams<R extends AnyPagesRoute, U>(
   route: R,
   options: SelectOptions<InferRouteParams<R>, U>,
-): RouterResult<U>;
+): RouterResult<U, ParamsDecodeError>;
 ```
 
 The exhaustive `switch` is the pattern to copy — the compiler holds you to
@@ -86,11 +90,13 @@ reaches the decode.
 Decoded search params as a `RouterResult`.
 
 ```ts
-function useSearch<R extends AnyPagesRoute>(route: R): RouterResult<SearchOutputOf<R["~search"]>>;
+function useSearch<R extends AnyPagesRoute>(
+  route: R,
+): RouterResult<InferRouteSearch<R>, SearchDecodeError>;
 function useSearch<R extends AnyPagesRoute, U>(
   route: R,
-  options: SelectOptions<SearchOutputOf<R["~search"]>, U>,
-): RouterResult<U>;
+  options: SelectOptions<InferRouteSearch<R>, U>,
+): RouterResult<U, SearchDecodeError>;
 ```
 
 ```tsx twoslash title="components/search-summary.tsx"

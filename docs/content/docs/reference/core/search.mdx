@@ -5,10 +5,10 @@ description: Standalone search-param decoding and encoding, the rawSearch escape
 
 The route methods wrap these helpers; they're public for every call site
 that holds a search config or route without page props — route handlers,
-middleware, tests, derived tooling. One asymmetry to know up front: the
-encode/decode primitives (`decodeSearch`, `encodeSearch`, `searchToString`)
-take the **search config** itself, while the safe variants
-(`safeDecodeSearch`, like `safeDecodeParams`) take the **route object**.
+middleware, tests, derived tooling. Every one of them — `decodeSearch`,
+`safeDecodeSearch`, `encodeSearch`, `searchToString` — accepts either a
+**route object** or a bare **search config**: pass the route when you have
+one (its path then anchors decode errors), the config when you don't.
 
 The exact wire behavior these helpers implement — absence vs. the empty
 string, ordering, duplicate keys, elision — is the
@@ -17,12 +17,12 @@ page documents the function contracts.
 
 ## decodeSearch
 
-Decodes search params against a config, from either source shape — a
-`URLSearchParams` (route handlers, middleware) or Next's `searchParams`
-record (an awaited props member):
+Decodes search params against a route or a bare config, from either
+source shape — a `URLSearchParams` (route handlers, middleware) or Next's
+`searchParams` record (an awaited props member):
 
 ```ts twoslash
-import { decodeSearch, p } from "paramour";
+import { decodeSearch, defineAppRoute, p } from "paramour";
 
 const config = {
   page: p.integer().default(1),
@@ -34,14 +34,14 @@ const fromUrl = decodeSearch(config, new URLSearchParams("?page=2"));
 
 const fromProps = decodeSearch(config, { page: "2", q: "socks" });
 
-// Optional third argument: anchor a thrown SearchDecodeError to a route.
-decodeSearch(config, { page: "x" }, "/products");
+// Pass the route instead, and a thrown SearchDecodeError names it.
+const productsRoute = defineAppRoute("/products", { search: config });
+decodeSearch(productsRoute, { page: "x" });
 ```
 
-The third argument, `routePath`, sets a thrown `SearchDecodeError`'s
+Given a route, a thrown `SearchDecodeError` carries the route's path in its
 `route` field and its message header (`Failed to decode search params for
-/products:`). The route methods pass `route.path` automatically; a bare
-`decodeSearch` call without it throws a route-less error.
+/products:`); given a bare config, the error is route-less.
 
 Decode semantics, per key:
 
@@ -70,8 +70,9 @@ through extras itself.
 
 ## safeDecodeSearch
 
-The [`SafeResult`](/docs/reference/core/routes#saferesult) twin — takes the
-route object, returns instead of throwing:
+The [`SafeResult`](/docs/reference/core/routes#saferesult) twin — same
+route-or-config target, returns instead of throwing. The error arm is typed
+`SearchDecodeError`:
 
 ```ts twoslash
 import { defineAppRoute, p, safeDecodeSearch } from "paramour";
@@ -280,8 +281,24 @@ text `"undefined"`. For arity-`"many"` codecs this serializes **one**
 element, not the whole array. This is a tooling/advanced surface — apps
 building links should be calling `href`.
 
-Its parse-side twin, `parseValue`, is not exported from the package barrel;
-tooling authors will find it under `paramour/internal`.
+### parseValue
+
+The parse-side twin: runs a codec's element parser on one wire string,
+**without** the codec's `.catch()` recovery — the one way to observe the
+raw parse outcome (a decode always recovers a caught failure, so it can't
+tell "parsed cleanly" from "failed and was caught"):
+
+```ts twoslash
+import { p, parseValue } from "paramour";
+
+parseValue(p.integer(), "42"); // => 42
+parseValue(p.integer().catch(0), "x"); // throws ParseError — no recovery
+```
+
+A grammar failure throws the codec's `ParseError`; a custom codec's own
+throws propagate as they would from a decode. Like `serializeValue`, it
+handles **one** element of an arity-`"many"` codec, and it's a
+tooling/advanced surface — apps decode with the route methods.
 
 ## Related types
 
@@ -289,8 +306,8 @@ tooling authors will find it under `paramour/internal`.
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `SearchConfig`           | A codec-map search config: `Record<string, AnyCodec>`.                                                                  |
 | `SearchSource`           | What the decoders accept: Next's `searchParams` record or a `URLSearchParams`. Both arrive already percent-decoded.     |
-| `SearchOutputOf<SC>`     | The decoded output type of a `search:` slot — codec map and `rawSearch` alike. What `parseSearch` resolves to.          |
-| `InferSearchInput<S>`    | The encode-side input of a codec map: required keys stay required; optional, defaulted, and array keys may be omitted.  |
-| `InferSearchOutput<S>`   | The parse-side output of a codec map: every declared key present; optional presence adds `undefined` to the value type. |
+| `SearchSlot`             | What a route's `search:` slot holds: a codec map or a `rawSearch` marker. For bounding a generic `SC` in route wrappers.  |
+| `InferSearchOutput<SC>`  | The decoded output of a `search:` slot. Codec map: every declared key present, optional presence adds `undefined`. `rawSearch`: the schema's output. For a route, use `InferRouteSearch<R>`. |
+| `InferSearchInput<SC>`   | The encode-side input of a `search:` slot. Codec map: required keys stay required; optional, defaulted, and array keys may be omitted. `rawSearch`: the raw wire record. |
 | `RawSearch<S>`           | The branded marker `rawSearch` returns — what a route's `search:` slot holds in raw mode.                               |
-| `StandardSearchSchema<SC>` | The schema type `standardSearchSchema` returns: wire-shaped record in, decoded search out.                            |
+| `StandardSearchSchema<R>` | The schema type `standardSearchSchema(route)` returns: wire-shaped record in, the route's decoded search out.           |

@@ -54,8 +54,8 @@ test("the returned schema is assignable to StandardSchemaV1 — the consumer-fac
   expect(schema).type.toBeAssignableTo<StandardSchemaV1>();
 });
 
-test("StandardSearchSchema<SC> names the function's exact return type", () => {
+test("StandardSearchSchema<R> names the function's exact return type", () => {
   expect(standardSearchSchema(mixedRoute)).type.toBe<
-    StandardSearchSchema<(typeof mixedRoute)["~search"]>
+    StandardSearchSchema<typeof mixedRoute>
   >();
 });
