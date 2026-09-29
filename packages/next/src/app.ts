@@ -70,7 +70,7 @@ export type { SelectOptions } from "./select.js";
  *   render, to the nearest client error boundary.
  *
  * Both read the route's blessed-internal `~search` / `~params` via the core
- * decoders — `@paramour/next` is a sanctioned consumer of those internals.
+ * decoders — `@paramour-js/next` is a sanctioned consumer of those internals.
  *
  * Every hook is gated to `AnyAppRoute`: a pages-branded route at one of
  * these call sites is a compile error, not a runtime surprise — these hooks
