@@ -15,7 +15,7 @@ import {
   emitObservation,
   getParamourSeam,
   OBSERVATION_BUFFER_CAP,
-} from "../src/devtools-seam.js";
+} from "../src/devtools-emit.js";
 
 const route = defineAppRoute("/seam-test", {});
 

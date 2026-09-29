@@ -27,7 +27,7 @@ import {
   useRouteParamsOrThrow as useAppRouteParamsOrThrow,
   useSearch as useAppSearch,
 } from "../src/app.js";
-import { getParamourSeam } from "../src/devtools-seam.js";
+import { getParamourSeam } from "../src/devtools-emit.js";
 import { AppNavigationContext } from "../src/navigation-adapter.js";
 import {
   useRouteParams as usePagesRouteParams,

@@ -28,9 +28,14 @@ import type { AnyRoute, ParamsSource, RouterKind, SafeResult } from "paramour";
  * - Production: every emit call site sits behind
  *   `process.env.NODE_ENV !== "production"`, which Next's compilers
  *   constant-fold; with the package's `sideEffects: false` the then-dead
- *   import of this module is dropped entirely. The emitted JS here imports
- *   NOTHING (the one `paramour` import is type-only) — load-bearing for
- *   that erasure.
+ *   import of the emitter module (`devtools-emit.ts`) is dropped entirely.
+ * - Stability: this module is the published, semver-covered contract. It
+ *   declares TYPES ONLY — the emit/attach helpers live in the internal
+ *   `devtools-emit.ts`, so a value import through the types-only
+ *   `./devtools-seam` entry can't type-check. Closed-looking unions here
+ *   (`ParamourHookId`, the observation `kind`s) are OPEN by policy: new
+ *   hooks and observation kinds ship in minor releases, so consumers must
+ *   tolerate members they don't recognize.
  */
 
 /** The `Symbol.for("paramour.devtools.seam")` slot shape — the seam contract. */
@@ -46,7 +51,10 @@ export interface ParamourDevtoolsSeam {
   readonly version: 1;
 }
 
-/** Discriminant naming which hook reported. */
+/**
+ * Discriminant naming which hook reported. Open by policy: a new hook adds a
+ * member in a minor release, so switch over it with a default branch.
+ */
 export type ParamourHookId =
   | "app.useRouteParams"
   | "app.useRouteParamsOrThrow"
@@ -79,6 +87,30 @@ export type ParamourNavigate = (search: string) => void;
 export type ParamourObservation =
   ParamourParamsObservation | ParamourSearchObservation;
 
+/** Fields every observation carries, whatever its `kind`. */
+export interface ParamourObservationBase {
+  readonly hook: ParamourHookId;
+  readonly navigate: ParamourNavigate;
+  /**
+   * The emitting hook's OWN resolution base at decode time —
+   * `usePathname()` (App) / `asPath`'s path part (Pages), both
+   * basePath-/locale-relative like {@link ParamourNavigate}'s. The panel
+   * keys "is this session the page on screen?" on it (suffix-matched
+   * against `window.location.pathname`, which DOES carry the prefix), so it
+   * never has to reverse-engineer a configured basePath. Additive field —
+   * no `version` bump.
+   */
+  readonly pathname: string;
+  readonly result: ParamourObservationResult;
+  /**
+   * The LIVE route object (same JS context, no serialization) — the
+   * panel calls `describeRoute`, the route's own codecs, and
+   * `buildSearchString` on it directly.
+   */
+  readonly route: AnyRoute;
+  readonly routerKind: RouterKind;
+}
+
 /**
  * Pre-`select` decode result: the hook's full `SafeResult` — the error arm
  * carries the LIVE `ParamsDecodeError`/`SearchDecodeError` with its
@@ -106,108 +138,3 @@ export interface ParamourSearchObservation extends ParamourObservationBase {
 }
 
 export type ParamourSearchWire = readonly (readonly [string, string])[];
-
-interface ParamourObservationBase {
-  readonly hook: ParamourHookId;
-  readonly navigate: ParamourNavigate;
-  /**
-   * The emitting hook's OWN resolution base at decode time —
-   * `usePathname()` (App) / `asPath`'s path part (Pages), both
-   * basePath-/locale-relative like {@link ParamourNavigate}'s. The panel
-   * keys "is this session the page on screen?" on it (suffix-matched
-   * against `window.location.pathname`, which DOES carry the prefix), so it
-   * never has to reverse-engineer a configured basePath. Additive field —
-   * no `version` bump.
-   */
-  readonly pathname: string;
-  readonly result: ParamourObservationResult;
-  /**
-   * The LIVE route object (same JS context, no serialization) — the
-   * panel calls `describeRoute`, the route's own codecs, and
-   * `buildSearchString` on it directly.
-   */
-  readonly route: AnyRoute;
-  readonly routerKind: RouterKind;
-}
-
-/**
- * 128: replay only needs the pre-panel-mount window. One observation per
- * decode CHANGE per hook means even a long pre-open session is dozens
- * of entries, not thousands; the panel keys on route, so depth beyond
- * "every route seen recently" adds nothing — the cap mostly bounds how many
- * live route/result references the buffer retains.
- */
-export const OBSERVATION_BUFFER_CAP = 128;
-
-const SEAM_KEY = Symbol.for("paramour.devtools.seam");
-
-const globalSlots = globalThis as Record<
-  symbol,
-  ParamourDevtoolsSeam | undefined
->;
-
-/**
- * Pushes one observation and notifies listeners. The internal production
- * early-return is belt-and-suspenders (every call site is ALSO guarded,
- * which is what the bundler erases); it makes the guard directly
- * unit-testable and keeps a future unguarded call site failing safe.
- */
-export function emitObservation(observation: ParamourObservation): void {
-  if (process.env.NODE_ENV === "production") return;
-  const seam = getParamourSeam();
-  seam.buffer.push(observation);
-  if (seam.buffer.length > OBSERVATION_BUFFER_CAP) seam.buffer.shift();
-  for (const listener of seam.listeners) {
-    try {
-      listener(observation);
-    } catch {
-      // A panel bug must never break app render — emit runs render-phase.
-    }
-  }
-}
-
-/**
- * The slot, created on first touch by whichever side (hooks or panel) runs
- * first.
- */
-export function getParamourSeam(): ParamourDevtoolsSeam {
-  const existing = globalSlots[SEAM_KEY];
-  if (existing !== undefined) return existing;
-  const created: ParamourDevtoolsSeam = {
-    buffer: [],
-    listeners: new Set(),
-    version: 1,
-  };
-  globalSlots[SEAM_KEY] = created;
-  return created;
-}
-
-/**
- * Pages `query` record → wire pairs; `string[]` values expand to repeated
- * keys in array order, `undefined` values are wire absence and are skipped.
- */
-export function recordWireSnapshot(source: ParamsSource): ParamourSearchWire {
-  const pairs: [string, string][] = [];
-  for (const [key, value] of Object.entries(source)) {
-    if (value === undefined) continue;
-    if (Array.isArray(value)) {
-      for (const element of value) pairs.push([key, element]);
-    } else {
-      pairs.push([key, value]);
-    }
-  }
-  return pairs;
-}
-
-/**
- * Decode-time freeze of the (live, mutable) `URLSearchParams` into wire
- * pairs: the observation outlives the render in the ring buffer, so it must
- * capture what the DECODE saw, not a live view.
- */
-export function searchWireSnapshot(
-  source: URLSearchParams,
-): ParamourSearchWire {
-  const pairs: [string, string][] = [];
-  for (const [key, value] of source) pairs.push([key, value]);
-  return pairs;
-}

@@ -241,7 +241,7 @@ async function discoveryCheck(
 function readManifest(
   projectRoot: string,
   name: string,
-): undefined | { dependencies?: Record<string, string>; version?: unknown } {
+): undefined | { version?: unknown } {
   // Walks upward like Node resolution: workspaces hoist dependencies to a
   // parent node_modules, so a single project-root read hard-fails healthy
   // monorepo setups.
@@ -252,15 +252,12 @@ function readManifest(
           join(dir, "node_modules", ...name.split("/"), "package.json"),
           "utf8",
         ),
-      ) as { dependencies?: Record<string, string>; version?: unknown };
+      ) as { version?: unknown };
     } catch {
       if (dirname(dir) === dir) return undefined;
     }
   }
 }
-
-/** `1.2.3` / `1.2.3-beta.1` — the shape a published `workspace:*` pin takes. */
-const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[\w.-]+)?$/;
 
 function versionCheck(projectRoot: string): DoctorCheck {
   const coreManifest = readManifest(projectRoot, "paramour");
@@ -284,29 +281,22 @@ function versionCheck(projectRoot: string): DoctorCheck {
       status: "fail",
     };
   }
-  // The packages version INDEPENDENTLY (changesets); comparing the two
-  // installed versions against each other warns on every correct install.
-  // The real invariant is that the installed core is the one the installed
-  // @paramour-js/next declares — `workspace:*` publishes as an exact pin, so
-  // when the declaration is exact this is string equality. A non-exact
-  // declaration (a range, or `workspace:*` inside this monorepo itself) is
-  // the package manager's to enforce; no claim to check.
-  const declared = nextManifest?.dependencies?.paramour;
-  if (
-    declared !== undefined &&
-    EXACT_VERSION.test(declared) &&
-    core !== declared
-  ) {
+  // The paramour packages release in LOCKSTEP (one changesets fixed group),
+  // and @paramour-js/next peers on the app's own `paramour` — so a coherent
+  // install has the two at the same version. The peer range itself is the
+  // package manager's to enforce; lockstep equality is the stronger claim,
+  // and the one that catches a half-upgraded app.
+  if (core !== next) {
     return {
       detail: [
-        "your package manager should have matched these — check for overrides/resolutions or a stale lockfile, then reinstall",
+        "paramour packages release together — upgrade them to the same version (e.g. `pnpm up paramour @paramour-js/next`)",
       ],
-      label: `versions: installed paramour ${core} != ${declared}, the version @paramour-js/next ${next} depends on`,
+      label: `versions: paramour ${core} != @paramour-js/next ${next}`,
       status: "warn",
     };
   }
   return {
-    label: `versions: paramour ${core} satisfies @paramour-js/next ${next}'s declared dependency`,
+    label: `versions: paramour and @paramour-js/next are both ${core}`,
     status: "pass",
   };
 }

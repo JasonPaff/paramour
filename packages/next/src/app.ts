@@ -20,7 +20,7 @@ import {
 } from "paramour";
 import { useContext } from "react";
 
-import { searchWireSnapshot } from "./devtools-seam.js";
+import { searchWireSnapshot } from "./devtools-emit.js";
 import {
   type AppNavigationAdapter,
   AppNavigationContext,

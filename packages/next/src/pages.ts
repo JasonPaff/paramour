@@ -20,7 +20,7 @@ import {
 } from "paramour";
 import { useContext } from "react";
 
-import { recordWireSnapshot } from "./devtools-seam.js";
+import { recordWireSnapshot } from "./devtools-emit.js";
 import {
   type PagesNavigationAdapter,
   PagesNavigationContext,

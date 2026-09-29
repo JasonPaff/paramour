@@ -61,7 +61,7 @@ const nextConfig: NextConfig = {};
 export default withTypedRoutes(nextConfig);
 ```
 
-`withTypedRoutes(config, options?)` regenerates the artifact once per production build (drift warns; `{ strict: true }` fails the build on drift instead) and runs a debounced regeneration watcher during `next dev`. `{ outFile: "..." }` relocates the artifact (monorepo escape hatch). Generation is never load-bearing: a missing route dir or an incidental failure warns and continues with stale types — the two exceptions that throw are an app↔pages route collision and a populated-but-ignored route dir.
+`withTypedRoutes(config, options?)` regenerates the artifact once per production build (drift warns; `{ strict: true }` fails the build on drift instead) and runs a debounced regeneration watcher during `next dev`. It reads `paramour.config` like the CLI does (`outFile` there relocates the artifact for both; Next's own `pageExtensions` wins inside Next, with a warning if the config file disagrees). Generation is never load-bearing: a missing route dir or an incidental failure warns and continues with stale types — the two exceptions that throw are an app↔pages route collision and a populated-but-ignored route dir.
 
 Add the script to `package.json`:
 

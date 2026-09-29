@@ -63,7 +63,7 @@ Commit the generated artifact — `paramour check` verifies it stays current in 
 
 Four things, each idempotent (rerunning init never clobbers your edits):
 
-1. **Created `paramour.config.ts`** — CLI configuration. Every field in the
+1. **Created `paramour.config.ts`** — configuration for the CLI and `withTypedRoutes`. Every field in the
    scaffold is a commented-out default, so you can delete the file and nothing
    changes. You'll only touch it if your project uses non-standard directories.
 2. **Wrapped `next.config.ts` with `withTypedRoutes`** — the build-time

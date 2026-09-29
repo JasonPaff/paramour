@@ -7,7 +7,7 @@ Derive [nuqs](https://nuqs.dev) parsers from [paramour](https://paramour.dev) se
 paramour owns the route contract: server-side `parseSearch`/`safeParseSearch` and typed `href()` links into the page. nuqs owns high-frequency in-page client URL state. Integrating them by hand costs a `createParser` bridge, every default declared twice, and hand-written `eq` functions for Dates and arrays. This package deletes all three layers: the adapter reads what the modified codec already carries.
 
 ```bash
-pnpm add @paramour-js/nuqs nuqs
+pnpm add @paramour-js/nuqs nuqs paramour
 ```
 
 ## Quick start

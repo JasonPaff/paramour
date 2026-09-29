@@ -17,7 +17,7 @@ import type { ParamourObservation } from "../src/devtools-seam.js";
 import type { PagesNavigationAdapter } from "../src/navigation-adapter.js";
 import type { ParamourTestingOptions } from "../src/testing.js";
 
-import { getParamourSeam } from "../src/devtools-seam.js";
+import { getParamourSeam } from "../src/devtools-emit.js";
 import { PagesNavigationContext } from "../src/navigation-adapter.js";
 import { useRouteParams, useSearch } from "../src/pages.js";
 import { ParamourTestingProvider } from "../src/testing.js";

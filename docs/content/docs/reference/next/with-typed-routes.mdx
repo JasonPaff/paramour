@@ -70,23 +70,26 @@ itself has no valid build for them:
 If no route directory exists at all (`app/`, `pages/`, `src/app/`,
 `src/pages/`), the wrapper warns once and skips generation entirely.
 
-<Callout title="withTypedRoutes does not read paramour.config">
-  The config file (`paramour.config.ts`) configures the **CLI**. The wrapper
-  takes its options directly — `outFile` via
-  `WithTypedRoutesOptions` — and reads `pageExtensions` from the Next config
-  it wraps. If you move the artifact with `outFile` in `paramour.config.ts`,
-  pass the same value to `withTypedRoutes` too, or the two will write to
-  different paths.
+<Callout title="One config file for the CLI and the wrapper">
+  `withTypedRoutes` reads [`paramour.config.ts`](#paramourconfig) exactly as
+  the CLI does — `appDir`, `pagesDir`, and `outFile` all apply to `next
+  dev`/`next build` too, so the two writers can never produce different
+  artifacts. The one field Next owns is `pageExtensions`: inside Next, the
+  wrapped config's `pageExtensions` wins (it decides what is a page), and
+  the wrapper warns once if the config file lists different ones. A
+  malformed config file throws during config evaluation — it's a
+  configuration mistake, not an incidental generation failure.
 </Callout>
 
 ## WithTypedRoutesOptions
 
-The second argument to `withTypedRoutes`. Both fields are optional.
+The optional second argument to `withTypedRoutes`. Where routes and the
+artifact live is configured in [`paramour.config.ts`](#paramourconfig), not
+here.
 
-| Option    | Default              | Description                                                                                                                  |
-| --------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `outFile` | `paramour-env.d.ts`  | Artifact location; relative paths resolve against the project root. The escape hatch for monorepos where the Next app root isn't where the file should live. |
-| `strict`  | `false`              | Upgrade build-phase drift from a loud warning to a build failure.                                                             |
+| Option   | Default | Description                                                        |
+| -------- | ------- | ------------------------------------------------------------------ |
+| `strict` | `false` | Upgrade build-phase drift from a loud warning to a build failure. |
 
 `strict: true` is for teams that treat the committed artifact as the law: if
 a `next build` finds the artifact stale — or missing, which counts as drift
@@ -103,9 +106,9 @@ degrades to stale types with a warning, strict or not.
 ## ParamourConfig
 
 The shape of `paramour.config.ts` (or `.mjs`/`.json`) at the project root —
-the **CLI's** config file, exported here so you can type the default export.
-Every field is optional; CLI precedence is flags → this file → automatic
-discovery.
+read by both the CLI and `withTypedRoutes`, and exported here so you can
+type the default export. Every field is optional; CLI precedence is flags →
+this file → automatic discovery.
 
 ```ts twoslash title="paramour.config.ts"
 import type { ParamourConfig } from "@paramour-js/next";
@@ -120,8 +123,8 @@ export default {
 | ---------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `appDir`         | discovered `app/` or `src/app/`     | App directory, relative to the project root.                                                                    |
 | `pagesDir`       | discovered `pages/` or `src/pages/` | Pages directory, relative to the project root.                                                                  |
-| `outFile`        | `paramour-env.d.ts`                 | Artifact path, relative to the project root.                                                                    |
-| `pageExtensions` | `["tsx", "ts", "jsx", "js"]`        | Page extensions, **no leading dots** — a leading dot is rejected because it would silently match nothing.       |
+| `outFile`        | `paramour-env.d.ts`                 | Artifact path, relative to the project root — the escape hatch for monorepos where the Next app root isn't where the file should live. |
+| `pageExtensions` | `["tsx", "ts", "jsx", "js"]`        | Page extensions, **no leading dots** — a leading dot is rejected because it would silently match nothing. Keep it in step with `next.config`'s: inside Next, Next's list wins. |
 | `routeFiles`     | automatic content scan              | Globs (relative to the project root) of modules exporting route definitions. Read by `list`/`doctor` only — generation never uses it. Set it when the automatic `defineAppRoute`/`definePagesRoute` source scan misfires. |
 
 The config file is discovered at the project root only (no upward

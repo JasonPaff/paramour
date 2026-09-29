@@ -16,16 +16,15 @@
   "engines": {
     "node": ">=22.13.0"
   },
-  "dependencies": {
-    "paramour": "workspace:*"
-  },
   "peerDependencies": {
-    "nuqs": "^2.9.0"
+    "nuqs": "^2.9.0",
+    "paramour": ">=0.9.0 <1.0.0 || ^1.0.0-rc.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "nuqs": "^2.9.0",
+    "paramour": "workspace:*",
     "react": "^19.2.0",
     "typescript": "^6.0.3",
     "zod": "^4.4.3"

@@ -17,9 +17,9 @@
     "node": ">=22.13.0"
   },
   "peerDependencies": {
-    "@paramour-js/next": ">=0.6.0",
+    "@paramour-js/next": ">=0.9.0 <1.0.0 || ^1.0.0-rc.0",
     "@tanstack/react-devtools": ">=0.10.0",
-    "paramour": ">=0.6.0",
+    "paramour": ">=0.9.0 <1.0.0 || ^1.0.0-rc.0",
     "react": ">=18.2.0"
   },
   "peerDependenciesMeta": {

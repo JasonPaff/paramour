@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { ParamourError } from "paramour";
 import { describe, expect, it } from "vitest";
 
 import { RouteCollisionError } from "../src";
@@ -43,5 +44,32 @@ describe("dot in a dynamic segment param (bug 6)", () => {
     const root = makeTempDir();
     makeTree(root, ["app/x/[a.b]/page.tsx", "app/x/[...rest]/page.tsx"]);
     expect(() => scanAppRoutes(join(root, "app"))).not.toThrow();
+  });
+});
+
+describe("RouteCollisionError identity", () => {
+  it("is a ParamourError with a literal, minification-proof name", () => {
+    const error = new RouteCollisionError("collision");
+    expect(error).toBeInstanceOf(ParamourError);
+    expect(error).toBeInstanceOf(RouteCollisionError);
+    expect(error.name).toBe("RouteCollisionError");
+  });
+
+  it("brands across copies and rejects structural look-alikes", () => {
+    const foreign = Object.create(
+      Object.defineProperty(
+        {},
+        Symbol.for("paramour.errors.RouteCollisionError"),
+        {
+          value: true,
+        },
+      ),
+    ) as unknown;
+    expect(foreign instanceof RouteCollisionError).toBe(true);
+    const lookalike = Object.assign(new Error("x"), {
+      name: "RouteCollisionError",
+    });
+    expect(lookalike instanceof RouteCollisionError).toBe(false);
+    expect(new ParamourError("x") instanceof RouteCollisionError).toBe(false);
   });
 });
