@@ -305,7 +305,8 @@ export type RegisteredStaticRoutePaths = [PresentRegisteredPaths] extends [
  * {@link AppRoute} / {@link PagesRoute} — gating it via the interface split
  * makes the wrong surface ABSENT, not just ill-typed. `~`-prefixed members
  * are runtime-internal, not public API — same convention as codecs;
- * `@paramour/next` is a blessed consumer, user code is not.
+ * the lockstep `@paramour-js/*` packages are blessed consumers, user code is
+ * not — and these members are outside semver.
  */
 export interface Route<
   Path extends string,

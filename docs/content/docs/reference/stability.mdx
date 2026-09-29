@@ -1,0 +1,110 @@
+---
+title: Stability & versioning
+description: What paramour's semver promise covers, what it deliberately doesn't, and how the packages version together.
+---
+
+paramour follows [semantic versioning](https://semver.org) from 1.0: a
+breaking change to anything this page lists as covered ships only in a new
+major version. This page is the contract. When it and another page
+disagree, this one wins.
+
+## One version for every package
+
+`paramour`, `@paramour-js/next`, `@paramour-js/nuqs`,
+`@paramour-js/devtools-panel`, and `@paramour-js/eslint-plugin` release in
+**lockstep**: every release bumps all five to the same version. Install and
+upgrade them together:
+
+```sh
+pnpm up paramour @paramour-js/next @paramour-js/nuqs
+```
+
+The adapter packages list `paramour` as a **peer dependency**, so your app
+always has exactly one copy of core. Two copies would split the route
+registry augmentation and the `Href` brand, and your routes would stop
+type-checking against the hooks. `paramour doctor` warns when the installed
+`paramour` and `@paramour-js/next` versions differ.
+
+## What's covered
+
+A breaking change to any of these is a major release:
+
+- **Every documented export** of `paramour`, `@paramour-js/next` (and its
+  `/app`, `/pages`, `/testing` entries), `@paramour-js/nuqs`,
+  `@paramour-js/devtools-panel`, and `@paramour-js/eslint-plugin`: names,
+  call signatures, runtime behavior, and the documented shape of their
+  types.
+- **`paramour/internal`**, the entry reserved for tooling (the devtools
+  panel, adapters). It isn't for app code and is documented only briefly,
+  but it gets the same promise: within a major, its exports only grow.
+- **The [wire format](/docs/reference/wire-format).** Every numbered rule
+  is pinned by a conformance test. A URL paramour produces today decodes to
+  the same value on any 1.x release, and a value encodes to the same URL.
+- **Codec grammars**: which wire strings each `p.*` builder accepts and
+  rejects, and what it emits.
+- **Error classes**: their names (`error.name` is a literal per class),
+  their `instanceof` identity, and the documented fields of `Issue`.
+- **The devtools seam** (`@paramour-js/next/devtools-seam`): the global
+  slot key, its data shape, and its `version` field. The seam is what lets
+  a third-party panel observe the hooks.
+- **The CLI**: command names, flags, exit codes (`0` ok, `1` verification
+  failed, `2` usage or operational error), and `paramour.config.*` keys.
+- **The generated artifact**: the `paramour-env.d.ts` default filename and
+  the `ParamourRegister` member names (`appRoutes`, `pagesRoutes`) that
+  your committed file contains.
+- **ESLint plugin**: rule names, their option schemas, and preset names.
+
+## What's not covered
+
+These can change in any minor release:
+
+- **`~`-prefixed properties** on route objects and codecs (`~search`,
+  `~presence`, …). They're runtime internals shared between the lockstep
+  packages. In types, use `InferRouteParams`, `InferRouteSearch`,
+  `InferCodecOutput`, and `PresenceOf` instead of reading them.
+- **Type parameters after the first.** Only `Codec`'s first parameter,
+  `Out`, is stable; the type-state parameters after it may change. Write
+  `AnyCodec<number>` rather than spelling them out. Likewise, passing
+  explicit type arguments to `defineAppRoute`, `definePagesRoute`, or `href`
+  is unsupported, because their type parameters exist for inference.
+- **Names of unexported types** that appear in editor hovers and compiler
+  errors. If a name isn't exported, you can't depend on it.
+- **Error message text.** Messages are written for people and get
+  improved. Branch on `error.name`, `instanceof`, and `issue.reason`, never
+  on message wording.
+- **Human-readable CLI output**: the wording and layout of `list`,
+  `doctor`, and `generate` output. Scripts should read `--json`, which is
+  covered.
+- **Lint findings.** A rule may flag new patterns in a minor release as its
+  detection improves. The recommended preset registers every rule at
+  `warn`, so an upgrade can't fail a build that doesn't promote rules to
+  `error`.
+
+## Unions that grow
+
+Some union types enumerate things paramour adds over time. Adding a member
+to one of these is a **minor** change, so any `switch` over them should
+keep a `default` branch:
+
+- `IssueReason`, the failure kinds on a decode `Issue`
+- `CodecKind`, which builder produced a codec
+- `SearchDescription["kind"]` and `ParamDescription["segmentKind"]` from
+  the reflection API
+- the devtools seam's `ParamourHookId` and observation `kind`s
+- `--json` output from the CLI, which may gain fields
+
+Unions you pass *in* (such as `CodecFormatStyle` or `RouterKind`) can only
+grow in ways that keep your existing arguments valid.
+
+## Supported platforms
+
+| Dependency | Supported range                        |
+| ---------- | -------------------------------------- |
+| Node.js    | `>=22.13`                              |
+| Next.js    | `>=15` (App Router and Pages Router)   |
+| React      | `>=18.2`                               |
+| nuqs       | `^2.9` (for `@paramour-js/nuqs`)       |
+| ESLint     | `^9 \|\| ^10`, flat config only (for `@paramour-js/eslint-plugin`) |
+
+Raising a minimum version is a breaking change and ships in a major
+release. Supporting a new major version of a dependency ships in a minor.
