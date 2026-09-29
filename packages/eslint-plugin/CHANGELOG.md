@@ -1,5 +1,27 @@
 # @paramour-js/eslint-plugin
 
+## 0.9.0
+
+### Minor Changes
+
+- [#45](https://github.com/JasonPaff/paramour/pull/45) [`bf41492`](https://github.com/JasonPaff/paramour/commit/bf414922039b6dab862909d23a7db4264161899d) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Two new rules catch misuses of paramour's own API that compile but misbehave. Both are in `recommended` at `warn`.
+
+  - **`no-impure-value-defaults`** flags clock or random reads (`new Date()`, `Date.now()`, `Math.random()`, `performance.now()`, `crypto.randomUUID()`, `Temporal.Now.*()`, …) in a `p.*` codec's value-form `.default()` or `.catch()`. The value is evaluated once at module load and then frozen, and because value defaults drive URL elision, links elide against the stale value. The rule offers an editor suggestion to switch to the factory form (`() => new Date()`). It is a suggestion rather than an autofix because factory defaults never elide and `@paramour-js/nuqs` types them as nullable.
+  - **`no-parse-context-in-get-static-props`** flags `route.parseContext()` / `safeParseContext()` inside `getStaticProps`, where the context has no query string and the call always fails. The message names the replacement: `decodeParams` / `safeDecodeParams(route, ctx.params ?? {})`.
+
+- [#45](https://github.com/JasonPaff/paramour/pull/45) [`bf41492`](https://github.com/JasonPaff/paramour/commit/bf414922039b6dab862909d23a7db4264161899d) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `no-raw-hrefs` now audits six surfaces spanning both routers — the write-side bypass surfaces design-15 deferred, plus the ones Next has grown since.
+
+  - **Pages router** — `useRouter` from `next/router` (variable, destructured, and namespace forms) and the static `Router.push`/`replace`/`prefetch` form on its default export now fire alongside the App Router surfaces.
+  - **`UrlObject` form** — `href={{ pathname: "/foo" }}` on `Link` (and configured wrappers) and `router.push({ pathname: "/foo" })` are flagged on the `pathname`; `ignorePaths` applies to it identically.
+  - **`linkComponents` option** — teaches the rule design-system `Link` wrappers via `{ name, source, prop? }` entries, where `name` is the _imported_ name (`"default"` for a default export) so aliases still match, and `prop` defaults to `"href"`.
+  - **`<Form action>`** — string actions on `Form` from `next/form`; function values (server actions) never fire.
+  - **`NextResponse.redirect` / `rewrite`** — raw internal paths as the direct argument or inside an inline `new URL("/path", base)`; the message nudges `new URL(href(route, …), request.url)`. Absolute URLs and `URL`-typed variables stay exempt.
+  - Extensionful module spellings (`next/link.js`, `next/navigation.js`) now match at every `no-raw-hrefs` surface, closing a gap with the other rules.
+
+### Patch Changes
+
+- [#49](https://github.com/JasonPaff/paramour/pull/49) [`d434759`](https://github.com/JasonPaff/paramour/commit/d434759481c1b9e4b420909d40fc34ac3738aba7) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `meta.version` now reports the installed package version. It was hardcoded as `0.1.0`, which went stale and fed ESLint's cache keys.
+
 ## 0.8.0
 
 ### Minor Changes
