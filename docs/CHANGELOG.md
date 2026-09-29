@@ -1,5 +1,13 @@
 # docs
 
+## 0.0.8
+
+### Patch Changes
+
+- Updated dependencies [[`11738eb`](https://github.com/JasonPaff/paramour/commit/11738ebe290179e8d75ca0ccbbd8cda133548602), [`2c857fa`](https://github.com/JasonPaff/paramour/commit/2c857fac3bbd13152726e01283487271b758590d), [`cec092d`](https://github.com/JasonPaff/paramour/commit/cec092d1037c84d0eb4a9995c4bb22ef12d20152)]:
+  - @paramour-js/next@0.9.0
+  - paramour@0.9.0
+
 ## 0.0.7
 
 ### Patch Changes

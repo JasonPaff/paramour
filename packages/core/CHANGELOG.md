@@ -1,5 +1,23 @@
 # paramour
 
+## 0.9.0
+
+### Minor Changes
+
+- [#46](https://github.com/JasonPaff/paramour/pull/46) [`2c857fa`](https://github.com/JasonPaff/paramour/commit/2c857fac3bbd13152726e01283487271b758590d) Thanks [@JasonPaff](https://github.com/JasonPaff)! - **Breaking — 1.0 API freeze, part 1: types and naming.** These changes settle the public type surface before 1.0.
+
+  - **`InferRouteSearch<R>`** (new) is the route-level twin of `InferRouteParams<R>`. Hook signatures, `standardSearchSchema` (`StandardSearchSchema<R>` now takes the route) and the docs use it, so no public signature mentions a route's internal `~search` member anymore. The `~`-prefixed members are documented as outside semver.
+  - **Search type helpers renamed.** `InferSearchInput` / `InferSearchOutput` now accept any `search:` slot (a codec map or `rawSearch`). `SearchOutputOf` is removed; use `InferSearchOutput`. `OutputOf` is renamed to `InferCodecOutput`. `RoutePropsInput` / `ParamsPropsInput` / `SearchPropsInput` are renamed to `RoutePropsLike` / `ParamsPropsLike` / `SearchPropsLike`.
+  - **`RouteConfig` and `SearchSlot` are exported**, so generic wrappers around `defineAppRoute` / `definePagesRoute` can be written.
+  - **Search functions take a route or a config.** `decodeSearch`, `safeDecodeSearch`, `encodeSearch` and `searchToString` accept either one. `decodeSearch`'s `routePath` third argument is removed; pass the route instead, and its path anchors the error.
+  - **`SafeResult<T, E>`** gains an error parameter. Params-only surfaces (`safeParseParams`, `safeDecodeParams`, `useRouteParams`) are typed `SafeResult<T, ParamsDecodeError>`, and search-only surfaces use `SearchDecodeError`. `RouterResult<T, E>` follows. Every error class now has a literal `name` (for example `"SearchDecodeError"`) that survives minification. This also makes the two decode errors structurally distinct.
+  - **`AnyCodec<Out>`** can be narrowed to one output type. Only `Codec`'s first type parameter is public API; the type-state parameters after it may change in minor releases.
+  - **`p.custom` can no longer impersonate built-ins.** Its `kind` is always `"custom"`, and its `label` is reported separately as `CodecDescription.label`. `kind` is now a `CodecKind` union.
+  - **`parseValue`** moves from `paramour/internal` to the main entry point, alongside `serializeValue`. `paramour/internal` is now covered by semver within a major.
+  - `ParseError`'s `selfDescribing` flag and constructor option are now internal.
+
+- [#48](https://github.com/JasonPaff/paramour/pull/48) [`cec092d`](https://github.com/JasonPaff/paramour/commit/cec092d1037c84d0eb4a9995c4bb22ef12d20152) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `p.timestamp()` now accepts `±HH:MM` UTC offsets on input, alongside `Z`. `2026-07-18T14:30:00+02:00` decodes to the same instant as `2026-07-18T12:30:00Z`. Output is unchanged: always UTC `Date#toISOString()`, so every instant still has exactly one URL. Offsets outside `00:00`–`23:59` are rejected, and so is any instant that falls outside years 0000–9999 once the offset is applied. This finalizes the 1.0 grammar; previously, offset timestamps failed to parse (and fell back to `.catch()`).
+
 ## 0.8.0
 
 ## 0.7.0
