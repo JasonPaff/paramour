@@ -327,8 +327,6 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
-  packages/codemod: {}
-
   packages/core:
     dependencies:
       '@standard-schema/spec':
