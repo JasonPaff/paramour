@@ -18,9 +18,7 @@ runs:
     # the same bug class the next-compat matrix catches dynamically, but for
     # every consumer. attw runs the esm-only profile because the packages are
     # deliberately ESM-only: node10 resolution and require()-from-CJS are
-    # out of scope by design. Needs dist/, hence after build. Runs only in
-    # packages that define the script (the private codemod placeholder
-    # doesn't).
+    # out of scope by design. Needs dist/, hence after build.
     - run: pnpm check:publish
       shell: bash
 

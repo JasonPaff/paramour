@@ -10,8 +10,10 @@ silently the moment someone writes `<Link href="/users/123">` or
 codecs simply never run. In a codebase mid-migration this is the default
 failure mode, not an edge case. The plugin audits the bypass in both
 directions — raw writes (`no-raw-hrefs`), raw reads
-(`no-raw-param-reads`) — and guards the integrity of what `href()` builds
-(`no-href-arithmetic`).
+(`no-raw-param-reads`) — guards the integrity of what `href()` builds
+(`no-href-arithmetic`), and catches two misuses of paramour's own API that
+compile but misbehave (`no-impure-value-defaults`,
+`no-parse-context-in-get-static-props`).
 
 ## Install
 
@@ -45,6 +47,8 @@ export default [
     plugins: { paramour },
     rules: {
       "paramour/no-href-arithmetic": "warn",
+      "paramour/no-impure-value-defaults": "warn",
+      "paramour/no-parse-context-in-get-static-props": "warn",
       "paramour/no-raw-hrefs": "warn",
       "paramour/no-raw-param-reads": "warn",
     },
@@ -54,8 +58,9 @@ export default [
 
 The preset registers every rule at `warn` on purpose: a raw string href or
 a raw param read is *working* code, and this is a nudge toward migration,
-not a correctness gate. Once your routes are migrated, promote any rule
-individually:
+not a correctness gate. The two API-misuse rules are real bugs when they
+fire, but they stay at `warn` too so the preset never fails a build on
+upgrade. Once your routes are migrated, promote any rule individually:
 
 ```js
 rules: { "paramour/no-raw-hrefs": "error" }
@@ -64,32 +69,54 @@ rules: { "paramour/no-raw-hrefs": "error" }
 ## no-raw-hrefs
 
 Reports string literals — and template literals with no `${}` expressions —
-that start with `/`, in three Next.js App Router surfaces:
+that start with `/`, in six Next.js surfaces spanning both routers:
 
 1. **`<Link href>`** — the `href` attribute of `Link` imported from
    `next/link`, under any local name. Imports are tracked through scope
    resolution, not name matching: `import L from "next/link"` fires on
    `<L href="/x" />`, while a component that happens to be called `Link`
-   but comes from anywhere else never fires.
+   but comes from anywhere else never fires. The `UrlObject` form is
+   covered too: `href={{ pathname: "/foo" }}` is flagged on its
+   `pathname`.
 2. **Router methods** — the first argument of `push`, `replace`, and
-   `prefetch` on a router obtained from `next/navigation`'s `useRouter()`,
-   in both the variable form (`const router = useRouter()`) and the
-   destructured form (`const { push } = useRouter()`, including renames
-   like `const { push: go } = useRouter()`).
-3. **Server redirects** — arguments to `redirect` and `permanentRedirect`
+   `prefetch` on a router obtained from `useRouter()` — imported from
+   `next/navigation` *or* `next/router` — in both the variable form
+   (`const router = useRouter()`) and the destructured form
+   (`const { push } = useRouter()`, including renames like
+   `const { push: go } = useRouter()`). A `UrlObject` first argument
+   (`router.push({ pathname: "/foo" })`) is flagged the same way.
+3. **The static `Router` form** — `push`, `replace`, and `prefetch` on
+   the `next/router` default export (`import Router from "next/router";
+   Router.push("/x")`).
+4. **Server redirects** — arguments to `redirect` and `permanentRedirect`
    imported from `next/navigation`. The server-side bypass, and the one
    most often forgotten.
+5. **`<Form action>`** — the `action` attribute of `Form` imported from
+   `next/form`, when it is a string. Function values (server actions) are
+   not paths and never fire.
+6. **`NextResponse.redirect` / `NextResponse.rewrite`** — with
+   `NextResponse` imported from `next/server`, a raw internal path either
+   as the direct first argument or as the first argument of an inline
+   `new URL("/path", base)`. These APIs require absolute URLs, so the
+   message nudges `new URL(href(route, …), request.url)`.
+
+Everywhere, the extensionful nodenext spellings (`next/link.js`,
+`next/router.js`, …) count too.
 
 ```tsx
 import Link from "next/link";
 import { redirect, useRouter } from "next/navigation";
+import { NextResponse } from "next/server";
 import { href } from "paramour";
 
 <Link href="/users/123" />; // ✗ flagged
+<Link href={{ pathname: "/users/123" }} />; // ✗ flagged on the pathname
 redirect("/login"); // ✗ flagged
 
 const router = useRouter();
 router.push("/shop?page=2"); // ✗ flagged
+
+NextResponse.redirect(new URL("/login", request.url)); // ✗ flagged on "/login"
 
 <Link href={href(usersRoute, { params: { id: 123 } })} />; // ✓ what the rule nudges toward
 ```
@@ -110,11 +137,17 @@ exempt despite their leading slashes.
 Type-only imports (`import type Link from "next/link"`) never fire — a
 value usage of one is already a TypeScript error.
 
+At the `NextResponse` surface, absolute-URL strings and `URL`-typed
+variables are exempt — they are exactly what those APIs require. In the
+`UrlObject` form, a computed key, a dynamic `pathname` value, or a
+`pathname` arriving via spread never fires.
+
 ### Options
 
-| Option        | Type       | Default | Description                                 |
-| ------------- | ---------- | ------- | ------------------------------------------- |
-| `ignorePaths` | `string[]` | `[]`    | Path prefixes to exempt during a migration. |
+| Option           | Type                                          | Default | Description                                 |
+| ---------------- | --------------------------------------------- | ------- | ------------------------------------------- |
+| `ignorePaths`    | `string[]`                                    | `[]`    | Path prefixes to exempt during a migration. |
+| `linkComponents` | `{ name: string; source: string; prop?: string }[]` | `[]`    | Design-system `Link` wrappers to audit.     |
 
 `ignorePaths` is the escape hatch for incremental adoption: a project that
 has migrated 10 of 80 routes silences the sections it has not reached yet
@@ -130,20 +163,44 @@ Matching is by path segment, not raw substring: `"/legacy"` exempts
 `/legacy`, `/legacy/old`, `/legacy?tab=1`, and `/legacy#top` — but **not**
 `/legacybar`. A trailing slash on the configured prefix is ignored
 (`"/legacy/"` behaves like `"/legacy"`), and `"/"` exempts everything.
-Prefixes only — no globs.
+Prefixes only — no globs. It applies identically at every surface,
+including a `UrlObject`'s `pathname`.
 
-### Deliberately out of scope (v1)
+`linkComponents` teaches the rule your design-system `Link` wrappers,
+which are otherwise undetectable syntactically:
+
+```js
+rules: {
+  "paramour/no-raw-hrefs": ["warn", {
+    linkComponents: [
+      { name: "AppLink", source: "@acme/ui" },
+      { name: "default", source: "@acme/ui/button-link", prop: "to" },
+    ],
+  }],
+}
+```
+
+`name` is the **imported** name — `"default"` for a default export —
+never the local alias: `import { AppLink as A } from "@acme/ui"` still
+fires on `<A href="/x" />`, the same scope-resolved matching every other
+surface uses. `prop` defaults to `"href"`. The `UrlObject` form is
+checked on wrapper props too, and extensionful source spellings match.
+
+### Deliberately out of scope (v2)
 
 Recorded so the omissions read as decisions, not oversights:
 
 - **Dynamic strings** — `"/users/" + id` and template literals with
-  expressions are the riskiest hrefs but also the noisiest to flag; the
-  static surfaces prove the false-positive policy first.
-- **The Pages router** — `next/router`'s `useRouter` does not fire.
-- **The `UrlObject` href form** — `href={{ pathname: "/foo" }}`.
-- **Wrapper components** — `Link` re-exported through a design-system
-  wrapper is undetectable syntactically; a `linkComponents` option is the
-  natural future answer.
+  expressions are the riskiest hrefs but also the noisiest to flag; they
+  need their own false-positive round before landing.
+- **`revalidatePath`** — it legally takes route *patterns*
+  (`revalidatePath("/product/[id]", "page")`) that `href()` does not
+  produce, so flagging it would fight correct code.
+- **Member-expression forms** — `<UI.Link href>` and
+  `ns.NextResponse.redirect(...)` element/callee names are not resolved.
+- **`URL` values built outside the call** —
+  `const url = new URL("/x", base); NextResponse.redirect(url)` escapes
+  detection; only the inline `new URL(...)` argument is inspected.
 - **Routers crossing boundaries** — a router instance passed as an
   argument or through props escapes the same-scope initializer check. The
   rule is purely syntactic by design: no type information, no
@@ -301,3 +358,120 @@ Recorded so the omissions read as decisions, not oversights:
 - **A `route.href()` method form** — not an omission but a fact: paramour
   has no such method. `href()` is a standalone import, which is what makes
   the scope-resolved detection precise.
+
+## no-impure-value-defaults
+
+Reports a codec's value-form `.default()` or `.catch()` whose argument
+reads the clock or a random source. A value argument is evaluated once,
+when the route module loads, so `p.timestamp().default(new Date())`
+freezes module-load time forever — and because value defaults drive
+URL elision, `href()` then elides against that stale value. The fix is
+the factory form, which runs per decode:
+
+```ts
+import { p } from "paramour";
+
+const since = p.timestamp().default(new Date()); // ✗ frozen at module load
+const seed = p.number().catch(Math.random()); // ✗
+
+const fresh = p.timestamp().default(() => new Date()); // ✓ fresh per decode
+```
+
+The impure constructs are a fixed allowlist, matched anywhere inside the
+argument (so `Date.now() - DAY` and `new Date().toISOString()` count) but
+never inside a nested function:
+
+- `new Date()` with no arguments, and `Date()` called without `new`
+- `Date.now()`, `Math.random()`, `performance.now()`
+- `crypto.randomUUID()`, `crypto.getRandomValues()` — the global, or the
+  default/namespace import of `crypto` / `node:crypto`
+- any `Temporal.Now.*()` call
+
+The rule only fires on a modifier whose receiver chain starts at a
+`p.<builder>()` call with `p` imported from `paramour` (named, aliased,
+or `ns.p` through a namespace import), walking back through intermediate
+modifiers such as `.catch(…).default(…)`. Other libraries' `.default()`
+(zod, yup, your own builders) never fire.
+
+There is no autofix, only an editor **suggestion** that wraps the
+argument in `() => …`. The rewrite deliberately changes behavior, so
+`--fix` never applies it: factory defaults are never elided from URLs (a
+time-varying factory could elide an explicitly passed value that later
+decodes differently), and `@paramour-js/nuqs` types factory-defaulted
+keys as nullable, so downstream reads may need adjusting.
+
+### What is exempt
+
+Factory forms, pure conversions (`new Date("2020-01-01T00:00:00Z")`,
+`new Date(0)`), shadowed globals (a local `Date` or `Math`, a `crypto`
+imported from anywhere but node's crypto module), and `.default()` /
+`.catch()` on anything that is not a paramour codec chain, including
+`Promise#catch`.
+
+### Options
+
+No options in v1. One-off exceptions use a standard
+`// eslint-disable-next-line paramour/no-impure-value-defaults` comment.
+
+### Deliberately out of scope (v1)
+
+Recorded so the omissions read as decisions, not oversights:
+
+- **A purity analysis** — arbitrary calls (`now()`, `getConfig()`) are
+  not flagged; only the allowlist above, which is impure by definition.
+  A user-extendable list may come later.
+- **Codecs crossing bindings** —
+  `const c = p.timestamp(); c.default(new Date())` escapes detection, the
+  same purely syntactic boundary as the other rules.
+- **Shared mutable defaults** — `p.json(s).default({})` hands out the
+  same object on every decode; that is a reference-sharing concern, not
+  a frozen-time one, and arrays are already copied per call.
+
+## no-parse-context-in-get-static-props
+
+Reports `route.parseContext(ctx)` and `route.safeParseContext(ctx)`
+inside `getStaticProps`. A `getStaticProps` context carries no query
+string, so the parse always fails there — by design, since typed search
+at build time would be a lie. The static story is decoding just the path
+params:
+
+```ts
+import { safeDecodeParams } from "paramour";
+
+export async function getStaticProps(ctx) {
+  const bad = productRoute.parseContext(ctx); // ✗ always fails
+  const good = safeDecodeParams(productRoute, ctx.params ?? {}); // ✓
+}
+```
+
+The message names the matching replacement: `decodeParams` for
+`parseContext`, `safeDecodeParams` for `safeParseContext`.
+
+TypeScript already rejects this call when `ctx` is typed as
+`GetStaticPropsContext` (`PagesContext` requires `query`); the rule
+covers plain-JS pages and contexts that reach the call as `any`.
+
+`getStaticProps` is recognized as a module-level function declaration or
+a `const` initialized with a function (through `as`, `satisfies`, and
+non-null wrappers), exported or not — `export { getStaticProps }` after
+the declaration counts. Every call lexically inside it is checked,
+including nested helpers.
+
+### What is exempt
+
+`getServerSideProps` and `getInitialProps`, the supported homes for
+`parseContext`; calls elsewhere in the same file; and non-module-level
+functions that happen to be named `getStaticProps`.
+
+### Options
+
+No options in v1.
+
+### Deliberately out of scope (v1)
+
+- **`getStaticPaths`** — `parseContext` is equally wrong there, but the
+  misuse is rare enough that it isn't worth a broader rule name.
+- **Wrapped exports** —
+  `export const getStaticProps = withI18n(async (ctx) => …)` hides the
+  function inside a call and is not recognized.
+- **Computed access** — `route["parseContext"](ctx)` is not matched.

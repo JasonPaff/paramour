@@ -155,7 +155,7 @@ const ECOSYSTEM = [
     slug: ["reference", "nuqs"],
   },
   {
-    blurb: "no-raw-hrefs — every link goes through href().",
+    blurb: "Finds every raw href and param read paramour never sees.",
     name: "@paramour-js/eslint-plugin",
     slug: ["reference", "eslint-plugin"],
   },
@@ -214,7 +214,7 @@ const COMPARISON = [
     typedRoutes: "—",
   },
   {
-    feature: "ESLint rule for raw hrefs",
+    feature: "ESLint rules for raw hrefs and param reads",
     ntu: "—",
     paramour: "✓",
     typedRoutes: "—",
