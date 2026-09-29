@@ -564,6 +564,19 @@ describe("decode-side hygiene", () => {
     );
   });
 
+  it("D2: an optional key may recover a failed parse to absent via .catch(undefined)", () => {
+    const config = { tier: p.enum(["a", "b"]).optional().catch(undefined) };
+    expect(decodeSearch(config, { tier: "nonsense" })).toEqual({
+      tier: undefined,
+    });
+    expect(decodeSearch(config, { tier: "a" })).toEqual({ tier: "a" });
+    expect(decodeSearch(config, {})).toEqual({ tier: undefined });
+    // The recovered key is still an own property (D4).
+    expect(Object.hasOwn(decodeSearch(config, { tier: "x" }), "tier")).toBe(
+      true,
+    );
+  });
+
   it("an explicit undefined under a declared key decodes as absent (Next's real record shape)", () => {
     expect(() => decodeSearch({ q: p.string() }, { q: undefined })).toThrow(
       /required search param is missing/,

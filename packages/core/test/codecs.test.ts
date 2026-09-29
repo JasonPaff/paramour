@@ -769,6 +769,36 @@ describe("modifier runtime guards (JS consumers)", () => {
     expect(codec["~presence"]).toBe("optional");
     expect(codec["~caught"]).toBe(true);
   });
+
+  it(".optional().catch(undefined) recovers to absent, in value and factory form", () => {
+    const value = p.integer().optional().catch(undefined);
+    expect(value["~caught"]).toBe(true);
+    expect(value["~catchValue"]?.()).toBeUndefined();
+    const factory = p
+      .integer()
+      .optional()
+      .catch(() => undefined);
+    expect(factory["~catchValue"]?.()).toBeUndefined();
+  });
+
+  it("rejects an undefined catch fallback on a non-optional codec", () => {
+    const required = p.integer() as unknown as {
+      catch: (v: unknown) => { "~catchValue": () => unknown };
+    };
+    expect(() => required.catch(undefined)).toThrow(ParamourError);
+    expect(() => required.catch(undefined)).toThrow(
+      /requires \.optional\(\) first/,
+    );
+    const defaulted = p.integer().default(1) as unknown as typeof required;
+    expect(() => defaulted.catch(undefined)).toThrow(
+      /requires \.optional\(\) first/,
+    );
+    // A factory's result is only knowable per decode, so it fails there.
+    const factory = required.catch(() => undefined);
+    expect(() => factory["~catchValue"]()).toThrow(ParamourError);
+    expect(() => factory["~catchValue"]()).toThrow(/returned undefined/);
+    expect(required.catch(() => 0)["~catchValue"]()).toBe(0);
+  });
 });
 
 describe("parseValue", () => {

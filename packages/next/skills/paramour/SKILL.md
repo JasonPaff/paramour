@@ -12,7 +12,7 @@ Paramour is a type-safe routing companion for Next.js: each route is defined onc
 1. Import only from package barrels: `paramour`, `@paramour-js/next`, `@paramour-js/next/app`, `@paramour-js/next/pages`, `@paramour-js/next/testing`. Never import `dist/` or deep source paths.
 2. Codec modifier legality is type-state: illegal chains do not compile (the method's type becomes `never`) and throw at runtime for JS callers. The rules:
    - `.optional()` and `.default()` apply only to a bare, unmodified single-value codec — at most ONE of the two, at most once. `.optional().default()`, `.default().optional()`, and any repeat are illegal.
-   - `.catch()` applies at most once and combines with either presence modifier in either order. It recovers parse failures of PRESENT wire values only — never absence.
+   - `.catch()` applies at most once and combines with either presence modifier in either order. It recovers parse failures of PRESENT wire values only — never absence. On an `.optional()` codec the fallback may be `undefined`, so a bad value reads as absent (`.optional().catch(undefined)`).
    - `p.array(...)` codecs take no `.optional()`/`.default()` (an absent key and `[]` are the same wire state). `.catch()` is allowed.
    - Codecs in a `params:` config take no presence modifiers at all (`.optional()`/`.default()` are illegal there); `.catch()` is allowed.
    - `p.csv(element)`/`p.array(element)` elements must be bare unmodified scalars: no modifiers, no csv inside csv, no array-arity element.

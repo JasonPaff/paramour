@@ -47,7 +47,9 @@ export interface Codec<
   E extends boolean = boolean,
 > {
   readonly catch: C extends false
-    ? (fallback: (() => Out) | Out) => Codec<Out, P, true, A, E>
+    ? (
+        fallback: (() => CatchFallback<Out, P>) | CatchFallback<Out, P>,
+      ) => Codec<Out, P, true, A, E>
     : never;
   /**
    * Overloaded so the value/factory split is visible in type-state: the
@@ -76,8 +78,13 @@ export interface Codec<
       : never
     : never;
   readonly "~arity": A;
-  /** Stored as a thunk regardless of the form passed to `.catch()`. */
-  readonly "~catchValue": (() => Out) | undefined;
+  /**
+   * Stored as a thunk regardless of the form passed to `.catch()`. The thunk
+   * may return `undefined` only on an `.optional()` codec (see
+   * {@link CatchFallback}); typed uniformly so every codec stays assignable
+   * to {@link AnyCodec}.
+   */
+  readonly "~catchValue": (() => Out | undefined) | undefined;
   readonly "~caught": C;
   /**
    * True when `.default()` received a value (not a factory). Value defaults
@@ -151,9 +158,23 @@ export type ParamCodec = Codec<any, "required", boolean>;
 export type Presence = "defaulted" | "optional" | "required";
 export type PresenceOf<C extends AnyCodec> = C["~presence"];
 
+/**
+ * What `.catch()` may recover to. An `.optional()` codec already decodes to
+ * `Out | undefined`, so it may also recover a failed parse to *absent* —
+ * `undefined` — which is the honest fallback when no in-domain value means
+ * "nothing selected". This does not blur D2: the INPUT `.catch()` handles is
+ * still a present-but-malformed value, never absence. Every other presence
+ * keeps an `Out`-only fallback: a required or defaulted key must decode to a
+ * value. Non-distributive so the `Presence` union inside {@link AnyCodec}
+ * reads as `Out`, keeping concrete optional codecs assignable to it.
+ */
+type CatchFallback<Out, P extends Presence> = [P] extends ["optional"]
+  ? Out | undefined
+  : Out;
+
 interface CodecState<Out> {
   readonly arity: Arity;
-  readonly catchValue: (() => Out) | undefined;
+  readonly catchValue: (() => Out | undefined) | undefined;
   readonly defaultElides: boolean;
   readonly defaultValue: (() => Out) | undefined;
   readonly element: AnyCodec | undefined;
@@ -206,12 +227,37 @@ export function createCodec<Out, A extends Arity = "single">(impl: {
 
 function build<Out>(state: CodecState<Out>): Codec<Out> {
   const codec = {
-    catch(fallback: (() => Out) | Out) {
+    catch(fallback: (() => Out | undefined) | Out | undefined) {
       // Runtime guards mirror the type-state for JS consumers.
       if (state.catchValue !== undefined) {
         throw new ParamourError(".catch() may only be applied once");
       }
-      return build({ ...state, catchValue: toThunk(fallback, "catch") });
+      if (state.presence === "optional") {
+        return build({ ...state, catchValue: toThunk(fallback, "catch") });
+      }
+      // Only an optional key may recover to absent (CatchFallback). The
+      // value form fails here, at definition time; a factory's result is
+      // only knowable per decode, so it is checked there.
+      if (fallback === undefined) {
+        throw new ParamourError(
+          ".catch(undefined) requires .optional() first: only an optional key can recover to absent",
+        );
+      }
+      const thunk = toThunk(fallback, "catch");
+      return build({
+        ...state,
+        catchValue: isFactory(fallback)
+          ? () => {
+              const value = thunk();
+              if (value === undefined) {
+                throw new ParamourError(
+                  ".catch() factory returned undefined on a non-optional codec: only an optional key can recover to absent",
+                );
+              }
+              return value;
+            }
+          : thunk,
+      });
     },
     default(value: (() => Out) | Out) {
       if (state.arity === "many") {

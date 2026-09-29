@@ -215,6 +215,12 @@ describe(".catch() parity, then null", () => {
     expect(() => parser.parse("junk")).toThrow(/factory threw/);
   });
 
+  it(".optional().catch(undefined) recovers to nuqs's null", () => {
+    const parser = nuqsParser(p.integer().optional().catch(undefined));
+    expect(parser.parse("junk")).toBeNull();
+    expect(parser.parse("7")).toBe(7);
+  });
+
   it("without .catch(), a malformed value reads as nuqs's null", () => {
     expect(nuqsParser(p.integer()).parse("junk")).toBeNull();
   });

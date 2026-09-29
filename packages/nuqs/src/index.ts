@@ -243,7 +243,9 @@ function recoverParse(
   catchValue: (() => unknown) | undefined,
 ): unknown {
   if (error instanceof ParseError) {
-    return catchValue === undefined ? null : catchValue();
+    // An optional codec may recover to absent (`.catch(undefined)`); nuqs
+    // spells absent `null`, so the fallback maps onto it.
+    return catchValue?.() ?? null;
   }
   throw error;
 }
