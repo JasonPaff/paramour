@@ -136,6 +136,22 @@ import { p } from "paramour";
 p.enum(["asc", "desc"]).catch("descending");
 ```
 
+An `.optional()` codec decodes to `Out | undefined`, so it may also recover
+to *absent*. Use this when a malformed value should read as "nothing
+selected" and no in-domain value means that:
+
+```ts twoslash
+import { decodeSearch, p } from "paramour";
+
+const config = { tier: p.enum(["gold", "silver"]).optional().catch(undefined) };
+
+const search = decodeSearch(config, new URLSearchParams("?tier=bronze"));
+// => { tier: undefined }
+```
+
+Apply `.optional()` first. `.catch(undefined)` on a required or defaulted
+codec fails to compile, and throws a `ParamourError` from plain JavaScript.
+
 ## Type-state rules
 
 Contradictory chains fail to compile: applying a modifier removes it (and

@@ -189,6 +189,19 @@ test("catch preserves 'many' arity", () => {
   expect(p.array().catch(["a"])["~arity"]).type.toBe<"many">();
 });
 
+test("only an optional codec's catch may recover to undefined", () => {
+  expect(p.integer().optional().catch).type.toBeCallableWith(undefined);
+  expect(p.integer().optional().catch).type.toBeCallableWith(() => undefined);
+  expect(p.integer().catch).type.not.toBeCallableWith(undefined);
+  expect(p.integer().catch).type.not.toBeCallableWith(() => undefined);
+  expect(p.integer().default(1).catch).type.not.toBeCallableWith(undefined);
+  expect(p.enum(["a", "b"]).optional().catch).type.not.toBeCallableWith("c");
+  expect(p.integer().optional().catch(undefined)).type.toBeAssignableTo<
+    AnyCodec<number>
+  >();
+  expect(p.integer().optional().catch(undefined)["~out"]).type.toBe<number>();
+});
+
 test("default and catch accept a factory form", () => {
   expect(p.integer().default).type.toBeCallableWith(() => 1);
   expect(p.integer().catch).type.toBeCallableWith(() => 0);

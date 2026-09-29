@@ -396,6 +396,16 @@ missing required param is still an error under `.catch()`.
   throws="SearchDecodeError"
 />
 
+The fallback is a value of the codec's output type. An `.optional()` key's
+output already includes `undefined`, so it alone may recover to absent with
+`.catch(undefined)`. This is still recovery from a present, malformed value,
+not a way of treating absence. Required and defaulted keys must recover to a
+value.
+
+<WireExample
+  code={`decodeSearch({ tier: p.enum(["gold", "silver"]).optional().catch(undefined) }, { tier: "bronze" })`}
+/>
+
 </Rule>
 
 <Rule id="D4" title="Presence governs absence — and every declared key appears">
