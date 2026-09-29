@@ -7,9 +7,10 @@ import { z } from "zod";
 
 import { p } from "../src";
 import type {
+  AnyCodec,
   InferSearchInput,
   InferSearchOutput,
-  OutputOf,
+  InferCodecOutput,
   PresenceOf,
 } from "../src";
 
@@ -111,7 +112,7 @@ test("p.custom infers Out from a matched parse/serialize pair", () => {
 
 test("exported utility types resolve against built codecs", () => {
   const codec = p.integer().default(1);
-  expect<OutputOf<typeof codec>>().type.toBe<number>();
+  expect<InferCodecOutput<typeof codec>>().type.toBe<number>();
   expect<PresenceOf<typeof codec>>().type.toBe<"defaulted">();
 });
 
@@ -292,4 +293,13 @@ test("array codecs: input key may be omitted (absent ≡ [])", () => {
   expect<{ tags: string[] }>().type.not.toBeAssignableTo<
     InferSearchInput<typeof config>
   >();
+});
+
+test("AnyCodec<Out>: any codec state producing Out", () => {
+  expect(p.integer()).type.toBeAssignableTo<AnyCodec<number>>();
+  expect(p.integer().optional()).type.toBeAssignableTo<AnyCodec<number>>();
+  expect(p.integer().default(1)).type.toBeAssignableTo<AnyCodec<number>>();
+  expect(p.integer().catch(0)).type.toBeAssignableTo<AnyCodec<number>>();
+  expect(p.array(p.integer())).type.toBeAssignableTo<AnyCodec<number[]>>();
+  expect(p.string()).type.not.toBeAssignableTo<AnyCodec<number>>();
 });

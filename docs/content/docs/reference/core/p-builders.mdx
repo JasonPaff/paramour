@@ -389,9 +389,10 @@ bigintCodec;
   other parse failure.
 - **`serialize: (value: Out) => string`** — foreign throws are rebranded to
   `SerializeError`.
-- **`label`** (optional) — the reflection name shown by
-  [`describeCodec`](./describe#describecodec) and `paramour list`; defaults
-  to `"custom"`.
+- **`label`** (optional) — a display name, reported as `label` by
+  [`describeCodec`](./describe#describecodec) and rendered by
+  `paramour list`, the devtools panel, and decode issues' `expected`. The
+  codec's `kind` stays `"custom"` either way.
 
 <Callout title="Paramour errors pass through loud">
   Any `ParamourError` thrown inside your `parse`/`serialize` — including

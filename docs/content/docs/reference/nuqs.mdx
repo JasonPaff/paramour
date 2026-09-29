@@ -20,9 +20,7 @@ page is the API reference.
 Derives one nuqs parser from one codec.
 
 ```ts
-function nuqsParser<C extends AnyCodec>(
-  codec: C & CompatibleCodec<C>,
-): NuqsParserOf<C>;
+function nuqsParser<C extends AnyCodec>(codec: C): NuqsParserOf<C>;
 ```
 
 Pass the codec exactly as it sits in a route's search config —
@@ -82,12 +80,10 @@ Derives a whole nuqs parser map from a route object (the common case) or a
 bare `SearchConfig`.
 
 ```ts
-function nuqsParsers<R extends AnyRoute>(
-  route: CompatibleRoute<R> & R,
-): NuqsParserMap<R["~search"]>;
-function nuqsParsers<S extends SearchConfig>(
-  config: CompatibleConfig<S> & S,
-): NuqsParserMap<S>;
+// Route form: a parser map for the route's search config.
+function nuqsParsers<R extends AnyRoute>(route: R): NuqsParserMap</* R's search config */>;
+// Config form.
+function nuqsParsers<S extends SearchConfig>(config: S): NuqsParserMap<S>;
 ```
 
 Each key gets the same per-codec derivation as [`nuqsParser`](#nuqsparser);
@@ -212,6 +208,6 @@ backstops — plain-JavaScript callers get the same judgments as
   [`nuqsParser`](#nuqsparser) derives from one codec: a multi
   (repeated-key) parser with `defaultValue: []` for arity-many codecs, a
   `withDefault` (non-nullable) single parser for value-form defaults, and a
-  nullable single parser otherwise. A hand-typed `Codec<…, "defaulted">`
-  whose default-elides flag was left at its `boolean` default falls to the
-  nullable branch — the safe reading.
+  nullable single parser otherwise. Codecs built with `p.*` always carry
+  the precise state; a codec whose default form the types can't see falls
+  to the nullable branch — the safe reading.

@@ -14,7 +14,12 @@
  */
 import { expect, test } from "tstyche";
 import { defineAppRoute, definePagesRoute, p } from "paramour";
-import type { InferRouteParams, SafeResult } from "paramour";
+import type {
+  InferRouteParams,
+  ParamsDecodeError,
+  SafeResult,
+  SearchDecodeError,
+} from "paramour";
 
 import { useRouteParams, useSearch } from "../src/pages.js";
 import type { RouterResult } from "../src/pages.js";
@@ -41,9 +46,11 @@ test("pages route is accepted and each hook returns its RouterResult", () => {
   expect(useRouteParams).type.toBeCallableWith(pagesRoute);
   expect(useSearch).type.toBeCallableWith(pagesRoute);
 
-  expect(useRouteParams(pagesRoute)).type.toBe<RouterResult<{ id: number }>>();
   expect(useRouteParams(pagesRoute)).type.toBe<
-    RouterResult<InferRouteParams<typeof pagesRoute>>
+    RouterResult<{ id: number }, ParamsDecodeError>
+  >();
+  expect(useRouteParams(pagesRoute)).type.toBe<
+    RouterResult<InferRouteParams<typeof pagesRoute>, ParamsDecodeError>
   >();
 
   // Optional codecs keep the key PRESENT and add `| undefined` (D4).
@@ -52,21 +59,21 @@ test("pages route is accepted and each hook returns its RouterResult", () => {
   // as non-identical to the literal.
   const search = useSearch(pagesRoute);
   expect(search).type.toBeAssignableTo<
-    RouterResult<{ page: number; q: string | undefined }>
+    RouterResult<{ page: number; q: string | undefined }, SearchDecodeError>
   >();
   expect<
-    RouterResult<{ page: number; q: string | undefined }>
+    RouterResult<{ page: number; q: string | undefined }, SearchDecodeError>
   >().type.toBeAssignableTo<typeof search>();
 });
 
 test("select overloads project the RouterResult", () => {
   // U is inferred from the selector; the pending arm stays in the union.
   expect(useSearch(pagesRoute, { select: (search) => search.page })).type.toBe<
-    RouterResult<number>
+    RouterResult<number, SearchDecodeError>
   >();
   expect(
     useRouteParams(pagesRoute, { select: (params) => params.id }),
-  ).type.toBe<RouterResult<number>>();
+  ).type.toBe<RouterResult<number, ParamsDecodeError>>();
 
   // The selector's input is the decoded output type — no annotation needed.
   useSearch(pagesRoute, {

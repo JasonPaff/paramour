@@ -1,13 +1,12 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import type { AnyRoute } from "./route.js";
+import type { AnyRoute, InferRouteSearch } from "./route.js";
 
 import { type Issue, SearchSourceError } from "./errors.js";
 import { safeDecodeSearch } from "./safe-decode.js";
 import {
   isRawSearch,
   requireSearchConfig,
-  type SearchOutputOf,
   type SearchSlot,
   type SearchSource,
 } from "./search.js";
@@ -26,9 +25,9 @@ import {
  * shape. `types` is carried by this annotation alone; the spec reads it at
  * the type level only, so no runtime key exists.
  */
-export type StandardSearchSchema<SC> = StandardSchemaV1<
+export type StandardSearchSchema<R extends AnyRoute> = StandardSchemaV1<
   Record<string, string | string[] | undefined>,
-  SearchOutputOf<SC>
+  InferRouteSearch<R>
 >;
 
 /**
@@ -42,7 +41,7 @@ export type StandardSearchSchema<SC> = StandardSchemaV1<
  */
 export function standardSearchSchema<R extends AnyRoute>(
   route: R,
-): StandardSearchSchema<R["~search"]> {
+): StandardSearchSchema<R> {
   const config = route["~search"] as SearchSlot;
   // A missing/malformed config is a programming error and stays loud;
   // checking eagerly fails at construction, not at first validate().

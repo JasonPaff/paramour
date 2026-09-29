@@ -79,10 +79,9 @@ param, validated by the schema you pass (required here — unvalidated
 pagination-friendly integer that is 1-based on the wire and 0-based in
 memory: `?page=1` decodes to index `0`.
 
-**Escape hatches.** `p.custom({ parse, serialize })` wraps any bidirectional
-pair of functions; `createCodec` is the lower-level factory the `p.*`
-builders themselves use. Reach for these when your wire shape isn't covered —
-not to skip validation.
+**Escape hatch.** `p.custom({ parse, serialize })` wraps any bidirectional
+pair of functions. Reach for it when your wire shape isn't covered — not to
+skip validation.
 
 ## Modifiers
 

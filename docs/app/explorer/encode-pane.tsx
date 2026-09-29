@@ -2,8 +2,12 @@
 
 import type { ReactNode } from "react";
 
-import { buildSearchString, encodeSearch, type SearchConfig } from "paramour";
-import { parseValue } from "paramour/internal";
+import {
+  buildSearchString,
+  encodeSearch,
+  parseValue,
+  type SearchConfig,
+} from "paramour";
 
 import { messageOf, show } from "@/lib/show-value";
 

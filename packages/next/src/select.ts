@@ -1,4 +1,9 @@
-import type { AnyRoute, ParamsSource, SafeResult } from "paramour";
+import type {
+  AnyRoute,
+  ParamsSource,
+  RouteDecodeError,
+  SafeResult,
+} from "paramour";
 
 import { useRef } from "react";
 
@@ -125,23 +130,23 @@ export function searchParamsFingerprint(
  * Error and pending arms pass through untouched; they are already
  * reference-stabilized by {@link useStableResult}'s raw-slice layer.
  */
-export function useSelectedResult<T, U>(
-  result: SafeResult<T>,
+export function useSelectedResult<T, U, E extends RouteDecodeError>(
+  result: SafeResult<T, E>,
   options: SelectOptions<T, U> | undefined,
-): SafeResult<U>;
-export function useSelectedResult<T, U>(
-  result: SafeResult<T> | { status: "pending" },
+): SafeResult<U, E>;
+export function useSelectedResult<T, U, E extends RouteDecodeError>(
+  result: SafeResult<T, E> | { status: "pending" },
   options: SelectOptions<T, U> | undefined,
-): SafeResult<U> | { status: "pending" };
-export function useSelectedResult<T, U>(
-  result: SafeResult<T> | { status: "pending" },
+): SafeResult<U, E> | { status: "pending" };
+export function useSelectedResult<T, U, E extends RouteDecodeError>(
+  result: SafeResult<T, E> | { status: "pending" },
   options: SelectOptions<T, U> | undefined,
-): SafeResult<U> | { status: "pending" } {
+): SafeResult<U, E> | { status: "pending" } {
   const cache = useRef<null | SelectedResultCache<T, U>>(null);
   if (options === undefined) {
     // No selector: the raw-slice layer already stabilized `result`, and the
     // public overloads pin U = T for this arity.
-    return result as SafeResult<U>;
+    return result as SafeResult<U, E>;
   }
   if (result.status !== "success") return result;
   const previous = cache.current;

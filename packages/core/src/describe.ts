@@ -1,4 +1,4 @@
-import type { AnyCodec, Arity, Presence } from "./codec.js";
+import type { AnyCodec, Arity, CodecKind, Presence } from "./codec.js";
 import type { AnyRoute, RouterKind } from "./route.js";
 import type { SearchConfig, SearchSlot } from "./search.js";
 
@@ -28,7 +28,9 @@ export interface CodecDescription {
    */
   readonly element?: CodecDescription;
   readonly enumMembers?: readonly string[];
-  readonly kind: string;
+  readonly kind: CodecKind;
+  /** A `p.custom` codec's display label, when it was given one. */
+  readonly label?: string;
   readonly presence: Presence;
 }
 
@@ -95,6 +97,7 @@ export function describeCodec(codec: AnyCodec): CodecDescription {
     ...(element === undefined ? {} : { element: describeCodec(element) }),
     ...(enumMembers === undefined ? {} : { enumMembers }),
     kind: codec["~kind"],
+    ...(codec["~label"] === undefined ? {} : { label: codec["~label"] }),
     presence: codec["~presence"],
   };
 }
@@ -146,11 +149,12 @@ export function formatCodecDescription(
   style: CodecFormatStyle,
 ): string {
   const memberSeparator = style === "verbose" ? ", " : "|";
+  // A custom codec renders its label when it has one; otherwise its kind.
   const kindLabel = (
-    part: Pick<CodecDescription, "enumMembers" | "kind">,
+    part: Pick<CodecDescription, "enumMembers" | "kind" | "label">,
   ): string =>
     part.enumMembers === undefined
-      ? part.kind
+      ? (part.label ?? part.kind)
       : `enum(${part.enumMembers.join(memberSeparator)})`;
   // Composite labels: a one-key list wraps its element (`csv<integer>`); a
   // repeated-key list IS its element, pluralized (`integer[]`) — the

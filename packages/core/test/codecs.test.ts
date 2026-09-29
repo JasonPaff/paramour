@@ -10,7 +10,8 @@ import {
   ParseError,
   SerializeError,
 } from "../src";
-import { foreignMessage, parseValue } from "../src/internal.js";
+import { parseValue } from "../src";
+import { foreignMessage } from "../src/internal.js";
 
 const parse = (
   codec: { "~parseElement": (raw: string) => unknown },
@@ -492,8 +493,8 @@ describe("p.csv", () => {
   });
 
   it("CV2: nesting is detected structurally, not via the reflection label", () => {
-    // ~kind is reflection metadata a p.custom label can set to anything —
-    // a scalar labeled "csv" is a legal comma-free element, not a nested list.
+    // A p.custom label is free-form reflection text — a scalar labeled "csv"
+    // is a legal comma-free element, not a nested list.
     const labeled = p.custom<string>({
       label: "csv",
       parse: (raw) => raw,

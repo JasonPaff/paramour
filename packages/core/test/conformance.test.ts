@@ -621,7 +621,7 @@ describe("error contract — every throw is a ParamourError", () => {
 
   it("a missing config (hand-built route lacking ~search) is a ParamourError at both codecs", () => {
     // Cast to Record<never, never> rather than `never` itself: `never` would
-    // make encodeSearch's second parameter type (SearchInputOf<S>, a
+    // make encodeSearch's second parameter type (InferSearchInput<S>, a
     // distributive conditional) collapse to `never` too, since distributing
     // a conditional type over `never` yields `never` — an unrelated type-level
     // gotcha, not something this runtime-guard test means to exercise.

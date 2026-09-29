@@ -570,14 +570,12 @@ describe("decode-issue enrichment", () => {
     expect(error.message).not.toContain("(expected");
   });
 
-  it("decodeSearch threads the route path and enriches issues", () => {
-    const error = capture(() =>
-      decodeSearch(
-        { page: p.integer(), sort: p.enum(["asc", "desc"]) },
-        { sort: "up" },
-        "/users/[id]",
-      ),
-    );
+  it("decodeSearch threads a route's path and enriches issues", () => {
+    const route = defineAppRoute("/users/[id]", {
+      params: { id: p.string() },
+      search: { page: p.integer(), sort: p.enum(["asc", "desc"]) },
+    });
+    const error = capture(() => decodeSearch(route, { sort: "up" }));
     if (!(error instanceof SearchDecodeError)) throw new Error("wrong class");
     expect(error.route).toBe("/users/[id]");
     expect(error.issues).toStrictEqual([

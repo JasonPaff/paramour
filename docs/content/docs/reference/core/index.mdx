@@ -15,7 +15,7 @@ anything to see what the compiler sees.
 
 - [`p.*` builders](./p-builders) — every built-in codec: wire grammars,
   accept/reject tables, schema slots, and list arities.
-- [Codec & modifiers](./codecs) — the `Codec` interface, `createCodec`,
+- [Codec & modifiers](./codecs) — the `Codec` interface,
   `.optional()`/`.default()`/`.catch()`, and the type-state rules that make
   illegal chains fail to compile.
 - [Routes](./routes) — `defineAppRoute`, `definePagesRoute`, the parse
@@ -33,9 +33,9 @@ anything to see what the compiler sees.
 
 ## The paramour/internal entry
 
-The package also ships a `paramour/internal` subpath exposing `parseValue`,
-`foreignMessage`, and `codecShapeLabel`. It exists for derived tooling — the devtools panel,
-adapters — so reflection-driven consumers can share core's implementation
-instead of re-deriving it. It is not for app authors, it is deliberately
-undocumented beyond this paragraph, and it carries no stability guarantees:
-its exports may change or disappear in any release.
+The package also ships a `paramour/internal` subpath exposing
+`foreignMessage` and `codecShapeLabel`. It exists for derived tooling — the
+devtools panel, adapters — so reflection-driven consumers can share core's
+implementation instead of re-deriving it. It is not for app authors and is
+deliberately undocumented beyond this paragraph, but it is covered by semver
+like the main entry: within a major version its exports only ever grow.

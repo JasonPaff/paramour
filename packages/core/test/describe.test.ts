@@ -136,15 +136,26 @@ describe("describeCodec", () => {
     expect(describeCodec(codec).defaultValue).toEqual({ kind: "factory" });
   });
 
-  it('labels custom codecs, defaulting to "custom"', () => {
+  it('custom codecs are always kind "custom"; a label is reported apart', () => {
     const impl = {
       parse: (raw: string) => raw,
       serialize: (value: string) => value,
     };
+    expect(describeCodec(p.custom(impl))).not.toHaveProperty("label");
     expect(describeCodec(p.custom(impl)).kind).toBe("custom");
-    expect(describeCodec(p.custom({ ...impl, label: "slug" })).kind).toBe(
-      "slug",
-    );
+    const labeled = describeCodec(p.custom({ ...impl, label: "slug" }));
+    expect(labeled.kind).toBe("custom");
+    expect(labeled.label).toBe("slug");
+    expect(formatCodecDescription(labeled, "shape")).toBe("slug");
+  });
+
+  it("a custom label cannot impersonate a built-in kind", () => {
+    const impersonator = p.custom({
+      label: "integer",
+      parse: (raw: string) => raw,
+      serialize: (value: string) => value,
+    });
+    expect(describeCodec(impersonator).kind).toBe("custom");
   });
 });
 

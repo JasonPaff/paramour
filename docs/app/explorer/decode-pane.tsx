@@ -6,10 +6,10 @@ import {
   type AnyCodec,
   decodeSearch,
   type Issue,
+  parseValue,
   type SearchConfig,
   SearchDecodeError,
 } from "paramour";
-import { parseValue } from "paramour/internal";
 
 import { messageOf, show } from "@/lib/show-value";
 

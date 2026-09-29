@@ -73,6 +73,26 @@ do — see [modifiers](/docs/concepts/codecs#modifiers).)
 Absent optionals are omitted entirely, and on decode, keys paramour doesn't
 own are ignored: `?utm_source=…` can never fail your parse.
 
+## Parse, decode, serialize: the vocabulary
+
+Three verbs, one per layer, used consistently across the API:
+
+- **Codecs parse and serialize single values.** `"42"` ⇄ `42`, one wire
+  string at a time. A codec's grammar rejecting a value is a `ParseError`
+  (`parseValue` / `serializeValue` expose this layer directly).
+- **Standalone functions decode and encode whole records.** `decodeParams`,
+  `decodeSearch`, `encodeSearch` run every key's codec over a params or
+  search record and aggregate failures into a `ParamsDecodeError` or
+  `SearchDecodeError`.
+- **Route methods parse Next's inputs.** `route.parse(props)`,
+  `parseSearch`, `parseContext(ctx)` take page props or a Pages context —
+  awaiting and unpacking them — then decode. Their failures are the same
+  `*DecodeError`s, because decoding is what failed.
+
+So `route.parse` throwing `SearchDecodeError` isn't a naming slip: parsing
+props *is* decoding records, which *is* parsing values, one layer down each
+time.
+
 ## When decoding fails
 
 Strictness needs good failure ergonomics. A failed decode aggregates *every*

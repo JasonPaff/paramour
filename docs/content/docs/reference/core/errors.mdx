@@ -28,6 +28,13 @@ foreign class lacks the brands entirely and never passes. Each class checks
 its own brand (a `ParseError` check never matches a plain `ParamourError`),
 and the checks are typed as predicates, so TypeScript narrows through them.
 
+Each class also carries a literal `name` (`"ParamsDecodeError"`,
+`"SearchDecodeError"`, …) that survives minification, so
+`error.name === "SearchDecodeError"` works as a discriminant too — and it's
+what keeps the two decode errors distinct at the type level, which
+[`SafeResult`](/docs/reference/core/routes#saferesult)'s error parameter
+relies on.
+
 ## ParamourError
 
 The base class — and the type thrown directly for *contract violations*:

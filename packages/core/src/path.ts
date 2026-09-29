@@ -199,7 +199,7 @@ export function decodeParams<R extends AnyRoute>(
               key: segment.name,
               message: error.message,
               // "parse" vs "validate" comes from the ParseError's own
-              // selfDescribing flag — structural, never message sniffing.
+              // ~selfDescribing flag — structural, never message sniffing.
               reason: parseIssueReason(error),
               // Issue.wire is the codec-grammar-layer value — the DECODED
               // segment, not the raw URL text — matching decodeSearch,

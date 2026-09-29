@@ -3,7 +3,7 @@
 import { useSearch } from "@paramour-js/next/app";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { href, type InferSearchInput, type SearchOutputOf } from "paramour";
+import { href, type InferSearchInput, type InferSearchOutput } from "paramour";
 import { useEffect, useRef, useState } from "react";
 
 import { allTags, filterProducts, products } from "../../lib/products";
@@ -11,7 +11,7 @@ import { productsRoute } from "./[id]/route.def";
 import { productsListRoute, productsListSearch } from "./route.def";
 
 type FilterInput = InferSearchInput<typeof productsListSearch>;
-type FilterOutput = SearchOutputOf<typeof productsListSearch>;
+type FilterOutput = InferSearchOutput<typeof productsListSearch>;
 
 const PAGE_SIZE = 3;
 const sortOptions: readonly FilterOutput["sort"][] = [

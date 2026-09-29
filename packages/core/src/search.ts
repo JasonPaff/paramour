@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import type { AnyCodec, OutputOf, PresenceOf } from "./codec.js";
+import type { AnyCodec, InferCodecOutput, PresenceOf } from "./codec.js";
+import type { AnyRoute } from "./route.js";
 
 import { codecShapeLabel } from "./describe.js";
 import {
@@ -19,31 +20,37 @@ import {
 import { runStandardSchemaSync } from "./schema.js";
 
 /**
- * href-input side (D4): required presence stays required;
- * optional and defaulted keys may be omitted. Array (arity-"many") keys may
- * also be omitted: absent and [] are the same wire state (S6/P6), so
- * requiring `tags: []` ceremony would be pure noise. Omittable keys also
- * admit an EXPLICIT `undefined` — encodeSearch already treats that value as
- * absent (S3), and without the `| undefined` widening a decoded
- * {@link InferSearchOutput} (every key present, optional presence as
- * `| undefined`) could not flow back into href under
- * `exactOptionalPropertyTypes` without key-by-key reassembly.
+ * href / encode input of a `search:` slot (SS6). A codec map: required
+ * presence stays required; optional and defaulted keys may be omitted
+ * (D4). Array (arity-"many") keys may also be omitted: absent and [] are
+ * the same wire state (S6/P6), so requiring `tags: []` ceremony would be
+ * pure noise. Omittable keys also admit an EXPLICIT `undefined` —
+ * encodeSearch already treats that value as absent (S3), and without the
+ * `| undefined` widening a decoded {@link InferSearchOutput} could not flow
+ * back into href under `exactOptionalPropertyTypes` without key-by-key
+ * reassembly. A `RawSearch` slot accepts the raw wire record instead (SS5 —
+ * the schema never runs on encode, so there's no encode-side type to infer
+ * from it).
  */
-export type InferSearchInput<S extends SearchConfig> = {
-  [K in Exclude<keyof S, OptionalInputKeys<S>>]: OutputOf<S[K]>;
-} & {
-  [K in OptionalInputKeys<S>]?: OutputOf<S[K]> | undefined;
-};
+export type InferSearchInput<SC extends SearchSlot> =
+  SC extends RawSearch<StandardSchemaV1>
+    ? Record<string, string | string[]>
+    : SC extends SearchConfig
+      ? CodecMapInput<SC>
+      : never;
 
 /**
- * Parse-output side (D4): every declared key is PRESENT on the
- * object; optional presence contributes `| undefined` to the value type.
+ * Decoded output of a `search:` slot (SS6). A codec map: every declared key
+ * is PRESENT on the object; optional presence contributes `| undefined` to
+ * the value type (D4). A `RawSearch` slot's output is the schema's own
+ * inferred output.
  */
-export type InferSearchOutput<S extends SearchConfig> = {
-  [K in keyof S]: PresenceOf<S[K]> extends "optional"
-    ? OutputOf<S[K]> | undefined
-    : OutputOf<S[K]>;
-};
+export type InferSearchOutput<SC extends SearchSlot> =
+  SC extends RawSearch<infer S>
+    ? StandardSchemaV1.InferOutput<S>
+    : SC extends SearchConfig
+      ? CodecMapOutput<SC>
+      : never;
 
 /**
  * The whole-object search escape hatch (SS1/SS2): wraps a bare
@@ -61,37 +68,9 @@ export interface RawSearch<S extends StandardSchemaV1> {
 export type SearchConfig = Record<string, AnyCodec>;
 
 /**
- * href / encode side of a `search:` config (SS6): a `RawSearch`
- * route accepts the raw wire record (SS5 — the schema never runs on encode,
- * so there's no encode-side type to infer from it); a codec map keeps its
- * existing `InferSearchInput` behavior. Module-exported for route.ts/href.ts,
- * not barrel-exported — same precedent as `encodeComponent`/`readInputValue`.
- */
-export type SearchInputOf<SC> =
-  SC extends RawSearch<StandardSchemaV1>
-    ? Record<string, string | string[]>
-    : SC extends SearchConfig
-      ? InferSearchInput<SC>
-      : never;
-
-/**
- * Parse-output side of a `search:` config (SS6): a `RawSearch`
- * route's output is the schema's own inferred output; a codec map keeps its
- * existing `InferSearchOutput` behavior. Module-exported for
- * route.ts/href.ts, not barrel-exported.
- */
-export type SearchOutputOf<SC> =
-  SC extends RawSearch<infer S>
-    ? StandardSchemaV1.InferOutput<S>
-    : SC extends SearchConfig
-      ? InferSearchOutput<SC>
-      : never;
-
-/**
- * The `search:` config slot's full type (SS2): a codec map (the
- * main road) or a `RawSearch` marker (the escape hatch). Internal — not
- * barrel-exported; `Route`/`RouteConfig`/`HrefArgs` consume it as their `SC`
- * bound.
+ * The `search:` config slot's full type (SS2): a codec map (the main road)
+ * or a `RawSearch` marker (the escape hatch). Public so route wrappers can
+ * bound their own `SC` parameter the way `define*Route` does.
  */
 export type SearchSlot = RawSearch<StandardSchemaV1> | SearchConfig;
 
@@ -102,6 +81,28 @@ export type SearchSlot = RawSearch<StandardSchemaV1> | SearchConfig;
  */
 export type SearchSource =
   Record<string, string | string[] | undefined> | URLSearchParams;
+
+/**
+ * The `search:` slot a search-function target resolves to: a route's own
+ * slot, or the slot itself. Every standalone search function accepts either
+ * form (the `nuqsParsers` precedent), so route users never reach for
+ * `~search`. Module-exported for safe-decode.ts, not barrel-exported.
+ */
+export type SlotOf<T extends AnyRoute | SearchSlot> = T extends AnyRoute
+  ? T["~search"]
+  : T;
+
+type CodecMapInput<S extends SearchConfig> = {
+  [K in Exclude<keyof S, OptionalInputKeys<S>>]: InferCodecOutput<S[K]>;
+} & {
+  [K in OptionalInputKeys<S>]?: InferCodecOutput<S[K]> | undefined;
+};
+
+type CodecMapOutput<S extends SearchConfig> = {
+  [K in keyof S]: PresenceOf<S[K]> extends "optional"
+    ? InferCodecOutput<S[K]> | undefined
+    : InferCodecOutput<S[K]>;
+};
 
 type OptionalInputKeys<S extends SearchConfig> = {
   [K in keyof S]: S[K]["~arity"] extends "many"
@@ -136,22 +137,34 @@ export function buildSearchString(
  * path instead: every source key reaches the schema (P8 does not apply
  * there — the schema owns stripping or passing through extras).
  *
- * `routePath` anchors a thrown {@link SearchDecodeError} to the owning
- * route's path pattern — route-level surfaces pass `route.path`; standalone
- * callers (nuqs, devtools) omit it and the error stays route-less.
+ * `target` is a route or a bare `search:` slot. A route anchors a thrown
+ * {@link SearchDecodeError} to its path pattern; a bare slot (nuqs,
+ * devtools, middleware snippets) leaves the error route-less.
  */
-export function decodeSearch<S extends SearchSlot>(
+export function decodeSearch<T extends AnyRoute | SearchSlot>(
+  target: T,
+  source: SearchSource,
+): InferSearchOutput<SlotOf<T>> {
+  const [config, routePath] = resolveSearchTarget(target);
+  return decodeSearchSlot(config, source, routePath) as InferSearchOutput<
+    SlotOf<T>
+  >;
+}
+
+/**
+ * {@link decodeSearch} on an already-resolved slot. Module-exported for the
+ * route methods, whose generic `SC` is the slot itself — going through the
+ * route-or-slot entry would re-derive it as `SlotOf<AppRoute<…>>`, which
+ * doesn't reduce back to `SC` inside a generic body.
+ */
+export function decodeSearchSlot<S extends SearchSlot>(
   config: S,
   source: SearchSource,
-  routePath?: string,
-): SearchOutputOf<S> {
+  routePath: null | string,
+): InferSearchOutput<S> {
   requireSearchConfig(config);
   if (isRawSearch(config)) {
-    return decodeRawSearch(
-      config,
-      source,
-      routePath ?? null,
-    ) as SearchOutputOf<S>;
+    return decodeRawSearch(config, source, routePath) as InferSearchOutput<S>;
   }
   // The conditional SearchSlot doesn't narrow inside the generic body once
   // the RawSearch branch returns (S stays a generic type parameter); this
@@ -268,9 +281,9 @@ export function decodeSearch<S extends SearchSlot>(
   }
 
   if (issues.length > 0) {
-    throw new SearchDecodeError(issues, routePath ?? null);
+    throw new SearchDecodeError(issues, routePath);
   }
-  return Object.fromEntries(entries) as SearchOutputOf<S>;
+  return Object.fromEntries(entries) as InferSearchOutput<S>;
 }
 
 /**
@@ -308,10 +321,11 @@ export function encodeComponent(text: string): string {
  * serializer exists for a whole-object schema, so the caller's record goes
  * straight to the byte layer and the schema never runs on encode.
  */
-export function encodeSearch<S extends SearchSlot>(
-  config: S,
-  input: SearchInputOf<S>,
+export function encodeSearch<T extends AnyRoute | SearchSlot>(
+  target: T,
+  input: InferSearchInput<SlotOf<T>>,
 ): [string, string][] {
+  const [config] = resolveSearchTarget(target);
   requireSearchConfig(config);
   if (isRawSearch(config)) {
     return encodeRawSearch(input);
@@ -475,11 +489,11 @@ export function requireSearchConfig(config: SearchSlot): void {
 }
 
 /** Convenience: encode + build in one step. */
-export function searchToString<S extends SearchSlot>(
-  config: S,
-  input: SearchInputOf<S>,
+export function searchToString<T extends AnyRoute | SearchSlot>(
+  target: T,
+  input: InferSearchInput<SlotOf<T>>,
 ): string {
-  return buildSearchString(encodeSearch(config, input));
+  return buildSearchString(encodeSearch(target, input));
 }
 
 /**
@@ -764,4 +778,27 @@ function requireRawSearchString(key: string, value: unknown): string {
     );
   }
   return value;
+}
+
+/**
+ * Splits a search-function target into its slot and the path that anchors
+ * errors. Routes are recognized by their `~search`/`~segments` members —
+ * `~`-prefixed keys are reserved, so no codec map or `RawSearch` marker can
+ * carry both. Anything else passes through for `requireSearchConfig` to
+ * validate.
+ */
+function resolveSearchTarget(
+  target: AnyRoute | SearchSlot,
+): [SearchSlot, null | string] {
+  const untrusted: unknown = target;
+  if (
+    typeof untrusted === "object" &&
+    untrusted !== null &&
+    "~search" in untrusted &&
+    "~segments" in untrusted
+  ) {
+    const route = target as AnyRoute;
+    return [route["~search"] as SearchSlot, route.path];
+  }
+  return [target as SearchSlot, null];
 }

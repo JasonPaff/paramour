@@ -8,12 +8,15 @@ import { useRouter } from "next/router.js";
 import {
   type AnyPagesRoute,
   type InferRouteParams,
+  type InferRouteSearch,
   ParamourError,
+  type ParamsDecodeError,
   type ParamsSource,
+  type RouteDecodeError,
   safeDecodeParams,
   safeDecodeSearch,
   type SafeResult,
-  type SearchOutputOf,
+  type SearchDecodeError,
 } from "paramour";
 import { useContext } from "react";
 
@@ -78,7 +81,8 @@ export type { SelectOptions } from "./select.js";
  * page. Literally `SafeResult<T> | { status: "pending" }`, so both routers'
  * results destructure identically.
  */
-export type RouterResult<T> = SafeResult<T> | { status: "pending" };
+export type RouterResult<T, E extends RouteDecodeError = RouteDecodeError> =
+  SafeResult<T, E> | { status: "pending" };
 
 /** Referentially stable across every pending render. */
 const PENDING: { readonly status: "pending" } = { status: "pending" };
@@ -89,15 +93,17 @@ const PENDING: { readonly status: "pending" } = { status: "pending" };
  */
 export function useRouteParams<R extends AnyPagesRoute>(
   route: R,
-): RouterResult<InferRouteParams<R>>;
+): RouterResult<InferRouteParams<R>, ParamsDecodeError>;
 export function useRouteParams<R extends AnyPagesRoute, U>(
   route: R,
   options: SelectOptions<InferRouteParams<R>, U>,
-): RouterResult<U>;
+): RouterResult<U, ParamsDecodeError>;
 export function useRouteParams<R extends AnyPagesRoute, U>(
   route: R,
   options?: SelectOptions<InferRouteParams<R>, U>,
-): RouterResult<InferRouteParams<R>> | RouterResult<U> {
+):
+  | RouterResult<InferRouteParams<R>, ParamsDecodeError>
+  | RouterResult<U, ParamsDecodeError> {
   const router = usePagesRouter();
   const { isReady, query } = router;
   const pathname = asPathPathname(router.asPath);
@@ -117,7 +123,7 @@ export function useRouteParams<R extends AnyPagesRoute, U>(
   const result = useStableResult(
     route,
     isReady ? paramsFingerprint(route, query) : PENDING_FINGERPRINT,
-    (): RouterResult<InferRouteParams<R>> => {
+    (): RouterResult<InferRouteParams<R>, ParamsDecodeError> => {
       // The merged query is a legal params source as-is: decodeParams reads
       // only the route's own segment names, never unknown keys. R5: next/router
       // has already percent-decoded `query`, so skip core's decode to avoid a
@@ -143,15 +149,17 @@ export function useRouteParams<R extends AnyPagesRoute, U>(
  */
 export function useSearch<R extends AnyPagesRoute>(
   route: R,
-): RouterResult<SearchOutputOf<R["~search"]>>;
+): RouterResult<InferRouteSearch<R>, SearchDecodeError>;
 export function useSearch<R extends AnyPagesRoute, U>(
   route: R,
-  options: SelectOptions<SearchOutputOf<R["~search"]>, U>,
-): RouterResult<U>;
+  options: SelectOptions<InferRouteSearch<R>, U>,
+): RouterResult<U, SearchDecodeError>;
 export function useSearch<R extends AnyPagesRoute, U>(
   route: R,
-  options?: SelectOptions<SearchOutputOf<R["~search"]>, U>,
-): RouterResult<SearchOutputOf<R["~search"]>> | RouterResult<U> {
+  options?: SelectOptions<InferRouteSearch<R>, U>,
+):
+  | RouterResult<InferRouteSearch<R>, SearchDecodeError>
+  | RouterResult<U, SearchDecodeError> {
   const router = usePagesRouter();
   const { isReady, query } = router;
   const pathname = asPathPathname(router.asPath);
@@ -173,7 +181,7 @@ export function useSearch<R extends AnyPagesRoute, U>(
   const result = useStableResult(
     route,
     isReady ? queryFingerprint(route, query) : PENDING_FINGERPRINT,
-    (): RouterResult<SearchOutputOf<R["~search"]>> => {
+    (): RouterResult<InferRouteSearch<R>, SearchDecodeError> => {
       const source = omitPathParams(query, route);
       const decoded = isReady ? safeDecodeSearch(route, source) : PENDING;
       if (process.env.NODE_ENV !== "production" && spec !== undefined) {
