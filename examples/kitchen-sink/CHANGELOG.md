@@ -1,5 +1,15 @@
 # example-kitchen-sink
 
+## 0.0.14
+
+### Patch Changes
+
+- Updated dependencies [[`436306e`](https://github.com/JasonPaff/paramour/commit/436306e1a0d37a5c64d8b0704e0f70622c9d94ff), [`412366d`](https://github.com/JasonPaff/paramour/commit/412366d6676228568fbd6eee9557a9eb1eda2218)]:
+  - @paramour-js/nuqs@0.10.0
+  - paramour@0.10.0
+  - @paramour-js/devtools-panel@0.10.0
+  - @paramour-js/next@0.10.0
+
 ## 0.0.13
 
 ### Patch Changes
