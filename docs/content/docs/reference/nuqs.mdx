@@ -70,6 +70,13 @@ Gotchas worth knowing:
   construction, for every codec kind including `p.custom`.
 - **Value-form defaults are snapshotted once** at derivation time. Mutating
   a reference-typed default (an array, say) after deriving is unsupported.
+- **A default only known at render time goes on the derived parser.** When
+  the default depends on the clock or on props (the current week, say), the
+  route can't declare it, so leave the key `.optional()` and call nuqs's own
+  `withDefault` on the derived parser inside the component. The derived
+  wire-form `eq` still applies, so `clearOnDefault` drops the value from the
+  URL whenever it equals the runtime default — no hand-written `null`
+  elision in your setters. See [the guide](/docs/guides/nuqs#defaults-computed-at-render-time).
 - **Plain-JavaScript callers** passing something that is not a codec get a
   loud `ParamourError` at derivation time, mirroring the compile-time
   judgments below.
@@ -148,6 +155,49 @@ Gotchas:
   still takes the config path.
 - The map is built key-safely (`Object.entries` → `Object.fromEntries`), so
   keys like `"__proto__"` become ordinary own properties of the result.
+
+## nuqsArrayOf
+
+A one-key list codec in nuqs's `parseAsArrayOf` wire format, for routes
+whose URLs nuqs already wrote (bookmarks, shared links) or that nuqs code
+elsewhere still reads.
+
+```ts
+function nuqsArrayOf<E = string>(element?: Codec<E>): Codec<E[]>;
+```
+
+It is an ordinary paramour codec, so it goes in a search config like any
+other, takes list-level modifiers (`nuqsArrayOf().default([])`), and
+derives an ordinary nuqs parser. Elements are strings unless an unmodified
+element codec is given, as for `p.csv`.
+
+[`p.csv`](/docs/reference/core/codecs) is paramour's own one-key list and is
+strict by design. `nuqsArrayOf` copies nuqs's two differences instead:
+
+| | `p.csv` | `nuqsArrayOf` (and nuqs) |
+| --- | --- | --- |
+| comma inside an element | `SerializeError` at link-build time | escaped as the literal text `%2C` |
+| element that fails to parse | the whole key fails (`.catch()` recovers it) | that element is dropped, the rest kept |
+| empty segment (`a,,b`) | parse failure | handed to the element codec (`p.string()` keeps `""`) |
+
+```ts
+import { nuqsArrayOf } from "@paramour-js/nuqs";
+import { p } from "paramour";
+
+const search = {
+  clients: nuqsArrayOf().default([]),
+  types: nuqsArrayOf(p.enum(["client", "internal"])).default([]),
+};
+// ?clients=Acme%252C%20Inc.,Globex&types=client,bogus
+// → { clients: ["Acme, Inc.", "Globex"], types: ["client"] }
+```
+
+nuqs's escaping is lossy in two places, and `nuqsArrayOf` refuses to
+write either rather than emit a URL that reads back as a different list:
+an element whose wire form already contains the text `%2C` (it would come
+back with a comma), and a list of one element whose wire form is empty
+(the empty wire string reads back as `[]`). Both are a `SerializeError`.
+Everything else nuqs writes, `nuqsArrayOf` reads, and the reverse.
 
 ## NoNuqsTwin
 

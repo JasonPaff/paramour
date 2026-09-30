@@ -19,15 +19,22 @@ import {
 import {
   type AnyCodec,
   type AnyRoute,
+  type Codec,
   type InferCodecOutput,
   isRawSearch,
+  p,
   ParamourError,
   ParseError,
   type SearchConfig,
+  SerializeError,
   serializeValue,
 } from "paramour";
 
 declare const noTwinReason: unique symbol;
+
+/** nuqs's `parseAsArrayOf` default separator, and its in-element escape. */
+const SEPARATOR = ",";
+const ENCODED_SEPARATOR = encodeURIComponent(SEPARATOR);
 
 /**
  * Compile-time rejection marker: shapes with no faithful nuqs translation
@@ -114,6 +121,77 @@ type NullOutputKeys<S extends SearchConfig> = {
 type RouteParserMap<R extends AnyRoute> = R["~search"] extends SearchConfig
   ? NuqsParserMap<R["~search"]>
   : never;
+
+/**
+ * A one-key list in nuqs's `parseAsArrayOf(itemParser)` wire format, as a
+ * paramour codec — for routes whose URLs nuqs already wrote, or must keep
+ * reading. `p.csv` is paramour's own one-key list and is strict on purpose;
+ * this is the compatibility twin, and it copies nuqs's two deliberate
+ * differences:
+ * - a comma inside an element is escaped as the literal text `%2C` instead
+ *   of being rejected, so lists of free-text values (names with commas) fit;
+ * - an element that fails to parse is dropped on its own instead of failing
+ *   the whole key, and an empty segment is handed to the element codec like
+ *   any other (`p.string()` keeps it, `p.enum()` drops it).
+ *
+ * nuqs's escaping is lossy in exactly two places, and serialize rejects
+ * both with a `SerializeError` rather than emit a URL that reads back as a
+ * different list: an element whose wire form already contains `%2C` (it
+ * would come back with a comma), and a sole element whose wire form is
+ * empty (the empty wire string reads back as `[]`). Everything else nuqs
+ * writes, this reads, and everything this writes, nuqs reads identically.
+ *
+ * Elements are unmodified scalars, as for `p.csv`: modifiers belong on the
+ * list (`nuqsArrayOf().default([])`), which is an ordinary single-arity
+ * codec and derives an ordinary nuqs parser.
+ */
+export function nuqsArrayOf<E = string>(element?: Codec<E>): Codec<E[]> {
+  const inner = resolveArrayElement(element);
+  const parseElement = inner["~parseElement"];
+  const serializeElement = inner["~serializeElement"];
+  return p.custom<E[]>({
+    label: "nuqs array",
+    parse(raw) {
+      if (raw === "") return [];
+      const values: E[] = [];
+      for (const segment of raw.split(SEPARATOR)) {
+        try {
+          values.push(
+            parseElement(segment.replaceAll(ENCODED_SEPARATOR, SEPARATOR)) as E,
+          );
+        } catch (error) {
+          // nuqs drops a failing element and keeps the rest. Only a
+          // ParseError is a failing element; anything else is a contract
+          // violation and stays loud, as in recoverParse.
+          if (!(error instanceof ParseError)) throw error;
+        }
+      }
+      return values;
+    },
+    serialize(values) {
+      const segments = values.map((value) => {
+        const wire = serializeElement(value);
+        if (typeof wire !== "string") {
+          throw new SerializeError(
+            "Expected the element to serialize to a string",
+          );
+        }
+        if (wire.includes(ENCODED_SEPARATOR)) {
+          throw new SerializeError(
+            `Element ${JSON.stringify(wire)} contains the literal text "${ENCODED_SEPARATOR}", which nuqs's list format would read back as a comma`,
+          );
+        }
+        return wire.replaceAll(SEPARATOR, ENCODED_SEPARATOR);
+      });
+      if (segments.length === 1 && segments[0] === "") {
+        throw new SerializeError(
+          "A list holding one empty element cannot be written: the empty wire string reads back as []",
+        );
+      }
+      return segments.join(SEPARATOR);
+    },
+  });
+}
 
 /**
  * Derive a nuqs parser from one codec, exactly as it sits in a route's
@@ -271,6 +349,28 @@ function requireCodec(
         : `search config value for key "${key}" is not a paramour codec`,
     );
   }
+}
+
+/**
+ * Runtime mirror of `nuqsArrayOf`'s `Codec<E>` parameter type, for plain-JS
+ * callers: only the element's parse/serialize functions are captured, so a
+ * modifier on it would be silently dropped rather than applied. Same
+ * judgment as core's `p.csv` element admission. Arity-many inners are
+ * excluded because they have no single wire string to put in a segment.
+ */
+function resolveArrayElement(element: AnyCodec | undefined): AnyCodec {
+  if (element === undefined) return p.string();
+  requireCodec(element, null);
+  if (
+    element["~arity"] === "many" ||
+    element["~caught"] ||
+    element["~presence"] !== "required"
+  ) {
+    throw new ParamourError(
+      "nuqsArrayOf() elements cannot carry modifiers (.optional()/.default()/.catch()) or be array codecs",
+    );
+  }
+  return element;
 }
 
 function resolveSearchConfig(source: unknown): Record<string, unknown> {

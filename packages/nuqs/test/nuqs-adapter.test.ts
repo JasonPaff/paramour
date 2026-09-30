@@ -1,7 +1,13 @@
 import type { SingleParserBuilder } from "nuqs/server";
 import type { AnyCodec } from "paramour";
 
-import { createLoader, createSerializer } from "nuqs/server";
+import {
+  createLoader,
+  createSerializer,
+  parseAsArrayOf,
+  parseAsString,
+  parseAsStringLiteral,
+} from "nuqs/server";
 import {
   buildSearchString,
   decodeSearch,
@@ -11,11 +17,12 @@ import {
   ParamourError,
   rawSearch,
   SearchDecodeError,
+  SerializeError,
 } from "paramour";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { nuqsParser, nuqsParsers } from "../src/index.js";
+import { nuqsArrayOf, nuqsParser, nuqsParsers } from "../src/index.js";
 
 /**
  * Bypasses the compile-time argument gates for table-driven and
@@ -380,5 +387,93 @@ describe("route objects and bare configs are interchangeable", () => {
     expect(createLoader(map)(`http://x/${url}`)).toEqual(
       decodeSearch(config, new URLSearchParams(url)),
     );
+  });
+});
+
+describe("nuqsArrayOf matches nuqs's parseAsArrayOf", () => {
+  const strings = nuqsArrayOf();
+  const nuqsStrings = parseAsArrayOf(parseAsString);
+  const members = ["client", "internal"] as const;
+  const literals = nuqsArrayOf(p.enum(members));
+  const nuqsLiterals = parseAsArrayOf(parseAsStringLiteral(members));
+
+  it.each(["", "a", "a,b", "Acme%2C Inc.,Globex", "a,,b", "a,", ",", "%2C"])(
+    "string lists parse %j identically",
+    (wire) => {
+      expect(decodeOne(strings, wire)).toEqual(nuqsStrings.parse(wire));
+    },
+  );
+
+  it.each(["", "client", "client,bogus,internal", "bogus", "client,,internal"])(
+    "literal lists drop unknown members element-wise on %j",
+    (wire) => {
+      expect(decodeOne(literals, wire)).toEqual(nuqsLiterals.parse(wire));
+    },
+  );
+
+  it.each([
+    [[]],
+    [["a"]],
+    [["a", "b"]],
+    [["Acme, Inc.", "Globex"]],
+    [["a", ""]],
+    [[",", ",,"]],
+  ])("serializes %j identically, and reads it back", (value: string[]) => {
+    const wire = encodeWire(strings, value);
+    expect(wire).toBe(nuqsStrings.serialize(value));
+    expect(decodeOne(strings, wire)).toEqual(value);
+  });
+
+  it("typed elements parse and serialize through the element codec", () => {
+    const ints = nuqsArrayOf(p.integer());
+    expect(decodeOne(ints, "1,x,3")).toEqual([1, 3]);
+    expect(encodeWire(ints, [1, 2])).toBe("1,2");
+  });
+
+  it("rejects the two values nuqs's format cannot round-trip", () => {
+    expect(() => encodeWire(strings, ["a%2Cb"])).toThrow(SerializeError);
+    expect(() => encodeWire(strings, [""])).toThrow(SerializeError);
+  });
+
+  it("takes list-level modifiers, and .default([]) elides the empty list", () => {
+    const config = { tags: nuqsArrayOf().default([]).catch([]) };
+    expect(decodeSearch(config, {})).toEqual({ tags: [] });
+    expect(encodeSearch(config, { tags: [] })).toEqual([]);
+  });
+
+  it("derives an ordinary nuqs parser whose URL the server decode re-reads", () => {
+    const config = { names: nuqsArrayOf().default([]) };
+    const map = nuqsParsers(config);
+    const serialize = createSerializer(map);
+    const url = serialize({ names: ["Acme, Inc.", "Globex"] });
+    expect(decodeSearch(config, new URLSearchParams(url))).toEqual({
+      names: ["Acme, Inc.", "Globex"],
+    });
+    expect(createLoader(map)(`http://x/${url}`)).toEqual({
+      names: ["Acme, Inc.", "Globex"],
+    });
+  });
+
+  it("a non-ParseError element failure stays loud", () => {
+    const loud = nuqsArrayOf(
+      p.custom<string>({
+        parse: () => {
+          throw new ParamourError("contract violation");
+        },
+        serialize: (value) => value,
+      }),
+    );
+    expect(() => decodeOne(loud, "a")).toThrow(/contract violation/);
+  });
+
+  it("rejects modified or array elements for plain-JS callers", () => {
+    expect(() => nuqsArrayOf(p.string().optional() as never)).toThrow(
+      ParamourError,
+    );
+    expect(() => nuqsArrayOf(p.string().catch("x") as never)).toThrow(
+      ParamourError,
+    );
+    expect(() => nuqsArrayOf(p.array() as never)).toThrow(ParamourError);
+    expect(() => nuqsArrayOf(42 as never)).toThrow(ParamourError);
   });
 });

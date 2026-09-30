@@ -1,10 +1,12 @@
 import type { inferParserType, SingleParserBuilder } from "nuqs/server";
 
+import type { Codec } from "paramour";
+
 import { defineAppRoute, p, rawSearch } from "paramour";
 import { expect, test } from "tstyche";
 import { z } from "zod";
 
-import { nuqsParser, nuqsParsers } from "../src/index.js";
+import { nuqsArrayOf, nuqsParser, nuqsParsers } from "../src/index.js";
 
 test("scalar codecs derive nullable single parsers", () => {
   expect(nuqsParser(p.string())).type.toBe<SingleParserBuilder<string>>();
@@ -102,4 +104,18 @@ test("rawSearch and search-less routes are rejected at the call", () => {
   expect(nuqsParsers).type.not.toBeCallableWith(raw);
   expect(nuqsParsers).type.not.toBeCallableWith(defineAppRoute("/plain", {}));
   expect(nuqsParsers).type.not.toBeCallableWith({});
+});
+
+test("nuqsArrayOf types its list from the element codec", () => {
+  expect(nuqsArrayOf()).type.toBe<Codec<string[]>>();
+  expect(nuqsArrayOf(p.enum(["a", "b"]))).type.toBe<Codec<("a" | "b")[]>>();
+  expect(
+    nuqsParser(nuqsArrayOf(p.integer()).default([])).defaultValue,
+  ).type.toBe<number[]>();
+});
+
+test("nuqsArrayOf elements cannot carry modifiers", () => {
+  expect(nuqsArrayOf).type.not.toBeCallableWith(p.string().optional());
+  expect(nuqsArrayOf).type.not.toBeCallableWith(p.string().catch("x"));
+  expect(nuqsArrayOf).type.not.toBeCallableWith(p.array());
 });
