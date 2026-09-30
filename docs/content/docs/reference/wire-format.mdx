@@ -568,8 +568,12 @@ return [
 <Rule id="CV7" title="Two list formats, both first-class">
 
 `p.array` (repeated keys — the HTML-form idiom) and `p.csv` (one-key
-packing — the copy-paste-friendly, nuqs-compatible spelling) are both
-fully supported. Same in-memory value, two deliberate wire spellings.
+packing — the copy-paste-friendly spelling nuqs also uses) are both
+fully supported. `p.csv` matches nuqs's `parseAsArrayOf` only for elements
+without a comma: nuqs escapes an in-element comma as `%2C` and drops
+elements that fail to parse, where [CV3](#cv3) and [CV4](#cv4) fail
+loudly instead. `nuqsArrayOf` in `@paramour-js/nuqs` reads and writes
+nuqs's exact format. Same in-memory value, two deliberate wire spellings.
 
 <WireExample
   code={`[

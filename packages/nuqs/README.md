@@ -60,8 +60,24 @@ The adapter imports from `nuqs/server`, so the derived parsers are usable in ser
 
 - **Factory defaults read `null` client-side.** `.default(() => …)` is time-varying by declaration: paramour re-invokes it per decode and never elides it, while nuqs's `withDefault` would freeze one value and clear-on-default against it — both halves lying about factory semantics. So factory-defaulted keys derive a _nullable_ parser; apply the factory at the read site when you want the paramour-decoded shape.
 - **Value defaults are snapshotted at derivation.** The value handed to `withDefault` is read once when `nuqsParsers` runs. Mutating a reference-typed default afterwards is unsupported: paramour's elision re-serializes the live default per encode and would follow the mutation, but the frozen nuqs copy will not.
+- **Defaults known only at render time go on the derived parser.** When a default depends on the clock or on props, the route can't declare it: leave the key `.optional()` and call nuqs's `withDefault` on the derived parser in the component (`parsers.from.withDefault(thisWeek.from)`). The wire-form `eq` still applies, so clearOnDefault elides the value whenever it equals the runtime default. Apply the same default wherever the server parses the route.
 - **Duplicated scalar keys read differently.** `?page=1&page=2` is a grammar violation to the server decode (an error, or the `.catch` value), but nuqs hands parsers only the _first_ value, which parses cleanly. The adapter never sees the duplicate, so the divergence cannot be closed at this layer. Neither side ever _writes_ a duplicated scalar key.
 - **Absent optionals are `undefined` server-side, `null` client-side** — each router's native spelling of absence.
+
+## Keeping URLs nuqs already wrote: `nuqsArrayOf`
+
+`p.csv` matches nuqs's `parseAsArrayOf` only when no element contains a comma. nuqs escapes an in-element comma as the literal text `%2C` and drops elements that fail to parse. `p.csv` rejects the comma at link-build time and fails the whole key. When existing bookmarks must keep working, use `nuqsArrayOf`, a paramour codec that reads and writes nuqs's exact format:
+
+```ts
+import { nuqsArrayOf } from "@paramour-js/nuqs";
+
+search: {
+  clients: nuqsArrayOf().default([]), // "Acme, Inc." fits
+  types: nuqsArrayOf(p.enum(["client", "internal"])).default([]), // unknown members dropped
+}
+```
+
+It refuses to write the two values nuqs's format can't round-trip (a `SerializeError`): an element whose wire form already contains `%2C`, and a list of one empty element.
 
 ## Shapes with no nuqs twin
 

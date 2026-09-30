@@ -133,6 +133,66 @@ nuqsParser(maybe);
 to derive from), as are search-less routes. Plain-JavaScript callers get the
 same judgments as loud runtime errors.
 
+## Defaults computed at render time
+
+A value-form `.default()` is fixed when the route is defined. When the
+default depends on the clock or on props — "this week" for a date range —
+the route can't declare it. Keep the key `.optional()` and add the default
+to the derived parser with nuqs's own `withDefault`, inside the component:
+
+```tsx
+"use client";
+
+import { nuqsParsers } from "@paramour-js/nuqs";
+import { useQueryStates } from "nuqs";
+import { useMemo } from "react";
+
+import { gridRoute } from "./route.def";
+
+const gridParsers = nuqsParsers(gridRoute); // from: p.string().optional(), …
+
+export function useGridRange() {
+  const defaults = useMemo(() => currentWeek(), []);
+  const parsers = useMemo(
+    () => ({
+      ...gridParsers,
+      from: gridParsers.from.withDefault(defaults.from),
+      to: gridParsers.to.withDefault(defaults.to),
+    }),
+    [defaults],
+  );
+  return useQueryStates(parsers);
+}
+```
+
+The derived parser keeps its wire-form `eq`, so nuqs's `clearOnDefault`
+drops `from`/`to` from the URL whenever they equal this render's default.
+Your setters pass plain values, with no `value === default ? null : value`
+logic, and reads are non-nullable. On the server the key is still
+`.optional()`, so apply the same default where you parse the route.
+
+## Keeping URLs nuqs already wrote
+
+`p.csv` is nuqs-compatible for lists whose elements contain no commas.
+nuqs's `parseAsArrayOf` escapes an in-element comma as `%2C` and drops
+elements that fail to parse, while `p.csv` rejects the comma and fails the
+whole key. If you are moving off hand-written nuqs parsers and existing
+bookmarks must keep working, use
+[`nuqsArrayOf`](/docs/reference/nuqs#nuqsarrayof), which reads and writes
+nuqs's format exactly:
+
+```ts
+import { nuqsArrayOf } from "@paramour-js/nuqs";
+import { defineAppRoute, p } from "paramour";
+
+export const reportRoute = defineAppRoute("/report", {
+  search: {
+    clients: nuqsArrayOf().default([]), // "Acme, Inc." fits
+    types: nuqsArrayOf(p.enum(["client", "internal"])).default([]),
+  },
+});
+```
+
 ## Server and client, one contract
 
 The point of deriving rather than declaring: your server components
