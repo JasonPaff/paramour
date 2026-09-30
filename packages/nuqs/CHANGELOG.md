@@ -1,5 +1,13 @@
 # @paramour-js/nuqs
 
+## 0.10.0
+
+### Minor Changes
+
+- [#54](https://github.com/JasonPaff/paramour/pull/54) [`436306e`](https://github.com/JasonPaff/paramour/commit/436306e1a0d37a5c64d8b0704e0f70622c9d94ff) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Add `nuqsArrayOf(element?)`, a one-key list codec in nuqs's `parseAsArrayOf` wire format. It escapes an in-element comma as `%2C` and drops elements that fail to parse, so routes can keep reading URLs nuqs already wrote, including lists of free-text values that contain commas. It refuses to write the two values nuqs's format can't round-trip. The adapter docs also cover defaults computed at render time: call `withDefault` on the derived parser.
+
+- [#52](https://github.com/JasonPaff/paramour/pull/52) [`412366d`](https://github.com/JasonPaff/paramour/commit/412366d6676228568fbd6eee9557a9eb1eda2218) Thanks [@JasonPaff](https://github.com/JasonPaff)! - **`.optional()` codecs can recover a bad value to absent.** `.catch()` on an `.optional()` codec now accepts `undefined` (or a factory returning it), so a malformed value decodes as `undefined` instead of failing the decode: `p.enum(["gold", "silver"]).optional().catch(undefined)`. Use it when a bad value should mean "nothing selected" and no in-domain value says that. Required and defaulted codecs still need a value fallback. On them, `.catch(undefined)` fails to compile and throws a `ParamourError` at runtime. Apply `.optional()` first. `nuqsParser` maps the absent fallback to nuqs's `null`.
+
 ## 0.9.0
 
 ### Minor Changes
