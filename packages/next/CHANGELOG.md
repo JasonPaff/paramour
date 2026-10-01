@@ -1,5 +1,11 @@
 # @paramour-js/next
 
+## 0.11.0
+
+### Minor Changes
+
+- [#55](https://github.com/JasonPaff/paramour/pull/55) [`66d7f5e`](https://github.com/JasonPaff/paramour/commit/66d7f5ee40cca12fbc45a9b0d263c8c45a31b383) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `paramour doctor` gains a warn-level `trailing slash` check: it lists each route definition whose `trailingSlash` option disagrees with `trailingSlash` in `next.config`. It reports only when definitions exist and the config value can be read statically.
+
 ## 0.10.0
 
 ## 0.9.0

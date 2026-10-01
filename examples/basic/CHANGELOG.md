@@ -1,5 +1,14 @@
 # example-basic
 
+## 0.0.15
+
+### Patch Changes
+
+- Updated dependencies [[`66d7f5e`](https://github.com/JasonPaff/paramour/commit/66d7f5ee40cca12fbc45a9b0d263c8c45a31b383), [`66d7f5e`](https://github.com/JasonPaff/paramour/commit/66d7f5ee40cca12fbc45a9b0d263c8c45a31b383)]:
+  - @paramour-js/next@0.11.0
+  - paramour@0.11.0
+  - @paramour-js/devtools-panel@0.11.0
+
 ## 0.0.14
 
 ### Patch Changes
