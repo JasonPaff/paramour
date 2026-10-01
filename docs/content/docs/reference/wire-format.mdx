@@ -714,16 +714,43 @@ return [
 
 </Rule>
 
-<Rule id="R6" title="No trailing slashes">
+<Rule id="R6" title="No trailing slashes, unless the route opts in">
 
-The root route builds `/`; every other href ends in a non-slash — an
-elided optional catch-all leaves the bare base path, never
+By default the root route builds `/`; every other href ends in a
+non-slash — an elided optional catch-all leaves the bare base path, never
 `/docs/`.
 
 <WireExample
   code={`const root = defineAppRoute("/", {});
 const docs = defineAppRoute("/docs/[[...slug]]", { params: { slug: p.string() } });
 return [href(root), buildPath(docs, {})];`}
+/>
+
+**The one exception is opt-in, per route:** a route defined with
+`trailingSlash: true` ends every non-root path in exactly one `/`, placed
+after the last emitted segment and before any `?query` or `#fragment`. The
+slash is added after [R3](#r3) elision, so an elided optional catch-all
+builds `/docs/`. The root stays `/`, including a root optional catch-all
+that elides. A dynamic segment or catch-all element is followed by the
+slash like any other segment (`/user/42/`, `/files/a/b/`), and a `/`
+inside an element is still `%2F` ([R2](#r2)), so the trailing slash is
+never ambiguous. `buildPath` and `href` apply it alike. `encodeParams`,
+`encodeStaticParams`, the query string, and the path literal (which still
+may not end in `/`) are unchanged. Set the option to match `trailingSlash`
+in `next.config`.
+
+<WireExample
+  code={`const root = defineAppRoute("/", { trailingSlash: true });
+const docs = defineAppRoute("/docs/[[...slug]]", {
+  params: { slug: p.string() },
+  search: { q: p.string().optional() },
+  trailingSlash: true,
+});
+return [
+  href(root),
+  href(docs),
+  href(docs, { params: { slug: ["a"] }, search: { q: "x" }, hash: "top" }),
+];`}
 />
 
 </Rule>

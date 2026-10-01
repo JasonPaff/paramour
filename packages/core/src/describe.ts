@@ -48,6 +48,11 @@ export interface RouteDescription {
   readonly path: string;
   readonly router: RouterKind;
   readonly search: SearchDescription;
+  /**
+   * Present (and `true`) only for a route defined with `trailingSlash: true`,
+   * so descriptions of R6-default routes are unchanged.
+   */
+  readonly trailingSlash?: true;
 }
 
 /**
@@ -127,6 +132,7 @@ export function describeRoute(route: AnyRoute): RouteDescription {
     path: route.path,
     router: route["~router"],
     search: describeSearch(route["~search"] as SearchSlot),
+    ...(route["~trailingSlash"] ? { trailingSlash: true } : {}),
   };
 }
 

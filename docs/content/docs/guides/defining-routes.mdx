@@ -68,6 +68,29 @@ const root = href(docsRoute, { params: { slug: [] } });
 
 (This exact route serves the page you're reading.)
 
+## Trailing slashes
+
+Links come out slash-free by default (`/about`). If `next.config` sets
+`trailingSlash: true`, which is common in a static export, set the same
+option on the route so its links match the URLs Next serves:
+
+```ts twoslash
+import { defineAppRoute, href, p } from "paramour";
+
+export const bundleRoute = defineAppRoute("/bundle", {
+  search: { name: p.string(), org: p.string() },
+  trailingSlash: true,
+});
+
+const link = href(bundleRoute, { search: { name: "x", org: "y" } });
+// => "/bundle/?name=x&org=y"
+```
+
+The root stays `/`, and the slash also follows dynamic segments and
+catch-alls (`/docs/guides/hooks/`). To set it once for every route, use a
+[typed re-export](/docs/reference/core/routes#wrapping-defineroute).
+`paramour doctor` flags a route that disagrees with `next.config`.
+
 ## Parsing on the server
 
 App routes expose two parse styles, and the choice is about who made the

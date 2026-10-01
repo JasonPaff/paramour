@@ -1,4 +1,4 @@
-import { defineAppRoute, p } from "paramour";
+import { defineAppRoute, href, p } from "paramour";
 import { describe, expect, it } from "vitest";
 
 import { matchesPathname } from "../src/match.js";
@@ -43,6 +43,33 @@ describe("matchesPathname (current-URL derivation)", () => {
 
   it("trailing slashes are normalization noise", () => {
     expect(matchesPathname(shopSegments, "/shop/")).toBe(true);
+  });
+
+  it("matches every path a trailingSlash: true route builds", () => {
+    const product = defineAppRoute("/product/[id]", {
+      params: { id: p.integer() },
+      trailingSlash: true,
+    });
+    const docs = defineAppRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+      trailingSlash: true,
+    });
+    const root = defineAppRoute("/", { trailingSlash: true });
+    const cases = [
+      [product, href(product, { params: { id: 42 } })],
+      [docs, href(docs)],
+      [docs, href(docs, { params: { slug: ["a", "b"] } })],
+      [root, href(root)],
+    ] as const;
+    expect(cases.map(([, path]) => path)).toEqual([
+      "/product/42/",
+      "/docs/",
+      "/docs/a/b/",
+      "/",
+    ]);
+    for (const [route, path] of cases) {
+      expect(matchesPathname(route["~segments"], path)).toBe(true);
+    }
   });
 
   it("static comparison percent-decodes the path part", () => {

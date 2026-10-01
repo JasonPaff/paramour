@@ -633,3 +633,46 @@ test("RouteConfig + SearchSlot: a generic wrapper around defineAppRoute", () => 
     readonly tab: string | undefined;
   }>();
 });
+
+test("trailingSlash: a boolean option on static and dynamic configs alike", () => {
+  expect(
+    defineAppRoute("/about", { trailingSlash: true }),
+  ).type.toBeAssignableTo<AnyAppRoute>();
+  expect(
+    definePagesRoute("/product/[id]", {
+      params: { id: p.integer() },
+      trailingSlash: true,
+    }),
+  ).type.not.toBeAssignableTo<AnyAppRoute>();
+  expect(defineAppRoute).type.not.toBeCallableWith("/about", {
+    trailingSlash: "yes",
+  });
+  expect(defineAppRoute).type.not.toBeCallableWith("/user/[id]", {
+    params: { id: p.integer() },
+    trailingSlash: 1,
+  });
+});
+
+test("trailingSlash: the Href brand keeps the route pattern, not the built URL", () => {
+  const asset = defineAppRoute("/asset", {
+    search: { name: p.string() },
+    trailingSlash: true,
+  });
+  expect(href(asset, { search: { name: "x" } })).type.toBe<Href<"/asset">>();
+});
+
+test("trailingSlash: a project-wide wrapper keeps the constructor's signature", () => {
+  // The pattern the guides document for a static export: default the option
+  // once, let a route's own value win.
+  const defineRoute: typeof defineAppRoute = (path, config) =>
+    defineAppRoute(path, { trailingSlash: true, ...config });
+  const route = defineRoute("/product/[id]", {
+    params: { id: p.integer() },
+    search: { tab: p.enum(["a", "b"]).optional() },
+  });
+  expect<InferRouteParams<typeof route>>().type.toBe<{ id: number }>();
+  expect<InferRouteSearch<typeof route>>().type.toBe<{
+    readonly tab: "a" | "b" | undefined;
+  }>();
+  expect(href(route, { params: { id: 1 } })).type.toBe<Href<"/product/[id]">>();
+});
