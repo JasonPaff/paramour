@@ -10,9 +10,14 @@ import {
   type GenerateInputs,
 } from "../generate.js";
 import { tsconfigCheck } from "../init/scaffold.js";
-import { detectWrapState, findNextConfig } from "../init/wrap-next-config.js";
+import {
+  detectWrapState,
+  findNextConfig,
+  readTrailingSlash,
+} from "../init/wrap-next-config.js";
 import {
   discoverRouteDefinitions,
+  type RouteDefinition,
   routeKey,
 } from "../list/discover-route-defs.js";
 import { scanRoutes, type ScanRoutesResult } from "../scan.js";
@@ -180,7 +185,19 @@ export async function runDoctorChecks(
   });
 
   // 8. Route-definition discovery health (list's engine).
-  checks.push(await discoveryCheck(projectRoot, config, routes));
+  const discovered = await discoveryCheck(projectRoot, config, routes);
+  checks.push(discovered.check);
+
+  // 9. Route definitions build the URLs next.config serves. Reported only
+  // when there is an answer: definitions exist and the config's
+  // trailingSlash reads statically.
+  if (nextConfig !== undefined && discovered.definitions.length > 0) {
+    const check = await trailingSlashCheck(
+      nextConfig.path,
+      discovered.definitions,
+    );
+    if (check !== undefined) checks.push(check);
+  }
 
   return checks;
 }
@@ -189,7 +206,7 @@ async function discoveryCheck(
   projectRoot: string,
   config: ParamourConfig,
   routes: ScanRoutesResult | undefined,
-): Promise<DoctorCheck> {
+): Promise<{ check: DoctorCheck; definitions: RouteDefinition[] }> {
   try {
     const discovery = await discoverRouteDefinitions(projectRoot, {
       routeFiles: config.routeFiles,
@@ -222,18 +239,24 @@ async function discoveryCheck(
       );
     }
     return {
-      detail,
-      label: `route definitions: ${String(discovery.definitions.length)} found in ${String(files.size)} module${files.size === 1 ? "" : "s"}`,
-      status:
-        discovery.loadFailures.length > 0 || discovery.duplicates.length > 0
-          ? "warn"
-          : "pass",
+      check: {
+        detail,
+        label: `route definitions: ${String(discovery.definitions.length)} found in ${String(files.size)} module${files.size === 1 ? "" : "s"}`,
+        status:
+          discovery.loadFailures.length > 0 || discovery.duplicates.length > 0
+            ? "warn"
+            : "pass",
+      },
+      definitions: discovery.definitions,
     };
   } catch (error) {
     return {
-      detail: [message(error)],
-      label: "route definitions: discovery failed",
-      status: "warn",
+      check: {
+        detail: [message(error)],
+        label: "route definitions: discovery failed",
+        status: "warn",
+      },
+      definitions: [],
     };
   }
 }
@@ -257,6 +280,51 @@ function readManifest(
       if (dirname(dir) === dir) return undefined;
     }
   }
+}
+
+/**
+ * Warn-level: a route whose `trailingSlash` disagrees with next.config's
+ * builds a URL the app only reaches through a redirect (or, in a static
+ * export, a path with no file behind it). `undefined` when the config's value
+ * cannot be read statically — no finding beats a guessed one.
+ */
+async function trailingSlashCheck(
+  nextConfigPath: string,
+  definitions: readonly RouteDefinition[],
+): Promise<DoctorCheck | undefined> {
+  let configured: boolean | undefined;
+  try {
+    configured = await readTrailingSlash(readFileSync(nextConfigPath, "utf8"));
+  } catch {
+    return undefined;
+  }
+  if (configured === undefined) return undefined;
+  const name = basename(nextConfigPath);
+  const setting = `trailingSlash: ${String(configured)}`;
+  // The routes come from the app's own paramour, which may predate the
+  // option and lack the member: missing reads as the R6 default.
+  const mismatched = definitions.filter(
+    (definition) =>
+      ((definition.route["~trailingSlash"] as boolean | undefined) ?? false) !==
+      configured,
+  );
+  if (mismatched.length === 0) {
+    return {
+      label: `trailing slash: route definitions match ${name} (${setting})`,
+      status: "pass",
+    };
+  }
+  const fix = configured
+    ? "add trailingSlash: true to its definition"
+    : "remove trailingSlash: true from its definition";
+  return {
+    detail: mismatched.map(
+      (definition) =>
+        `${definition.route.path} (${definition.route["~router"]}) in ${definition.file}: ${fix}`,
+    ),
+    label: `trailing slash: ${String(mismatched.length)} route definition${mismatched.length === 1 ? "" : "s"} disagree${mismatched.length === 1 ? "s" : ""} with ${name} (${setting})`,
+    status: "warn",
+  };
 }
 
 function versionCheck(projectRoot: string): DoctorCheck {

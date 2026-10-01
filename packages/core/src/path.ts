@@ -104,12 +104,22 @@ type SerializedSegment =
  * joined with `/`. R2's element joining falls out of the same join as
  * everything else; a fully-elided path (an optional catch-all at the root)
  * yields "/".
+ *
+ * R6's one exception lives here, not in href, so `buildPath` and `href`
+ * always agree on the path: a route defined with `trailingSlash: true` gets a
+ * "/" after its last segment. The slash goes on the BUILT path, after any
+ * elision, so an elided optional catch-all yields "/docs/" and the root stays
+ * "/" rather than "//". It is a route-definition fact, not a Next config read,
+ * because route modules also run where no Next config exists (a CLI printing
+ * absolute links); a static export with `trailingSlash: true` serves exactly
+ * these URLs without a redirect.
  */
 export function buildPath<R extends AnyRoute>(
   route: R,
   params: InferParamsInput<R>,
 ): string {
-  return `/${encodeParams(route, params).join("/")}`;
+  const path = `/${encodeParams(route, params).join("/")}`;
+  return route["~trailingSlash"] && path !== "/" ? `${path}/` : path;
 }
 
 /**
@@ -433,7 +443,11 @@ export function tokenizePath(path: string): PathSegment[] {
     throw new ParamourError(`route path must start with "/": "${path}"`);
   }
   if (path !== "/" && path.endsWith("/")) {
-    throw new ParamourError(`route path must not end with "/": "${path}"`);
+    // The literal is the route's identity (registry key, Href brand), so it
+    // never carries the slash; the built URL can, via the define option.
+    throw new ParamourError(
+      `route path must not end with "/": "${path}" (to build links with a trailing slash, pass trailingSlash: true in the route config)`,
+    );
   }
   if (path === "/") return [];
 

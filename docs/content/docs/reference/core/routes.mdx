@@ -15,9 +15,10 @@ methods, hooks) is gated on that brand.
 ## defineAppRoute
 
 Defines an App Router route from a path literal and a config: `params`
-(required exactly when the path has dynamic segments, forbidden otherwise)
-and `search` (always optional — a codec map, or a
-[`rawSearch`](/docs/reference/core/search#rawsearch) schema).
+(required exactly when the path has dynamic segments, forbidden otherwise),
+`search` (always optional — a codec map, or a
+[`rawSearch`](/docs/reference/core/search#rawsearch) schema), and
+[`trailingSlash`](#trailingslash) (optional boolean, default `false`).
 
 ```ts twoslash
 import { defineAppRoute, p } from "paramour";
@@ -92,6 +93,39 @@ describes **one segment element** (the array-ness of a catch-all comes from
 the segment kind), so presence modifiers are compile errors in param
 position. See [defining routes](/docs/guides/defining-routes) for catch-all
 recipes.
+
+### trailingSlash
+
+`trailingSlash: true` makes every link the route builds end in `/`. That is
+the URL shape a Next app with `trailingSlash: true` in `next.config` serves
+without a redirect (a static export writes `asset/index.html` for
+`/asset/`). The root stays `/`, and the query and fragment follow the
+slash:
+
+```ts twoslash
+import { defineAppRoute, href, p } from "paramour";
+
+const assetRoute = defineAppRoute("/asset", {
+  search: { name: p.string(), version: p.string().optional() },
+  trailingSlash: true,
+});
+
+const link = href(assetRoute, { search: { name: "atk-guide" } });
+// => "/asset/?name=atk-guide"
+```
+
+The option lives on the route definition, not in a Next config read, so
+core builds the same URL wherever the route module runs, including code
+with no Next present (a CLI printing absolute links with
+`new URL(href(route), webRoot)`). The path literal stays slash-free
+(`"/asset"`, never `"/asset/"`): it is the route's identity in the
+registry and in the `Href<"/asset">` brand, so the type of a built link is
+unchanged. The exact rule, including catch-alls and elision, is
+[R6](/docs/reference/wire-format#r6). Parsing is unaffected: params and
+search arrive from Next already split from the pathname.
+[`paramour doctor`](/docs/reference/next/cli/doctor) warns when a
+definition disagrees with `next.config`. To set the option on every route,
+see [Wrapping define\*Route](#wrapping-defineroute).
 
 ## definePagesRoute
 
@@ -305,6 +339,27 @@ const productRoute = defineTrackedRoute("/product/[id]", {
 type ProductSearch = InferRouteSearch<typeof productRoute>;
 //   ^?
 ```
+
+When every route in a project shares an option, such as `trailingSlash`
+for a static export, a typed re-export is enough. Spread the config last so
+a route's own value still wins:
+
+```ts twoslash
+import { defineAppRoute as defineRoute, href, p } from "paramour";
+
+export const defineAppRoute: typeof defineRoute = (path, config) =>
+  defineRoute(path, { trailingSlash: true, ...config });
+
+const bundleRoute = defineAppRoute("/bundle", {
+  search: { name: p.string(), org: p.string() },
+});
+
+const link = href(bundleRoute, { search: { name: "x", org: "y" } });
+// => "/bundle/?name=x&org=y"
+```
+
+Keep the name `defineAppRoute` (or `definePagesRoute`) for the re-export:
+`paramour list` and `doctor` find route modules by those names.
 
 Explicit type arguments to `defineAppRoute` / `definePagesRoute` (and
 `href`) are not part of the supported API — their type parameters exist

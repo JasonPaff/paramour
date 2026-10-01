@@ -110,6 +110,10 @@ exactly what `href` exists to prevent). Both are banned at the type level
 contract for plain-JS callers: a path string containing `[`, `]`, `?`, or
 `#` throws (dynamic segments need a route object; query and hash never ride
 in the path string), as does passing `params`/`search` alongside a string.
+The string form has no route definition, so it never adds a
+[trailing slash](/docs/reference/core/routes#trailingslash): it returns the
+registered path as written. In a project with `trailingSlash: true`, build
+those links from route objects.
 
 ## Href
 
@@ -171,7 +175,11 @@ const root = buildPath(docsRoute, { slug: [] });
 ```
 
 An elided optional catch-all contributes no segments (the segment and its
-preceding `/` vanish); a fully-elided path yields `"/"`.
+preceding `/` vanish); a fully-elided path yields `"/"`. A route defined
+with [`trailingSlash: true`](/docs/reference/core/routes#trailingslash)
+gets a `/` after its last segment here, so `buildPath` and `href` always
+agree: `"/docs/guides/hooks/"` and `"/docs/"` for the route above, while
+the root stays `"/"`.
 
 ### encodeParams
 

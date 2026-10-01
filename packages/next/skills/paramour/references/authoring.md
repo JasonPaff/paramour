@@ -92,7 +92,7 @@ href(productRoute, { params: { id: 1 }, hash: "reviews" }); // "#reviews" append
 href("/about", { hash: "team" }); // string form: registered STATIC paths only
 ```
 
-`href` returns `Href` — a string subtype accepted by `next/link`, `router.push`, `redirect` unchanged. Required params/search make the options argument required; defaulted/optional/array keys are omittable. Serialization failures (bad value, empty segment, required catch-all given `[]`) throw `SerializeError` at link-build time. Lower-level pieces: `buildPath(route, params)`, `searchToString(config, input)`, `encodeStaticParams(route, params)` for `generateStaticParams`/`getStaticPaths`.
+`href` returns `Href` — a string subtype accepted by `next/link`, `router.push`, `redirect` unchanged. Required params/search make the options argument required; defaulted/optional/array keys are omittable. Serialization failures (bad value, empty segment, required catch-all given `[]`) throw `SerializeError` at link-build time. A route defined with `trailingSlash: true` (match `next.config`'s `trailingSlash`) builds `/asset/?q=1` instead of `/asset?q=1`; the root stays `/` and the path literal never ends in `/`. Lower-level pieces: `buildPath(route, params)`, `searchToString(config, input)`, `encodeStaticParams(route, params)` for `generateStaticParams`/`getStaticPaths`.
 
 ## Client hooks
 

@@ -1168,6 +1168,22 @@ describe("route segment shapes (R1/R3/R6)", () => {
     });
     expect(href(docs, { params: { slug: [] } })).toBe("/docs");
   });
+
+  it("R6: a route defined with trailingSlash: true ends every non-root path in a slash", () => {
+    const root = defineAppRoute("/", { trailingSlash: true });
+    expect(href(root)).toBe("/");
+    const docs = defineAppRoute("/docs/[[...slug]]", {
+      params: { slug: p.string() },
+      search: { q: p.string().optional() },
+      trailingSlash: true,
+    });
+    expect(href(docs)).toBe("/docs/");
+    expect(href(docs, { params: { slug: ["a"] } })).toBe("/docs/a/");
+    expect(
+      href(docs, { hash: "x", params: { slug: ["a"] }, search: { q: "1" } }),
+    ).toBe("/docs/a/?q=1#x");
+    expect(buildPath(docs, {})).toBe("/docs/");
+  });
 });
 
 describe("S5 caveat — integer-like keys", () => {

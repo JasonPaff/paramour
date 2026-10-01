@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   detectWrapState,
   findNextConfig,
+  readTrailingSlash,
   wrapNextConfigSource,
 } from "../src/init/wrap-next-config.js";
 import { makeTempDir, makeTree } from "./helpers.js";
@@ -165,5 +166,54 @@ describe("findNextConfig", () => {
     expect(findNextConfig(root)?.lang).toBe("mjs");
     makeTree(root, ["next.config.ts"]);
     expect(findNextConfig(root)?.lang).toBe("ts");
+  });
+});
+
+describe("readTrailingSlash", () => {
+  it("follows a wrapper call and a typed const binding", async () => {
+    const source = `import type { NextConfig } from "next";
+import { withTypedRoutes } from "@paramour-js/next";
+
+const nextConfig: NextConfig = { output: "export", trailingSlash: true };
+
+export default withTypedRoutes(nextConfig);
+`;
+    expect(await readTrailingSlash(source)).toBe(true);
+  });
+
+  it("reads an inline literal through satisfies and nested wrappers", async () => {
+    const source = `export default withA(withB({ trailingSlash: false } satisfies NextConfig));`;
+    expect(await readTrailingSlash(source)).toBe(false);
+  });
+
+  it("reads CommonJS module.exports", async () => {
+    expect(
+      await readTrailingSlash(`module.exports = { "trailingSlash": true };`),
+    ).toBe(true);
+  });
+
+  it("an object literal without the key is Next's default, false", async () => {
+    expect(await readTrailingSlash(IDENTIFIER_TS)).toBe(false);
+  });
+
+  it("is undefined when the value cannot be read statically", async () => {
+    for (const source of [
+      `export default (phase) => ({ trailingSlash: true });`,
+      `const base = {}; export default { ...base };`,
+      `export default { trailingSlash: process.env.SLASH === "1" };`,
+      `export default load();`,
+      `export default config;`,
+      `not valid {`,
+    ]) {
+      expect(await readTrailingSlash(source), source).toBeUndefined();
+    }
+  });
+
+  it("last write wins, as at runtime", async () => {
+    expect(
+      await readTrailingSlash(
+        `export default { trailingSlash: true, trailingSlash: false };`,
+      ),
+    ).toBe(false);
   });
 });

@@ -325,21 +325,33 @@ export interface Route<
    * registry — tree-shaking is untouched.
    */
   readonly "~segments": readonly PathSegment[];
+  /**
+   * The define-time `trailingSlash` option (R6's exception): `buildPath`, and
+   * so `href`, append "/" to every non-root path when true. Required, not
+   * optional: an optional member here turns the wrong-router diagnostics
+   * (an AppRoute passed where AnyPagesRoute is expected) into
+   * exactOptionalPropertyTypes noise. Readers test it for truthiness, so a
+   * plain-JS hand-built route without it gets the R6 default.
+   */
+  readonly "~trailingSlash": boolean;
 }
 
 /**
  * Conditional on the path shape: dynamic paths REQUIRE `params` with exactly
  * the extracted segment names; static paths REJECT it (`?: never` — may be
  * absent, may never be present, which under exactOptionalPropertyTypes holds
- * even for non-fresh objects).
+ * even for non-fresh objects). `trailingSlash` is the same on both branches.
  */
 export type RouteConfig<
   Path extends string,
   PC extends ParamsConfig<Path>,
   SC extends SearchSlot,
 > = [PathParamNames<Path>] extends [never]
-  ? { readonly params?: never; readonly search?: SC }
-  : { readonly params: ConformParams<Path, PC>; readonly search?: SC };
+  ? TrailingSlashOption & { readonly params?: never; readonly search?: SC }
+  : TrailingSlashOption & {
+      readonly params: ConformParams<Path, PC>;
+      readonly search?: SC;
+    };
 
 /**
  * Full page-props contract: the type a page annotates its props with.
@@ -432,6 +444,20 @@ type PresentRegisteredPaths =
 type StaticPathsOf<P extends string> = P extends `${string}[${string}`
   ? never
   : P;
+
+/**
+ * The route-config option behind R6's exception. Not exported on its own:
+ * it is part of {@link RouteConfig}, the type wrappers should name.
+ */
+interface TrailingSlashOption {
+  /**
+   * Build every non-root path with a trailing slash: `/asset/`,
+   * `/docs/a/b/`, `/asset/?q=1#top`; the root stays `/`. Set it to match
+   * `trailingSlash` in `next.config` (`paramour doctor` warns when they
+   * disagree). Defaults to `false`, wire-format rule R6.
+   */
+  readonly trailingSlash?: boolean;
+}
 
 /**
  * Defines an App Router route: the URL-shaped path literal plus its
@@ -656,13 +682,25 @@ function routeData<
   config: RouteConfig<Path, PC, SC>,
 ): Route<Path, PC, SC, R> {
   const segments = tokenizePath(path);
-  const { params, search } = config as { params?: PC; search?: SC };
+  const { params, search, trailingSlash } = config as {
+    params?: PC;
+    search?: SC;
+    trailingSlash?: unknown;
+  };
+  // Plain-JS backstop, fail-fast like the literal checks: a truthy string
+  // ("false") read loosely would silently change every link the route builds.
+  if (trailingSlash !== undefined && typeof trailingSlash !== "boolean") {
+    throw new ParamourError(
+      `route "${path}": trailingSlash must be a boolean, got ${describeType(trailingSlash)}`,
+    );
+  }
   return {
     path,
     "~params": params ?? ({} as PC),
     "~router": router,
     "~search": search ?? ({} as SC),
     "~segments": segments,
+    "~trailingSlash": trailingSlash ?? false,
   };
 }
 
