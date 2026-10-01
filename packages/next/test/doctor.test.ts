@@ -1,10 +1,11 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { emitArtifact } from "../src/emit.js";
 import { runCli } from "../src/run-cli.js";
-import { makeTempDir, makeTree } from "./helpers.js";
+import { linkCorePackage, makeTempDir, makeTree } from "./helpers.js";
 
 const originalCwd = process.cwd();
 afterEach(() => {
@@ -250,5 +251,107 @@ describe("paramour doctor", () => {
     const staleText = stale.out.join("\n");
     expect(staleText).toContain("⚠ skills: .claude/skills/paramour is stale");
     expect(staleText).toContain("SKILL.md: missing — run `paramour skills`");
+  });
+
+  describe("trailing slash vs next.config", () => {
+    const SLASH_CONFIG = `import { withTypedRoutes } from "@paramour-js/next";
+
+const nextConfig = { output: "export", trailingSlash: true };
+
+export default withTypedRoutes(nextConfig);
+`;
+
+    const CORE_VERSION = (
+      JSON.parse(
+        readFileSync(
+          fileURLToPath(new URL("../../core/package.json", import.meta.url)),
+          "utf8",
+        ),
+      ) as { version: string }
+    ).version;
+
+    /** Healthy project plus real route definitions (core linked, not faked). */
+    function makeDefinedProject(routes: string, nextConfig: string): string {
+      const root = makeTempDir();
+      makeTree(root, ["app/page.tsx", "app/asset/page.tsx"]);
+      writeFileSync(
+        join(root, "paramour-env.d.ts"),
+        emitArtifact({ appRoutes: ["/", "/asset"], pagesRoutes: [] }),
+      );
+      writeFileSync(join(root, "next.config.ts"), nextConfig);
+      if (!linkCorePackage(root)) throw new Error("junction link failed");
+      // The linked core's real version, so the lockstep check passes and the
+      // exit code reflects only the check under test.
+      const nextManifest = join(root, "node_modules", "@paramour-js", "next");
+      mkdirSync(nextManifest, { recursive: true });
+      writeFileSync(
+        join(nextManifest, "package.json"),
+        JSON.stringify({ name: "@paramour-js/next", version: CORE_VERSION }),
+      );
+      mkdirSync(join(root, "lib"));
+      writeFileSync(join(root, "lib", "routes.ts"), routes);
+      process.chdir(root);
+      return root;
+    }
+
+    it("passes when every definition matches", async () => {
+      makeDefinedProject(
+        `import { defineAppRoute, p } from "paramour";
+export const home = defineAppRoute("/", { trailingSlash: true });
+export const asset = defineAppRoute("/asset", {
+  search: { name: p.string() },
+  trailingSlash: true,
+});
+`,
+        SLASH_CONFIG,
+      );
+      const run = await doctor();
+      expect(run.code).toBe(0);
+      expect(run.out.join("\n")).toContain(
+        "✔ trailing slash: route definitions match next.config.ts (trailingSlash: true)",
+      );
+    });
+
+    it("warns, per route, when a definition disagrees (exit 0)", async () => {
+      makeDefinedProject(
+        `import { defineAppRoute } from "paramour";
+export const home = defineAppRoute("/", { trailingSlash: true });
+export const asset = defineAppRoute("/asset", {});
+`,
+        SLASH_CONFIG,
+      );
+      const run = await doctor();
+      expect(run.code).toBe(0);
+      const text = run.out.join("\n");
+      expect(text).toContain(
+        "⚠ trailing slash: 1 route definition disagrees with next.config.ts (trailingSlash: true)",
+      );
+      expect(text).toContain(
+        "/asset (app) in lib/routes.ts: add trailingSlash: true to its definition",
+      );
+    });
+
+    it("an opted-in route under Next's default warns too", async () => {
+      makeDefinedProject(
+        `import { defineAppRoute } from "paramour";
+export const asset = defineAppRoute("/asset", { trailingSlash: true });
+`,
+        WRAPPED_NEXT_CONFIG,
+      );
+      const text = (await doctor()).out.join("\n");
+      expect(text).toContain("(trailingSlash: false)");
+      expect(text).toContain("remove trailingSlash: true from its definition");
+    });
+
+    it("says nothing when next.config's value is not static", async () => {
+      makeDefinedProject(
+        `import { defineAppRoute } from "paramour";
+export const asset = defineAppRoute("/asset", {});
+`,
+        `export default () => ({ trailingSlash: true });
+`,
+      );
+      expect((await doctor()).out.join("\n")).not.toContain("trailing slash:");
+    });
   });
 });
