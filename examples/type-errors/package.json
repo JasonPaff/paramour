@@ -1,6 +1,6 @@
 {
   "name": "example-type-errors",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "private": true,
   "scripts": {
     "check": "paramour generate --check && node scripts/check.mjs",
