@@ -101,7 +101,9 @@ the [CLI guide](/docs/guides/cli#check) compares it with the `paramour
 check` gate.
 
 Only *drift* can fail a strict build. An incidental generation failure still
-degrades to stale types with a warning, strict or not.
+degrades to stale types with a warning, strict or not. Line endings are not
+drift either: a Windows checkout with `core.autocrlf=true` leaves the
+artifact CRLF on disk, which is treated as current and left untouched.
 
 ## ParamourConfig
 
