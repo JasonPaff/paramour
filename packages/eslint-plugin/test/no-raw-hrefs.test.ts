@@ -492,6 +492,22 @@ NextResponse.redirect("/legacybar");`,
       ],
       options: [{ ignorePaths: ["/legacy"] }],
     },
+    // The built-in /api exemption is segment-bounded too
+    {
+      code: `import Link from "next/link";
+export const el = <Link href="/apiary" />;`,
+      errors: [{ data: { path: "/apiary" }, messageId: "rawHref" }],
+    },
+    {
+      code: `import { redirect } from "next/navigation";
+redirect("/apis/v2");`,
+      errors: [
+        {
+          data: { callee: "redirect", path: "/apis/v2" },
+          messageId: "rawRedirect",
+        },
+      ],
+    },
     // Multiple violations in one file, with report locations
     {
       code: `import Link from "next/link";
@@ -668,6 +684,28 @@ export const el = <Anchor href="/x" />;`,
           linkComponents: [{ name: "Anchor", prop: "to", source: "@acme/ui" }],
         },
       ],
+    },
+    // Route handlers under /api are exempt with no options: href() cannot
+    // build them, because the registry lists only pages.
+    `import Link from "next/link";
+export const el = <Link href="/api/auth/auto-signin" />;`,
+    `import Link from "next/link";
+export const el = <Link href="/api" />;`,
+    `import Link from "next/link";
+export const el = <Link href={{ pathname: "/api/export" }} />;`,
+    `import { useRouter } from "next/navigation";
+export function C() {
+  const router = useRouter();
+  router.push("/api/auth/sign-out?callbackUrl=%2F");
+}`,
+    `import { NextResponse } from "next/server";
+NextResponse.redirect("/api/auth/signin");`,
+    // ...and the exemption stacks with configured ignorePaths
+    {
+      code: `import Link from "next/link";
+export const a = <Link href="/api/x" />;
+export const b = <Link href="/legacy/y" />;`,
+      options: [{ ignorePaths: ["/legacy"] }],
     },
     // ignorePaths: prefix boundaries
     {

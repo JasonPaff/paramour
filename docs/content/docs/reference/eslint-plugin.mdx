@@ -134,6 +134,14 @@ empty strings all pass without a protocol allowlist to maintain.
 Protocol-relative URLs (`//cdn.example.com/x`) are external too, and are
 exempt despite their leading slashes.
 
+Paths under `/api` (`/api`, `/api/auth/signin`, `/api?x=1`, but not
+`/apiary`) are always exempt, with no configuration. They point at route
+handlers, and `href()` cannot build those because the registry lists only
+pages, so a warning there would have no fix. The exemption follows the
+convention: `/api` is the Pages Router's reserved API directory and where
+App Router projects put route handlers. Route handlers elsewhere need
+`ignorePaths`, and a page that lives under `/api` is not checked.
+
 Type-only imports (`import type Link from "next/link"`) never fire — a
 value usage of one is already a TypeScript error.
 
