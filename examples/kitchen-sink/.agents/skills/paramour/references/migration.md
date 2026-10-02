@@ -76,7 +76,7 @@ export default async function ProductPage(props: RouteProps) {
 - `sp.x ?? "default"` / `Number(sp.x ?? "1")` → codec with `.default(value)`. The decoded field is non-optional and the default value elides from built URLs.
 - "May be absent, no fallback" (`typeof sp.x === "string" ? sp.x : undefined`) → `.optional()`. Decoded as `T | undefined`.
 - Silent-coercion tolerance (old code shrugged off garbage, e.g. `Number(...)` producing `NaN` handled downstream) → add `.catch(fallback)` so a malformed PRESENT value falls back instead of failing the decode. `.catch()` never covers absence — combine with `.default()`/`.optional()` for that.
-- Multi-value keys (`sp.tags` handled as `string | string[]`) → `p.array()` for repeated keys (`?tags=a&tags=b`) or `p.csv()` for one comma-joined key (`?tags=a,b`). Match whichever wire form the app already emits.
+- Multi-value keys (`sp.tags` handled as `string | string[]`) → `p.array()` for repeated keys (`?tags=a&tags=b`) or `p.csv()` for one comma-joined key (`?tags=a,b`). Match whichever wire form the app already emits. Lists that nuqs's `parseAsArrayOf` already wrote (elements with `%2C`-escaped commas, bad elements dropped) → `nuqsArrayOf(element)` from `@paramour-js/nuqs`, not `p.csv()`.
 - Enumerated strings → `p.enum(["a", "b"])`; numbers → `p.number()`; booleans (`sp.flag === "true"`) → `p.boolean()`; dates → `p.isoDate()` (YYYY-MM-DD) or `p.timestamp()` (ISO instant; emits UTC).
 
 ### Behavior change to decide explicitly

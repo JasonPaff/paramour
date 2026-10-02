@@ -236,7 +236,7 @@ describe("describeRoute", () => {
     });
   });
 
-  it("reports trailingSlash only when the route opts in", () => {
+  it("reports trailingSlash exactly as the route set it", () => {
     const route = defineAppRoute("/about", { trailingSlash: true });
     expect(describeRoute(route)).toEqual({
       params: {},
@@ -247,7 +247,10 @@ describe("describeRoute", () => {
     });
     expect(
       describeRoute(defineAppRoute("/about", { trailingSlash: false })),
-    ).not.toHaveProperty("trailingSlash");
+    ).toHaveProperty("trailingSlash", false);
+    expect(describeRoute(defineAppRoute("/about", {}))).not.toHaveProperty(
+      "trailingSlash",
+    );
   });
 
   it("describes a rawSearch slot as raw", () => {

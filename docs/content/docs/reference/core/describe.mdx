@@ -142,6 +142,7 @@ carries it, so `array<csv<E>>` renders as `csv<E>[]`.
 - **`ParamDescription`** — a `CodecDescription` plus the `segmentKind` of
   the dynamic segment hosting it.
 - **`RouteDescription`** — the reflected route: `path`, `router`, `params`,
-  `search`, and `trailingSlash: true` only for a route defined with it.
+  `search`, and `trailingSlash` whenever the route's config sets it (`true`
+  or `false`); it is absent when the option was left unset.
 - **`SearchDescription`** — the search slot's three shapes: `"codecs"`,
   `"none"`, or `"raw"`.

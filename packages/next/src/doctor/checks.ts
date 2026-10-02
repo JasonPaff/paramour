@@ -305,8 +305,7 @@ async function trailingSlashCheck(
   // option and lack the member: missing reads as the R6 default.
   const mismatched = definitions.filter(
     (definition) =>
-      ((definition.route["~trailingSlash"] as boolean | undefined) ?? false) !==
-      configured,
+      (definition.route["~trailingSlash"] ?? false) !== configured,
   );
   if (mismatched.length === 0) {
     return {

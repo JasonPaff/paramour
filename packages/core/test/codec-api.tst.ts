@@ -202,6 +202,17 @@ test("only an optional codec's catch may recover to undefined", () => {
   expect(p.integer().optional().catch(undefined)["~out"]).type.toBe<number>();
 });
 
+test("a non-optional catch rejects undefined even when the output admits it", () => {
+  const maybe = p.custom<string | undefined>({
+    parse: (raw) => raw,
+    serialize: (value) => value ?? "",
+  });
+  expect(maybe.catch).type.not.toBeCallableWith(undefined);
+  expect(maybe.catch).type.not.toBeCallableWith(() => undefined);
+  expect(maybe.catch).type.toBeCallableWith("fallback");
+  expect(maybe.optional().catch).type.toBeCallableWith(undefined);
+});
+
 test("default and catch accept a factory form", () => {
   expect(p.integer().default).type.toBeCallableWith(() => 1);
   expect(p.integer().catch).type.toBeCallableWith(() => 0);
