@@ -197,6 +197,21 @@ describe("withTypedRoutes build phase", () => {
     );
   });
 
+  it("strict: true resolves on a CRLF checkout of a fresh artifact, leaving it untouched", async () => {
+    // git core.autocrlf=true checks the committed LF artifact out as CRLF.
+    const root = makeProject(["app/page.tsx"]);
+    const artifact = join(root, "paramour-env.d.ts");
+    const crlf = emitApp(["/"]).replaceAll("\n", "\r\n");
+    writeFileSync(artifact, crlf);
+    const warn = silenceWarn();
+    const config = { reactStrictMode: true as const };
+    await expect(
+      withTypedRoutes(config, { strict: true })(PHASE_BUILD, {}),
+    ).resolves.toBe(config);
+    expect(warn).not.toHaveBeenCalled();
+    expect(readFileSync(artifact, "utf8")).toBe(crlf);
+  });
+
   it("strict: true still resolves when generation itself fails (only drift may fail a strict build)", async () => {
     // outFile pointing at an existing DIRECTORY makes the artifact write
     // throw (EISDIR) — an incidental generation failure, not drift.

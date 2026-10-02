@@ -5,7 +5,8 @@ description: Verify the committed artifact is current — exit 1 on drift, never
 
 The CI gate. `check` is exactly
 [`generate --check`](/docs/reference/next/cli/generate): re-scan the route
-directories, byte-compare the result against the committed artifact, exit
+directories, compare the result against the committed artifact (CRLF and LF
+line endings count as equal, so an `autocrlf` checkout is not drift), exit
 `1` on drift, **never write**:
 
 ```bash
@@ -27,7 +28,7 @@ Run `paramour generate` and commit the result.
 ```
 
 A **missing artifact counts as drift** — CI can't silently degrade to
-unchecked paths. So does byte drift with an identical route set (a
+unchecked paths. So does content drift with an identical route set (a
 hand-edited artifact), reported as `content differs from generator output`.
 
 ## Flags
@@ -67,6 +68,6 @@ explicitly and first, rather than mid-`next build`.
 
 | Code | When                                                                       |
 | ---- | -------------------------------------------------------------------------- |
-| `0`  | The artifact matches the filesystem byte-for-byte.                          |
+| `0`  | The artifact matches the filesystem (line endings aside).                   |
 | `1`  | Drift — including a missing or hand-edited artifact.                        |
 | `2`  | Usage/config errors, no route directories, route collisions, I/O failures.  |

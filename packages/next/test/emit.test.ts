@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
@@ -151,6 +151,26 @@ describe("writeIfChanged", () => {
       written: true,
     });
     expect(readFileSync(file, "utf8")).toBe("content\n");
+  });
+
+  it("treats a CRLF checkout of the same content as a no-op and keeps its endings", () => {
+    const file = join(makeTempDir(), "paramour-env.d.ts");
+    writeFileSync(file, "line one\r\nline two\r\n");
+    expect(writeIfChanged(file, "line one\nline two\n")).toEqual({
+      previousContent: "line one\r\nline two\r\n",
+      written: false,
+    });
+    expect(readFileSync(file, "utf8")).toBe("line one\r\nline two\r\n");
+  });
+
+  it("rewrites a CRLF file whose content really changed, as LF", () => {
+    const file = join(makeTempDir(), "paramour-env.d.ts");
+    writeFileSync(file, "old\r\n");
+    expect(writeIfChanged(file, "new\n")).toEqual({
+      previousContent: "old\r\n",
+      written: true,
+    });
+    expect(readFileSync(file, "utf8")).toBe("new\n");
   });
 
   it("distinguishes an empty existing file from a missing one", () => {
