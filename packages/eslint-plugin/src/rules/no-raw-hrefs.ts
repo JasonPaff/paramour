@@ -81,6 +81,15 @@ function isIgnored(path: string, ignorePaths: readonly string[]): boolean {
 }
 
 /**
+ * Always exempt, on top of `ignorePaths`. Links to route handlers can't be
+ * built with href(): the registry lists only pages, so a warning there has
+ * no fix. `/api` is the Pages Router's reserved API directory and the App
+ * Router convention for route handlers. A page under /api goes unflagged,
+ * which is the accepted cost.
+ */
+const ROUTE_HANDLER_PREFIX = "/api";
+
+/**
  * Flags any literal starting with "/"; everything else (external URLs,
  * "#hash", "mailto:", relative paths, "") is exempt by not starting with "/".
  * "//host/path" is protocol-relative — an external URL, so also exempt.
@@ -91,7 +100,7 @@ function isRawInternalPath(path: string): boolean {
 
 export const noRawHrefs = createRule<Options, MessageIds>({
   create(context, [options]) {
-    const ignorePaths = options.ignorePaths ?? [];
+    const ignorePaths = [ROUTE_HANDLER_PREFIX, ...(options.ignorePaths ?? [])];
     const linkComponents = options.linkComponents ?? [];
     const { sourceCode } = context;
 
