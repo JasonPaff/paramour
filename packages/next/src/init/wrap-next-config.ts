@@ -34,6 +34,16 @@ interface ProxiedNode {
 
 const IMPORT_LINE = `import { withTypedRoutes } from "@paramour-js/next";`;
 
+/** {@link writtenBindings}' name for `module.exports` (no identifier has a dot). */
+const MODULE_EXPORTS = "module.exports";
+
+/** The `Object` statics that write their first argument's properties. */
+const OBJECT_WRITERS = new Set([
+  "assign",
+  "defineProperties",
+  "defineProperty",
+]);
+
 /**
  * Wrap-state probe for `doctor`: same import/callee detection the codemod
  * uses for idempotence, without mutating anything.
@@ -81,12 +91,13 @@ export function manualSnippet(): string {
 
 /**
  * Reads `trailingSlash` from a next.config source for `doctor`, statically:
- * the default export (or CJS `module.exports`) is followed through wrapper
- * calls (first argument), TS `as`/`satisfies`, and top-level `const`
- * bindings to an object literal. A literal without the key is Next's default,
- * `false`. Anything else (a config function, a non-literal value, a spread
- * that could carry the key) is `undefined`: doctor stays quiet rather than
- * guess, since evaluating the config would run user code.
+ * the default export (or CJS `module.exports`) is followed through
+ * single-argument wrapper calls, TS `as`/`satisfies`, and top-level bindings
+ * to an object literal. A literal without the key is Next's default, `false`.
+ * Anything else (a config function, a non-literal value, a spread that could
+ * carry the key, a multi-argument call, a binding written after its
+ * declaration) is `undefined`: doctor stays quiet rather than guess, since
+ * evaluating the config would run user code.
  */
 export async function readTrailingSlash(
   source: string,
@@ -98,6 +109,7 @@ export async function readTrailingSlash(
   } catch {
     return undefined;
   }
+  const written = writtenBindings(program);
   const body = asNodes(program.body);
   const bindings = new Map<string, unknown>();
   let exported: unknown;
@@ -105,7 +117,11 @@ export async function readTrailingSlash(
     if (statement.type === "VariableDeclaration") {
       for (const declarator of asNodes(statement.declarations)) {
         const id = asNode(declarator.id);
-        if (id?.type === "Identifier" && typeof id.name === "string") {
+        if (
+          id?.type === "Identifier" &&
+          typeof id.name === "string" &&
+          !written.has(id.name)
+        ) {
           bindings.set(id.name, declarator.init);
         }
       }
@@ -117,7 +133,7 @@ export async function readTrailingSlash(
         expression?.type === "AssignmentExpression" &&
         isModuleExports(asNode(expression.left))
       ) {
-        exported = expression.right;
+        exported = written.has(MODULE_EXPORTS) ? undefined : expression.right;
       }
     }
   }
@@ -234,8 +250,13 @@ function trailingSlashOf(
   if (node === undefined || depth > 16) return undefined;
   switch (node.type) {
     case "CallExpression": {
-      const [first] = asNodes(node.arguments);
-      return trailingSlashOf(first, bindings, depth + 1);
+      // Only a single-argument wrapper (`withTypedRoutes(config)`, curried
+      // `withX(options)(config)`) is followed. With more arguments nothing
+      // says which one is the config, and plugin options often come first.
+      const [only, ...rest] = asNodes(node.arguments);
+      return rest.length === 0
+        ? trailingSlashOf(only, bindings, depth + 1)
+        : undefined;
     }
     case "Identifier": {
       return typeof node.name === "string" && bindings.has(node.name)
@@ -277,4 +298,86 @@ function withTypedRoutesLocal(
     (item) =>
       item.from === "@paramour-js/next" && item.imported === "withTypedRoutes",
   )?.local;
+}
+
+/**
+ * The binding a write lands on: an identifier, or `module.exports`. TS
+ * wrappers are seen through, so `(config as NextConfig).x = …` counts.
+ */
+function writeTarget(value: unknown): string | undefined {
+  let node = asNode(value);
+  while (
+    node?.type === "ParenthesizedExpression" ||
+    node?.type === "TSAsExpression" ||
+    node?.type === "TSNonNullExpression" ||
+    node?.type === "TSSatisfiesExpression"
+  ) {
+    node = asNode(node.expression);
+  }
+  if (node?.type === "Identifier" && typeof node.name === "string") {
+    return node.name;
+  }
+  return isModuleExports(node) ? MODULE_EXPORTS : undefined;
+}
+
+/**
+ * Every binding the program writes after its declaration, which makes its
+ * declared value an unreliable read: a direct property write or delete
+ * (`c.x = …`, `c[k] = …`, `delete c.x`), an `Object.assign` /
+ * `Object.defineProperty` / `Object.defineProperties` target, or a
+ * reassignment (`c = …`, or `module.exports` assigned more than once). A
+ * write to a nested object (`c.experimental.x = …`) is not counted, since it
+ * cannot change `c.trailingSlash`. The whole program is searched, not just
+ * the top level, because a static-export toggle usually sits under an `if`.
+ * Scope is ignored, so a shadowing parameter of the same name also counts;
+ * that errs toward unknown, which only costs a finding.
+ */
+function writtenBindings(program: AstNode): Set<string> {
+  const written = new Set<string>();
+  let moduleExportsAssignments = 0;
+  const add = (target: string | undefined): void => {
+    if (target !== undefined) written.add(target);
+  };
+  const visit = (node: AstNode): void => {
+    if (node.type === "AssignmentExpression") {
+      const left = asNode(node.left);
+      // `module.exports` is itself a member expression: test it first.
+      if (isModuleExports(left)) {
+        moduleExportsAssignments += 1;
+      } else if (left?.type === "MemberExpression") {
+        add(writeTarget(left.object));
+      } else {
+        add(writeTarget(left));
+      }
+    } else if (node.type === "UnaryExpression" && node.operator === "delete") {
+      const argument = asNode(node.argument);
+      if (argument?.type === "MemberExpression") {
+        add(writeTarget(argument.object));
+      }
+    } else if (node.type === "CallExpression") {
+      const callee = asNode(node.callee);
+      const object = asNode(callee?.object);
+      const property = asNode(callee?.property);
+      if (
+        callee?.type === "MemberExpression" &&
+        callee.computed !== true &&
+        object?.type === "Identifier" &&
+        object.name === "Object" &&
+        property?.type === "Identifier" &&
+        typeof property.name === "string" &&
+        OBJECT_WRITERS.has(property.name)
+      ) {
+        add(writeTarget(asNodes(node.arguments)[0]));
+      }
+    }
+    for (const child of Object.values(node)) {
+      for (const item of Array.isArray(child) ? asNodes(child) : [child]) {
+        const next = asNode(item);
+        if (next !== undefined) visit(next);
+      }
+    }
+  };
+  visit(program);
+  if (moduleExportsAssignments > 1) written.add(MODULE_EXPORTS);
+  return written;
 }

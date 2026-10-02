@@ -209,6 +209,55 @@ export default withTypedRoutes(nextConfig);
     }
   });
 
+  it("is undefined when a multi-argument call hides which argument is the config", async () => {
+    for (const source of [
+      `export default withPlugin({ enabled: true }, { trailingSlash: true });`,
+      `export default withPlugin({ trailingSlash: true }, nextConfig);`,
+      `const nextConfig = {}; export default withPlugin({}, nextConfig);`,
+    ]) {
+      expect(await readTrailingSlash(source), source).toBeUndefined();
+    }
+  });
+
+  it("follows a curried wrapper's single config argument", async () => {
+    expect(
+      await readTrailingSlash(
+        `export default withPlugin({ enabled: true })({ trailingSlash: true });`,
+      ),
+    ).toBe(true);
+  });
+
+  it("is undefined when the config binding is written after its declaration", async () => {
+    for (const source of [
+      `const c = { output: "export" }; c.trailingSlash = true; export default c;`,
+      `const c = {}; c["trailingSlash"] = true; export default withTypedRoutes(c);`,
+      `const c = {};
+if (process.env.EXPORT === "1") {
+  c.trailingSlash = true;
+}
+export default withTypedRoutes(c);`,
+      `const c = {}; (c as NextConfig).trailingSlash = true; export default c;`,
+      `const c = { trailingSlash: true }; delete c.trailingSlash; export default c;`,
+      `const c = {}; Object.assign(c, { trailingSlash: true }); export default c;`,
+      `const c = {}; Object.defineProperty(c, "trailingSlash", { value: true }); export default c;`,
+      `let c = {}; if (process.env.EXPORT) c = { trailingSlash: true }; export default c;`,
+      `const base = {}; const c = withX(base); base.trailingSlash = true; export default c;`,
+      `module.exports = {}; module.exports.trailingSlash = true;`,
+      `module.exports = {}; if (process.env.EXPORT) module.exports = { trailingSlash: true };`,
+      `module.exports = {}; Object.assign(module.exports, { trailingSlash: true });`,
+    ]) {
+      expect(await readTrailingSlash(source), source).toBeUndefined();
+    }
+  });
+
+  it("a write to a nested object cannot change trailingSlash", async () => {
+    expect(
+      await readTrailingSlash(
+        `const c = { experimental: {}, trailingSlash: true }; c.experimental.typedRoutes = false; export default c;`,
+      ),
+    ).toBe(true);
+  });
+
   it("last write wins, as at runtime", async () => {
     expect(
       await readTrailingSlash(
