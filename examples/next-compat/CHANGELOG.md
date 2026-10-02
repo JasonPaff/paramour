@@ -1,5 +1,13 @@
 # example-next-compat
 
+## 0.0.16
+
+### Patch Changes
+
+- Updated dependencies [[`88aafff`](https://github.com/JasonPaff/paramour/commit/88aafff233557b31a10649e9aa24af186847a4c3), [`dd1d767`](https://github.com/JasonPaff/paramour/commit/dd1d767dd8924ad5e97573a606bd9a4644bbde7a)]:
+  - @paramour-js/next@0.11.1
+  - paramour@0.11.1
+
 ## 0.0.15
 
 ### Patch Changes
