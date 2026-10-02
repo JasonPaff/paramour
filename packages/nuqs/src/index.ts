@@ -20,6 +20,8 @@ import {
   type AnyCodec,
   type AnyRoute,
   type Codec,
+  describeCodec,
+  formatCodecDescription,
   type InferCodecOutput,
   isRawSearch,
   p,
@@ -138,8 +140,9 @@ type RouteParserMap<R extends AnyRoute> = R["~search"] extends SearchConfig
  * both with a `SerializeError` rather than emit a URL that reads back as a
  * different list: an element whose wire form already contains `%2C` (it
  * would come back with a comma), and a sole element whose wire form is
- * empty (the empty wire string reads back as `[]`). Everything else nuqs
- * writes, this reads, and everything this writes, nuqs reads identically.
+ * empty (the empty wire string reads back as `[]`). Beyond those, the two
+ * agree on every URL as long as nuqs uses its default `,` separator and the
+ * element codec accepts the same text as nuqs's element parser.
  *
  * Elements are unmodified scalars, as for `p.csv`: modifiers belong on the
  * list (`nuqsArrayOf().default([])`), which is an ordinary single-arity
@@ -150,7 +153,9 @@ export function nuqsArrayOf<E = string>(element?: Codec<E>): Codec<E[]> {
   const parseElement = inner["~parseElement"];
   const serializeElement = inner["~serializeElement"];
   return p.custom<E[]>({
-    label: "nuqs array",
+    // Named after the element like core's composites (`csv<integer>`), so
+    // `paramour list` and devtools show what the list holds.
+    label: `nuqsArrayOf<${formatCodecDescription(describeCodec(inner), "shape")}>`,
     parse(raw) {
       if (raw === "") return [];
       const values: E[] = [];
@@ -169,6 +174,11 @@ export function nuqsArrayOf<E = string>(element?: Codec<E>): Codec<E[]> {
       return values;
     },
     serialize(values) {
+      // Plain-JS backstop, matching p.csv's message for a non-array value.
+      const list: unknown = values;
+      if (!Array.isArray(list)) {
+        throw new SerializeError(`Expected an array, got ${typeof list}`);
+      }
       const segments = values.map((value) => {
         const wire = serializeElement(value);
         if (typeof wire !== "string") {

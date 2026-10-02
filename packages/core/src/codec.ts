@@ -164,13 +164,15 @@ export type PresenceOf<C extends AnyCodec> = C["~presence"];
  * `undefined` — which is the honest fallback when no in-domain value means
  * "nothing selected". This does not blur D2: the INPUT `.catch()` handles is
  * still a present-but-malformed value, never absence. Every other presence
- * keeps an `Out`-only fallback: a required or defaulted key must decode to a
- * value. Non-distributive so the `Presence` union inside {@link AnyCodec}
- * reads as `Out`, keeping concrete optional codecs assignable to it.
+ * keeps a defined fallback: a required or defaulted key must decode to a
+ * value, so `undefined` is excluded even when `Out` itself admits it (the
+ * runtime guard in `catch` would throw on it). Non-distributive so the
+ * `Presence` union inside {@link AnyCodec} takes the defined branch, keeping
+ * concrete optional codecs assignable to it.
  */
 type CatchFallback<Out, P extends Presence> = [P] extends ["optional"]
   ? Out | undefined
-  : Out;
+  : Exclude<Out, undefined>;
 
 interface CodecState<Out> {
   readonly arity: Arity;

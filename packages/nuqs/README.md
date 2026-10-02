@@ -66,10 +66,11 @@ The adapter imports from `nuqs/server`, so the derived parsers are usable in ser
 
 ## Keeping URLs nuqs already wrote: `nuqsArrayOf`
 
-`p.csv` matches nuqs's `parseAsArrayOf` only when no element contains a comma. nuqs escapes an in-element comma as the literal text `%2C` and drops elements that fail to parse. `p.csv` rejects the comma at link-build time and fails the whole key. When existing bookmarks must keep working, use `nuqsArrayOf`, a paramour codec that reads and writes nuqs's exact format:
+`p.csv` matches nuqs's `parseAsArrayOf` only when every element is non-empty and contains no comma. nuqs escapes an in-element comma as the literal text `%2C` and drops elements that fail to parse. `p.csv` rejects the comma at link-build time and fails the whole key. When existing bookmarks must keep working, use `nuqsArrayOf`, a paramour codec that reads and writes nuqs's exact format:
 
 ```ts
 import { nuqsArrayOf } from "@paramour-js/nuqs";
+import { p } from "paramour";
 
 search: {
   clients: nuqsArrayOf().default([]), // "Acme, Inc." fits
@@ -77,7 +78,7 @@ search: {
 }
 ```
 
-It refuses to write the two values nuqs's format can't round-trip (a `SerializeError`): an element whose wire form already contains `%2C`, and a list of one empty element.
+It refuses to write the two values nuqs's format can't round-trip (a `SerializeError`, thrown from nuqs setters too): an element whose wire form already contains `%2C`, and a list of one empty element. Only nuqs's default `,` separator is supported.
 
 ## Shapes with no nuqs twin
 

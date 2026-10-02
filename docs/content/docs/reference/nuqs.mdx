@@ -196,8 +196,20 @@ nuqs's escaping is lossy in two places, and `nuqsArrayOf` refuses to
 write either rather than emit a URL that reads back as a different list:
 an element whose wire form already contains the text `%2C` (it would come
 back with a comma), and a list of one element whose wire form is empty
-(the empty wire string reads back as `[]`). Both are a `SerializeError`.
-Everything else nuqs writes, `nuqsArrayOf` reads, and the reverse.
+(the empty wire string reads back as `[]`). Both are a `SerializeError`,
+thrown from a nuqs setter too: `setTags([""])` throws instead of writing
+`?tags=`.
+
+Beyond those two lists, `nuqsArrayOf` and `parseAsArrayOf` agree on every
+URL when nuqs uses its default `,` separator (a custom separator is not
+supported) and the element codec accepts the same text as nuqs's element
+parser. Element grammars can differ: `parseAsInteger` reads `"1.5"` as
+`1`, while `p.integer()` rejects it, so `nuqsArrayOf(p.integer())` drops
+that element.
+
+Because a failing element is dropped rather than failing the key, a
+`.catch()` on `nuqsArrayOf` never fires for bad elements. Use `.default()`
+for the value of an absent key.
 
 ## NoNuqsTwin
 

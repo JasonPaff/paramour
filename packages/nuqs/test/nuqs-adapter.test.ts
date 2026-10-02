@@ -12,7 +12,9 @@ import {
   buildSearchString,
   decodeSearch,
   defineAppRoute,
+  describeCodec,
   encodeSearch,
+  formatCodecDescription,
   p,
   ParamourError,
   rawSearch,
@@ -475,5 +477,24 @@ describe("nuqsArrayOf matches nuqs's parseAsArrayOf", () => {
     );
     expect(() => nuqsArrayOf(p.array() as never)).toThrow(ParamourError);
     expect(() => nuqsArrayOf(42 as never)).toThrow(ParamourError);
+  });
+
+  it("rejects a non-array value for plain-JS callers, as p.csv does", () => {
+    expect(() =>
+      encodeSearch({ tags: nuqsArrayOf() }, { tags: "a" as never }),
+    ).toThrow(/Expected an array, got string/);
+  });
+
+  it("reflects its element in the label", () => {
+    expect(describeCodec(nuqsArrayOf())).toMatchObject({
+      kind: "custom",
+      label: "nuqsArrayOf<string>",
+    });
+    expect(
+      formatCodecDescription(
+        describeCodec(nuqsArrayOf(p.integer()).default([])),
+        "compact",
+      ),
+    ).toMatch(/^nuqsArrayOf<integer>/);
   });
 });

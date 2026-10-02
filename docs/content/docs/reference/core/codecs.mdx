@@ -178,9 +178,11 @@ The rules, spelled out:
 - Each modifier may be applied **once**.
 - `.optional()` and `.default()` are mutually exclusive in either order —
   what would `.optional().default(1)` mean when the key is absent?
-- `.catch()` combines freely with either presence modifier, in any order:
+- `.catch()` combines with either presence modifier, in any order:
   `p.integer().catch(0).default(1)` and `p.integer().default(1).catch(0)`
-  are both legal.
+  are both legal. The one exception is an `undefined` fallback, which only
+  an optional key can recover to, so it needs `.optional()` first:
+  `p.integer().optional().catch(undefined)`.
 - Arity-`"many"` codecs (`p.array`) have no presence modifiers at all —
   absent and `[]` are the same wire state (see
   [`p.array`](./p-builders#parray)).

@@ -327,13 +327,15 @@ export interface Route<
   readonly "~segments": readonly PathSegment[];
   /**
    * The define-time `trailingSlash` option (R6's exception): `buildPath`, and
-   * so `href`, append "/" to every non-root path when true. Required, not
-   * optional: an optional member here turns the wrong-router diagnostics
-   * (an AppRoute passed where AnyPagesRoute is expected) into
-   * exactOptionalPropertyTypes noise. Readers test it for truthiness, so a
-   * plain-JS hand-built route without it gets the R6 default.
+   * so `href`, append "/" to every non-root path when true. `undefined`
+   * when the config left it unset, kept apart from an explicit `false` so
+   * reflection can tell an opt-out from the default. Required, not optional:
+   * an optional member here turns the wrong-router diagnostics (an AppRoute
+   * passed where AnyPagesRoute is expected) into exactOptionalPropertyTypes
+   * noise. Readers test it for truthiness, so a plain-JS hand-built route
+   * without it gets the R6 default.
    */
-  readonly "~trailingSlash": boolean;
+  readonly "~trailingSlash": boolean | undefined;
 }
 
 /**
@@ -700,7 +702,7 @@ function routeData<
     "~router": router,
     "~search": search ?? ({} as SC),
     "~segments": segments,
-    "~trailingSlash": trailingSlash ?? false,
+    "~trailingSlash": trailingSlash,
   };
 }
 
