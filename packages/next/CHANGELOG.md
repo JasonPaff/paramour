@@ -1,5 +1,11 @@
 # @paramour-js/next
 
+## 1.0.0-rc.0
+
+### Major Changes
+
+- [#65](https://github.com/JasonPaff/paramour/pull/65) [`1ff43d2`](https://github.com/JasonPaff/paramour/commit/1ff43d21a7be809fd9aadc296a7b5384049d520e) Thanks [@JasonPaff](https://github.com/JasonPaff)! - 1.0 release candidate. The public API is frozen: from 1.0 on, semver applies as the Stability & versioning page describes, and breaking changes wait for 2.0. This release adds no changes beyond 0.11.3. Install it with the `rc` dist-tag (`npm install paramour@rc`) and report anything that should change before 1.0.0 final.
+
 ## 0.11.3
 
 ### Patch Changes
