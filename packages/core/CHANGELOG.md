@@ -1,5 +1,13 @@
 # paramour
 
+## 0.11.2
+
+### Patch Changes
+
+- [#61](https://github.com/JasonPaff/paramour/pull/61) [`521a4b4`](https://github.com/JasonPaff/paramour/commit/521a4b43afc16d28591b2e75d0542d3896e1f6ef) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `.catch()` on a required or defaulted codec now rejects an `undefined` fallback at compile time even when the codec's output type includes `undefined` (for example `p.custom<string | undefined>`). That chain already threw at runtime; only an `.optional()` codec may recover to absent.
+
+- [#61](https://github.com/JasonPaff/paramour/pull/61) [`521a4b4`](https://github.com/JasonPaff/paramour/commit/521a4b43afc16d28591b2e75d0542d3896e1f6ef) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `describeRoute` reports `trailingSlash` whenever the route's config sets it, `false` included, so an explicit opt-out is distinguishable from an unset option. `RouteDescription.trailingSlash` is now typed `boolean`.
+
 ## 0.11.1
 
 ## 0.11.0
