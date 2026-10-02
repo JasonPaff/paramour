@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { lineEnding } from "../emit.js";
+
 /**
  * The `paramour init` next.config codemod (magicast: recast printing +
  * babel-ts parsing, so TS/ESM configs transform format-preservingly).
@@ -179,7 +181,12 @@ export async function wrapNextConfigSource(
       local ?? "withTypedRoutes",
       current,
     );
-    return { code: generateCode(mod).code, status: "wrapped" };
+    // recast prints new nodes with LF and drops the final newline; keep the
+    // user's file as it was on both counts.
+    const eol = lineEnding(source);
+    let code = generateCode(mod).code.replaceAll("\r\n", "\n");
+    if (source.endsWith("\n") && !code.endsWith("\n")) code += "\n";
+    return { code: code.replaceAll("\n", eol), status: "wrapped" };
   } catch {
     return { snippet: manualSnippet(), status: "manual" };
   }

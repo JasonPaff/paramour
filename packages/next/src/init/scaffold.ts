@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
+import { lineEnding } from "../emit.js";
 import { resolveRouteDirs } from "../scan.js";
 import { loadPackagedSkill } from "../skills/packaged.js";
 import { auditTarget, isOutdated } from "../skills/sync.js";
@@ -15,9 +16,9 @@ export interface SetupCheck {
 
 /**
  * Insert `"paramour": "paramour generate"` into a package.json's scripts,
- * preserving the file's own indentation and trailing-newline choice.
- * Throws on malformed JSON — a broken package.json is init's one hard
- * prerequisite failure.
+ * preserving the file's own indentation, line ending, and trailing-newline
+ * choice. Throws on malformed JSON — a broken package.json is init's one
+ * hard prerequisite failure.
  */
 export function addPackageScript(text: string): {
   changed: boolean;
@@ -41,8 +42,12 @@ export function addPackageScript(text: string): {
   if (scripts?.paramour !== undefined) return { changed: false, text };
   pkg.scripts = { ...scripts, paramour: "paramour generate" };
   const indent = /^([ \t]+)"/m.exec(text)?.[1] ?? "  ";
-  const trailing = text.endsWith("\n") ? "\n" : "";
-  return { changed: true, text: JSON.stringify(pkg, null, indent) + trailing };
+  const eol = lineEnding(text);
+  const trailing = text.endsWith("\n") ? eol : "";
+  return {
+    changed: true,
+    text: JSON.stringify(pkg, null, indent).replaceAll("\n", eol) + trailing,
+  };
 }
 
 /**
