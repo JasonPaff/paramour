@@ -1,5 +1,11 @@
 # @paramour-js/nuqs
 
+## 0.11.2
+
+### Patch Changes
+
+- [#61](https://github.com/JasonPaff/paramour/pull/61) [`521a4b4`](https://github.com/JasonPaff/paramour/commit/521a4b43afc16d28591b2e75d0542d3896e1f6ef) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `nuqsArrayOf` reflects its element in its label (`nuqsArrayOf<integer>` instead of `nuqs array`), so `paramour list` and the devtools panel show what the list holds. Serializing a non-array value from plain JS now throws `Expected an array` like `p.csv`.
+
 ## 0.11.1
 
 ## 0.11.0
