@@ -573,6 +573,59 @@ describe("paramour init", () => {
     expect(snapshotTree(root)).toEqual(before);
   });
 
+  it("treats a CRLF checkout of its own section as up to date", async () => {
+    // git core.autocrlf=true checks the committed LF file out as CRLF.
+    const checkedOut = `${AGENTS_MD}\n${agentsSnippet()}\n`.replaceAll(
+      "\n",
+      "\r\n",
+    );
+    const root = makeProject(["app/page.tsx"], {
+      "CLAUDE.md": checkedOut,
+      "package.json": PACKAGE_JSON,
+    });
+    const run = await init(["--no-wrap"]);
+    expect(run.out.join("\n")).toContain(
+      "• CLAUDE.md paramour section already up to date — skipped",
+    );
+    expect(readFileSync(join(root, "CLAUDE.md"), "utf8")).toBe(checkedOut);
+  });
+
+  it("keeps a CRLF instructions file CRLF when appending and updating", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "AGENTS.md": AGENTS_MD.replaceAll("\n", "\r\n"),
+      "package.json": PACKAGE_JSON,
+    });
+    await init(["--no-wrap"]);
+    const appended = readFileSync(join(root, "AGENTS.md"), "utf8");
+    expect(appended).toContain(AGENTS_MARKER_START);
+    expect(appended).not.toMatch(/(?<!\r)\n/);
+
+    writeFileSync(
+      join(root, "AGENTS.md"),
+      appended.replace("## paramour", "## paramour (edited)"),
+    );
+    const run = await init(["--no-wrap"]);
+    expect(run.out.join("\n")).toContain(
+      "✔ updated paramour section in AGENTS.md",
+    );
+    const updated = readFileSync(join(root, "AGENTS.md"), "utf8");
+    expect(updated).toBe(appended);
+  });
+
+  it("keeps a CRLF package.json CRLF when adding the script", async () => {
+    const root = makeProject(["app/page.tsx"], {
+      "package.json": PACKAGE_JSON.replaceAll("\n", "\r\n"),
+    });
+    const run = await init(["--no-wrap"]);
+    expect(run.out.join("\n")).toContain(
+      `✔ added "paramour" script to package.json`,
+    );
+    const text = readFileSync(join(root, "package.json"), "utf8");
+    expect(text).toContain('"paramour": "paramour generate"');
+    expect(text).not.toMatch(/(?<!\r)\n/);
+    expect(text.endsWith("}\r\n")).toBe(true);
+  });
+
   it("starts the section on its own line when the file lacks a trailing newline", async () => {
     const root = makeProject(["app/page.tsx"], {
       "AGENTS.md": "# Notes without newline",
