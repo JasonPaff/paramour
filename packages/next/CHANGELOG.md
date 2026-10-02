@@ -1,5 +1,13 @@
 # @paramour-js/next
 
+## 0.11.1
+
+### Patch Changes
+
+- [#59](https://github.com/JasonPaff/paramour/pull/59) [`88aafff`](https://github.com/JasonPaff/paramour/commit/88aafff233557b31a10649e9aa24af186847a4c3) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `@paramour-js/next/app` now loads under Node's ESM resolver. It imported the bare `next/navigation`, which Node cannot resolve because `next` publishes no `exports` map, so any Vitest test rendering a component that used the app hooks failed with `ERR_MODULE_NOT_FOUND` unless `@paramour-js/next` was listed in `server.deps.inline`. The entry now imports `next/navigation.js`, as the pages entry already imports `next/router.js`; bundled builds resolve to the same module. The testing guide also covers setting `__NEXT_TRAILING_SLASH` so `<Link>` keeps the slash from `trailingSlash: true` routes in tests.
+
+- [#58](https://github.com/JasonPaff/paramour/pull/58) [`dd1d767`](https://github.com/JasonPaff/paramour/commit/dd1d767dd8924ad5e97573a606bd9a4644bbde7a) Thanks [@JasonPaff](https://github.com/JasonPaff)! - Line endings are no longer drift. `withTypedRoutes({ strict: true })` and `paramour check` compared `paramour-env.d.ts` byte for byte, so a Windows checkout with `core.autocrlf=true` (CRLF on disk, LF generated) failed every strict build and every `check`, and the no-op regeneration left the file modified in `git status`. Both now compare with CRLF and LF treated as equal, and a file that differs only in line endings is left untouched.
+
 ## 0.11.0
 
 ### Minor Changes
