@@ -214,6 +214,76 @@ export const two = defineAppRoute("/two/[id]", { params: { id: p.integer() } });
     expect(text).toMatch(/\/two\/\[id\]\s+⚠ filesystem only/);
   });
 
+  it("resolves tsconfig paths aliases in definition modules and their imports", async () => {
+    // create-next-app's default alias, used both by the definition and by
+    // the module it imports.
+    makeProject(["src/app/users/[id]/page.tsx"], {
+      "src/app/users/[id]/route.def.ts": `import { defineAppRoute, p } from "paramour";
+import { tableSearch } from "@/lib/route-codecs";
+export const users = defineAppRoute("/users/[id]", {
+  params: { id: p.integer() },
+  search: tableSearch,
+});
+`,
+      "src/lib/route-codecs.ts": `export { tableSearch } from "@/lib/table";
+`,
+      "src/lib/table.ts": `import { p } from "paramour";
+export const tableSearch = { page: p.integer().default(1) };
+`,
+      "tsconfig.json": `{
+  // JSONC, as create-next-app writes it
+  "compilerOptions": { "paths": { "@/*": ["./src/*"] } },
+}
+`,
+    });
+    const run = await list();
+    expect(run.code).toBe(0);
+    const text = run.out.join("\n");
+    expect(text).toMatch(
+      /\/users\/\[id\]\s+src\/app\/users\/\[id\]\/route\.def\.ts/,
+    );
+    expect(text).toContain("page: integer (default: 1)");
+    expect(text).not.toContain("failed to load");
+  });
+
+  it("follows tsconfig extends and baseUrl when resolving aliases", async () => {
+    makeProject(["app/a/[id]/page.tsx"], {
+      "app/a/[id]/route.def.ts": `import { defineAppRoute } from "paramour";
+import { idParams } from "~/codecs";
+export const a = defineAppRoute("/a/[id]", { params: idParams });
+`,
+      "config/tsconfig.base.json": `{
+  "compilerOptions": { "baseUrl": "..", "paths": { "~/*": ["lib/*"] } }
+}
+`,
+      "lib/codecs.ts": `import { p } from "paramour";
+export const idParams = { id: p.integer() };
+`,
+      "tsconfig.json": `{ "extends": "./config/tsconfig.base.json" }`,
+    });
+    const run = await list();
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toMatch(
+      /\/a\/\[id\]\s+app\/a\/\[id\]\/route\.def\.ts/,
+    );
+  });
+
+  it("reports an unresolvable import as a one-line load failure", async () => {
+    makeProject(["app/a/[id]/page.tsx"], {
+      "app/a/[id]/route.def.ts": `import { defineAppRoute, p } from "paramour";
+import "@/nowhere";
+export const a = defineAppRoute("/a/[id]", { params: { id: p.integer() } });
+`,
+    });
+    const run = await list();
+    expect(run.code).toBe(0);
+    const failure = run.out.find((line) => line.includes("route.def.ts:"));
+    expect(failure).toMatch(/Cannot find module '@\/nowhere'/);
+    // Node appends a multi-line "Require stack" to MODULE_NOT_FOUND; the
+    // report keeps one line per module.
+    expect(run.out.join("\n")).not.toContain("Require stack");
+  });
+
   it("--json emits the machine-readable report", async () => {
     makeProject(
       ["app/page.tsx", "app/product/[id]/page.tsx", "pages/legacy/[id].tsx"],
