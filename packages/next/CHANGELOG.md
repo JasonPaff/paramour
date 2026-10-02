@@ -1,5 +1,15 @@
 # @paramour-js/next
 
+## 1.0.0-rc.1
+
+### Patch Changes
+
+- [#71](https://github.com/JasonPaff/paramour/pull/71) [`2e4a142`](https://github.com/JasonPaff/paramour/commit/2e4a142920fc38b5928011deb319d550307f6db1) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `paramour init` keeps the line endings of the files it edits. In a CRLF checkout (git `core.autocrlf=true`), it used to report "updated paramour section" for an unchanged `AGENTS.md`/`CLAUDE.md` section and leave the file with mixed CRLF and LF line endings. It also rewrote a CRLF `package.json` or `next.config` entirely in LF. It now recognizes its own section regardless of line endings, and writes each edit using the file's existing line ending. Wrapping `next.config` also no longer drops the file's final newline.
+
+- [#70](https://github.com/JasonPaff/paramour/pull/70) [`5c25ee5`](https://github.com/JasonPaff/paramour/commit/5c25ee567a64012c07cab9b2a6766a72105f1dc3) Thanks [@JasonPaff](https://github.com/JasonPaff)! - The automatic route-definition scan in `paramour list` and `paramour doctor` no longer loads test files (`*.test.*`, `*.spec.*`, and files under `__tests__/`). A test that mentions `defineAppRoute` used to be evaluated outside its test runner, which ran its top-level `describe`/`it` calls and any setup side effects. Explicit `routeFiles` globs are unchanged and can still name test files.
+
+- [#69](https://github.com/JasonPaff/paramour/pull/69) [`9d26444`](https://github.com/JasonPaff/paramour/commit/9d2644487d6de5c4e6238524f71e7b604e504bbd) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `paramour list` and `paramour doctor` now resolve tsconfig `paths` aliases when they load route definitions, following `extends` and `baseUrl`. A definition that imports shared codecs through an alias such as `@/lib/codecs` (the `create-next-app` default) used to fail to load and show up as "filesystem only". A module that still fails to load is now reported on one line, without Node's multi-line "Require stack".
+
 ## 1.0.0-rc.0
 
 ### Major Changes

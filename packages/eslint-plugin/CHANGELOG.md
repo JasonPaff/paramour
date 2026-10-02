@@ -1,5 +1,11 @@
 # @paramour-js/eslint-plugin
 
+## 1.0.0-rc.1
+
+### Patch Changes
+
+- [#73](https://github.com/JasonPaff/paramour/pull/73) [`3b9d326`](https://github.com/JasonPaff/paramour/commit/3b9d326d0545420a467fe185c3d5f5cae01ef97e) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `no-raw-hrefs` no longer reports paths under `/api` (`/api`, `/api/auth/signin`, `/api?x=1`, but not `/apiary`). They point at route handlers, which `href()` cannot build because the route registry lists only pages, so the warning had no fix. The exemption needs no configuration and applies in addition to `ignorePaths`.
+
 ## 1.0.0-rc.0
 
 ### Major Changes
