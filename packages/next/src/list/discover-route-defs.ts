@@ -58,6 +58,12 @@ const IGNORE_PATTERNS = [
   "**/out/**",
 ];
 
+// Test files often mention defineAppRoute (they test route codecs), and
+// evaluating them outside the runner executes their top-level
+// describe/it calls and any setup side effects. These are ignored only in
+// the automatic scan: explicit `routeFiles` globs are taken as written.
+const TEST_IGNORE_PATTERNS = ["**/*.{test,spec}.*", "**/__tests__/**"];
+
 /** Files past this size skip the content pre-filter (bundles, lockfiles). */
 const MAX_PREFILTER_BYTES = 512 * 1024;
 
@@ -79,12 +85,16 @@ export async function discoverRouteDefinitions(
   // Dynamic imports, same stance as config.ts: only commands that actually
   // discover definitions pay for tinyglobby/jiti.
   const { glob } = await import("tinyglobby");
-  const files = await glob(
-    options.routeFiles === undefined
-      ? DEFAULT_PATTERNS
-      : [...options.routeFiles],
-    { absolute: true, cwd: projectRoot, ignore: IGNORE_PATTERNS },
-  );
+  const { routeFiles } = options;
+  const [patterns, ignore] =
+    routeFiles === undefined
+      ? [DEFAULT_PATTERNS, [...IGNORE_PATTERNS, ...TEST_IGNORE_PATTERNS]]
+      : [[...routeFiles], IGNORE_PATTERNS];
+  const files = await glob(patterns, {
+    absolute: true,
+    cwd: projectRoot,
+    ignore,
+  });
   // Deterministic load order — dedupe's "first wins" must not depend on
   // filesystem enumeration order.
   files.sort();
