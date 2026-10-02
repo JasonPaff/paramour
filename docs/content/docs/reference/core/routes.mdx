@@ -122,7 +122,9 @@ with no Next present (a CLI printing absolute links with
 registry and in the `Href<"/asset">` brand, so the type of a built link is
 unchanged. The exact rule, including catch-alls and elision, is
 [R6](/docs/reference/wire-format#r6). Parsing is unaffected: params and
-search arrive from Next already split from the pathname.
+search arrive from Next already split from the pathname. In component
+tests, `<Link>` drops the slash unless you set Next's flag for it; see
+[Testing](/docs/guides/testing#routes-with-trailingslash).
 [`paramour doctor`](/docs/reference/next/cli/doctor) warns when a
 definition disagrees with `next.config`. To set the option on every route,
 see [Wrapping define\*Route](#wrapping-defineroute).

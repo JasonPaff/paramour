@@ -15,7 +15,7 @@ import { createContext } from "react";
  * (`useContext(ctx) ?? realAdapter`), so neither this module nor the
  * /testing entry ever drags a `next/*` specifier into its graph. The
  * dist.test.ts bundle-hygiene invariants (/app reaches only
- * `next/navigation`, /pages only `next/router.js`, /testing neither) depend
+ * `next/navigation.js`, /pages only `next/router.js`, /testing neither) depend
  * on exactly this split — a context whose DEFAULT VALUE were the real
  * adapter would break all three.
  */

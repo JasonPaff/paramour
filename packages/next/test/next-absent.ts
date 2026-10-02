@@ -1,5 +1,5 @@
 /**
- * Inert resolution shim for the `next/navigation` and `next/router.js`
+ * Inert resolution shim for the `next/navigation.js` and `next/router.js`
  * specifiers, wired in via a Vitest `alias` (root `vitest.config.ts`).
  *
  * `next` is peer-only on purpose (never materialized in the workspace), but

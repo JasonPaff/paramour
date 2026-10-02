@@ -1,11 +1,17 @@
 "use client";
 
+// Extensionful for the same reason as pages.ts's `next/router.js`: `next`
+// ships no `exports` map, so wherever this package is loaded through Node's
+// ESM resolver (Vitest externalizes node_modules) the bare `next/navigation`
+// dies with ERR_MODULE_NOT_FOUND. The root stub `next/navigation.js` is the
+// file the bare specifier resolves to, and Next's bundler aliases are keyed
+// on that file, so bundles see the same module either way.
 import {
   useParams,
   usePathname,
   useRouter,
   useSearchParams,
-} from "next/navigation";
+} from "next/navigation.js";
 import {
   type AnyAppRoute,
   decodeParams,
