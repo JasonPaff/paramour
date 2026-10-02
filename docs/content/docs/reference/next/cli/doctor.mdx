@@ -46,7 +46,7 @@ about is untrue; `warn` is advisory and never affects the exit code.
 | --------------------- | ----------------------------------------------------------------------------------------------------- | --------- |
 | `config`              | `paramour.config.{ts,mjs,json}` parses and validates (no config at all is a pass — defaults in effect). | fail      |
 | `route directories`   | An app and/or pages directory resolves, config dirs honored.                                          | fail      |
-| `artifact`            | The artifact exists and is byte-current — the [`check`](/docs/reference/next/cli/check) engine; drift details name the routes. | fail      |
+| `artifact`            | The artifact exists and is current — the [`check`](/docs/reference/next/cli/check) engine; drift details name the routes. | fail      |
 | `next.config`         | The config file wraps `withTypedRoutes`. Warn-level only: CLI-only workflows (generate in a script, check in CI) are legitimate. | warn only |
 | `versions`            | `paramour` and `@paramour-js/next` resolve in `node_modules` (fail if not), and the two are the same version (warn on mismatch — the paramour packages release in lockstep, so a mismatch means a half-upgraded app). | fail      |
 | `skills`              | Installed [agent skills](/docs/reference/next/cli/skills) match this package's bundled content — one check line per installed target. Warn-level only: stale guidance degrades agent output but breaks nothing, and the deliberate CI gate is `skills --check`. Projects without agent tooling (or that never installed skills) get a pass line, not a nag. | warn only |

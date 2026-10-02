@@ -9,10 +9,20 @@ export interface WriteIfChangedResult {
    */
   previousContent: null | string;
   /**
-   * `false` on a byte-identical no-op — the signal `--check` and the watch
-   * loop hang off.
+   * `false` on a no-op (identical up to line endings) — the signal `--check`
+   * and the watch loop hang off.
    */
   written: boolean;
+}
+
+/**
+ * Content equality that ignores CRLF vs LF. A consumer repo with git
+ * `core.autocrlf=true` checks the committed LF artifact out as CRLF; that
+ * flip is not drift, and treating it as drift fails every strict build and
+ * `paramour check` on a fresh Windows checkout.
+ */
+export function sameContent(a: string, b: string): boolean {
+  return a.replaceAll("\r\n", "\n") === b.replaceAll("\r\n", "\n");
 }
 
 const HEADER =
@@ -82,7 +92,9 @@ export function emitArtifact(routes: EmitRoutes): string {
 /**
  * Compare-before-write: a no-op regeneration must not touch the file — that
  * property is what prevents TS-server churn, watch-loop feedback, and
- * concurrent-generator races.
+ * concurrent-generator races. A file differing only in line endings is a
+ * no-op too, so a CRLF checkout keeps its endings and `git status` stays
+ * clean; a real change is written LF.
  */
 export function writeIfChanged(
   filePath: string,
@@ -91,7 +103,9 @@ export function writeIfChanged(
   const previousContent = existsSync(filePath)
     ? readFileSync(filePath, "utf8")
     : null;
-  if (previousContent === content) return { previousContent, written: false };
+  if (previousContent !== null && sameContent(previousContent, content)) {
+    return { previousContent, written: false };
+  }
   // The outFile escape hatch may point into a not-yet-existing directory.
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, content);

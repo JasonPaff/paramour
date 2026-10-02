@@ -91,6 +91,17 @@ describe("checkArtifact (--check)", () => {
     });
   });
 
+  it("reports up to date for a CRLF checkout of a fresh artifact", () => {
+    const inputs = makeInputs(["app/page.tsx", "pages/legacy.tsx"]);
+    generate(inputs);
+    const crlf = readFileSync(inputs.artifactPath, "utf8").replaceAll(
+      "\n",
+      "\r\n",
+    );
+    writeFileSync(inputs.artifactPath, crlf);
+    expect(checkArtifact(inputs).upToDate).toBe(true);
+  });
+
   it("treats a missing artifact as drift, listing every route as new per router", () => {
     const inputs = makeInputs(["app/page.tsx", "pages/legacy.tsx"]);
     const result = checkArtifact(inputs);

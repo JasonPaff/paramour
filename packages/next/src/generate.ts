@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 
-import { emitArtifact, writeIfChanged } from "./emit.js";
+import { emitArtifact, sameContent, writeIfChanged } from "./emit.js";
 import { scanRoutes } from "./scan.js";
 
 /**
@@ -60,9 +60,10 @@ const MEMBER_HEADER = /^\s*(appRoutes|pagesRoutes):\s*$/;
 const UNION_MEMBER = /^\s*\| "(.*)";?\s*$/;
 
 /**
- * `--check`: scan to memory and byte-compare against disk — never writes. A
- * missing artifact is drift, not an error: that is exactly the
- * CI-degrades-to-world-A case the committed file exists to prevent.
+ * `--check`: scan to memory and compare against disk (line endings aside, as
+ * in {@link writeIfChanged}) — never writes. A missing artifact is drift, not
+ * an error: that is exactly the CI-degrades-to-world-A case the committed
+ * file exists to prevent.
  */
 export function checkArtifact(inputs: GenerateInputs): CheckResult {
   const routes = scanRoutes(inputs, inputs.pageExtensions);
@@ -70,7 +71,7 @@ export function checkArtifact(inputs: GenerateInputs): CheckResult {
   const current = existsSync(inputs.artifactPath)
     ? readFileSync(inputs.artifactPath, "utf8")
     : null;
-  if (current === expected) {
+  if (current !== null && sameContent(current, expected)) {
     return {
       app: { appeared: [], disappeared: [] },
       missingFile: false,
