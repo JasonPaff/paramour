@@ -1,6 +1,7 @@
 ## Summary
 
-<!-- What does this change, and why? Link the issue if one exists. -->
+<!-- What does this change, and why? Maintainers: add "Fixes PAR-123" (or
+"Part of PAR-123") to link the Linear issue. -->
 
 ## Checklist
 
