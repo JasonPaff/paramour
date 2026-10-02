@@ -77,8 +77,10 @@ describe.skipIf(!existsSync(distAppJs))("dist app entry (packaging)", () => {
   it("no next/router is reachable from /app (bundle hygiene)", () => {
     const specifiers = reachableSpecifiers(distAppJs);
     // Guard the guard: an entry that stopped importing its own router would
-    // make the negative assertion pass vacuously.
-    expect(specifiers).toContain("next/navigation");
+    // make the negative assertion pass vacuously. Extensionful on purpose —
+    // the bare specifier dies under Node ESM resolution (see src/app.ts).
+    expect(specifiers).toContain("next/navigation.js");
+    expect(specifiers).not.toContain("next/navigation");
     expect(specifiers).not.toContain("next/router");
     expect(specifiers).not.toContain("next/router.js");
   });
@@ -110,6 +112,7 @@ describe.skipIf(!existsSync(distPagesJs))(
       expect(specifiers).toContain("next/router.js");
       expect(specifiers).not.toContain("next/router");
       expect(specifiers).not.toContain("next/navigation");
+      expect(specifiers).not.toContain("next/navigation.js");
     });
   },
 );
@@ -163,6 +166,7 @@ describe.skipIf(!existsSync(distTestingJs))(
       // entry that stopped importing anything.
       expect(specifiers).toContain("./navigation-adapter.js");
       expect(specifiers).not.toContain("next/navigation");
+      expect(specifiers).not.toContain("next/navigation.js");
       expect(specifiers).not.toContain("next/router");
       expect(specifiers).not.toContain("next/router.js");
     });

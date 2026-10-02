@@ -190,6 +190,31 @@ test("reports pending before hydration", () => {
 });
 ```
 
+## Routes with `trailingSlash`
+
+If your routes use [`trailingSlash: true`](/docs/reference/core/routes#trailingslash),
+`href(route)` returns `/asset/?…`, but a `<Link>` rendered in a test shows
+`/asset?…`. Next's `<Link>` removes a trailing slash unless
+`process.env.__NEXT_TRAILING_SLASH` is set. `next build` and `next dev` set
+it from `trailingSlash` in `next.config`, and a test runner does not. Set it
+yourself so the rendered links match production:
+
+```ts title="vitest.config.ts"
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    env: { __NEXT_TRAILING_SLASH: "true" },
+  },
+});
+```
+
+Under Jest, set `process.env.__NEXT_TRAILING_SLASH = "true"` in a
+`setupFiles` module. The variable is Next's internal flag, not public API,
+so this is a test-only workaround. Paramour does not set it for you,
+because it changes the behavior of every `<Link>` in the test process, not
+only the ones paramour built.
+
 ## No module mocking involved
 
 The provider overrides the hooks' framework reads through React context, not

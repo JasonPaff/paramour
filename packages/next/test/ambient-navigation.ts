@@ -19,7 +19,7 @@
  * `examples/next-compat` owns the other half — that *real* Next still returns
  * something assignable to `ParamsSource` — on every supported major.
  */
-import type { useParams, useRouter, useSearchParams } from "next/navigation";
+import type { useParams, useRouter, useSearchParams } from "next/navigation.js";
 import type { ParamsSource } from "paramour";
 
 type AmbientParams = ReturnType<typeof useParams>;

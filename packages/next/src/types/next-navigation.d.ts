@@ -30,8 +30,13 @@
  * base — basePath-/locale-relative, which is what `replace` expects back.
  * `examples/next-compat/src/navigation.ts` pins the real signatures'
  * assignability on every supported major.
+ *
+ * The declared specifier is the extensionful `next/navigation.js` — it must
+ * match app.ts's import exactly (see the comment there: the bare form dies
+ * under Node ESM resolution, e.g. Vitest loading the package as an
+ * external).
  */
-declare module "next/navigation" {
+declare module "next/navigation.js" {
   export function useParams(): import("paramour").ParamsSource | null;
   export function usePathname(): string;
   export function useRouter(): { replace(href: string): void };
