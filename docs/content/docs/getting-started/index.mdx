@@ -48,13 +48,14 @@ paramour init
   ✔ wrapped next.config.ts with withTypedRoutes
   ✔ added "paramour" script to package.json
   ✔ wrote paramour-env.d.ts (1 route)
-  • no agent tooling detected — skipped agent skills (`paramour skills` installs to the portable .agents/skills/)
-  • no AGENTS.md or CLAUDE.md — skipped agents snippet
+  ✔ installed agent skills → .agents/skills/paramour
+  ✔ appended paramour section to AGENTS.md
 
 setup:
   ✔ route directories: app/
   ✔ dependencies declared: paramour, @paramour-js/next
   ✔ tsconfig.json includes paramour-env.d.ts
+  ✔ agent skills: .agents/skills/paramour up to date
 
 Commit the generated artifact — `paramour check` verifies it stays current in CI.
 ```
@@ -75,12 +76,17 @@ Four things, each idempotent (rerunning init never clobbers your edits):
    registry; commit it like a lockfile. The
    [registry page](/docs/concepts/registry) explains how it works.
 
-The two skipped steps are for projects with coding agents in the loop: when
+The two agent lines in the output are for projects with coding agents in
+the loop. When
 init detects agent tooling (a `.claude/`, `.cursor/`, `.codex/`, or
 `.agents/` directory, or a root `AGENTS.md`), it also installs the bundled
 [agent skill](/docs/guides/ai-agents) and appends a paramour section to your
-agent instructions file — so your agent learns the library the moment you
-do. On a fresh `create-next-app` there's nothing to detect, hence the skips.
+agent instructions file, so your agent learns the library the moment you
+do. Current `create-next-app` writes an `AGENTS.md` (and a `CLAUDE.md` that
+imports it), so both steps run on a fresh app: the skill lands in the
+portable `.agents/skills/`, and the paramour section goes below Next's own
+block in `AGENTS.md`, between its own markers. In a project with no agent
+tooling, init skips both steps and says so.
 
 ## Define your first route
 

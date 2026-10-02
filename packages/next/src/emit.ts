@@ -16,6 +16,16 @@ export interface WriteIfChangedResult {
 }
 
 /**
+ * The line ending a user-owned file already uses. Init edits files the user
+ * owns (package.json, next.config, AGENTS.md), and writing LF text into a CRLF file
+ * leaves mixed endings, so those edits keep the file's own ending. Generated
+ * files are always written LF instead.
+ */
+export function lineEnding(text: string): "\n" | "\r\n" {
+  return text.includes("\r\n") ? "\r\n" : "\n";
+}
+
+/**
  * Content equality that ignores CRLF vs LF. A consumer repo with git
  * `core.autocrlf=true` checks the committed LF artifact out as CRLF; that
  * flip is not drift, and treating it as drift fails every strict build and

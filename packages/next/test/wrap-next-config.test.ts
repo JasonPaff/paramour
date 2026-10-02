@@ -30,6 +30,29 @@ describe("wrapNextConfigSource", () => {
     );
     // The untouched parts keep their original formatting (recast).
     expect(result.code).toContain("  reactStrictMode: true,");
+    expect(
+      result.code.endsWith("export default withTypedRoutes(nextConfig);\n"),
+    ).toBe(true);
+  });
+
+  it("keeps a CRLF config CRLF, including the added import", async () => {
+    const result = await wrapNextConfigSource(
+      IDENTIFIER_TS.replaceAll("\n", "\r\n"),
+    );
+    expect(result.status).toBe("wrapped");
+    if (result.status !== "wrapped") return;
+    expect(result.code).toContain(
+      "export default withTypedRoutes(nextConfig);",
+    );
+    expect(result.code).not.toMatch(/(?<!\r)\n/);
+    expect(result.code.endsWith(";\r\n")).toBe(true);
+  });
+
+  it("does not add a final newline the source did not have", async () => {
+    const result = await wrapNextConfigSource(IDENTIFIER_TS.trimEnd());
+    expect(result.status).toBe("wrapped");
+    if (result.status !== "wrapped") return;
+    expect(result.code.endsWith("withTypedRoutes(nextConfig);")).toBe(true);
   });
 
   it("wraps an object-literal default export", async () => {
