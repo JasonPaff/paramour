@@ -353,5 +353,25 @@ export const asset = defineAppRoute("/asset", {});
       );
       expect((await doctor()).out.join("\n")).not.toContain("trailing slash:");
     });
+
+    it("does not advise removing trailingSlash when next.config sets it by assignment", async () => {
+      makeDefinedProject(
+        `import { defineAppRoute } from "paramour";
+export const asset = defineAppRoute("/asset", { trailingSlash: true });
+`,
+        `import { withTypedRoutes } from "@paramour-js/next";
+
+const nextConfig = { output: "export" };
+if (process.env.STATIC_EXPORT === "1") {
+  nextConfig.trailingSlash = true;
+}
+
+export default withTypedRoutes(nextConfig);
+`,
+      );
+      const run = await doctor();
+      expect(run.code).toBe(0);
+      expect(run.out.join("\n")).not.toContain("trailing slash:");
+    });
   });
 });
