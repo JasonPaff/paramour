@@ -175,6 +175,48 @@ export const a = defineAppRoute("/a/[id]", { params: { id: p.integer() } });
     expect(text).toMatch(/\/b\/\[id\]\s+⚠ filesystem only/);
   });
 
+  it("never evaluates test files in the automatic scan", async () => {
+    const root = makeProject(["app/a/[id]/page.tsx"], {
+      "app/a/[id]/route.def.ts": `import { defineAppRoute, p } from "paramour";
+export const a = defineAppRoute("/a/[id]", { params: { id: p.integer() } });
+`,
+      "lib/__tests__/routes.ts": `// defineAppRoute
+import { writeFileSync } from "node:fs";
+writeFileSync("evaluated-tests", "");
+`,
+      "lib/codecs.spec.mts": `// defineAppRoute
+import { writeFileSync } from "node:fs";
+writeFileSync("evaluated-spec", "");
+`,
+      "lib/codecs.test.ts": `// defineAppRoute
+import { writeFileSync } from "node:fs";
+writeFileSync("evaluated-test", "");
+`,
+    });
+    const run = await list();
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).not.toContain("failed to load");
+    for (const marker of [
+      "evaluated-test",
+      "evaluated-spec",
+      "evaluated-tests",
+    ]) {
+      expect(existsSync(join(root, marker))).toBe(false);
+    }
+  });
+
+  it("routeFiles globs can still name test files explicitly", async () => {
+    makeProject(["app/a/[id]/page.tsx"], {
+      "defs/a.test.ts": `import { defineAppRoute, p } from "paramour";
+export const a = defineAppRoute("/a/[id]", { params: { id: p.integer() } });
+`,
+      "paramour.config.json": `{ "routeFiles": ["defs/**/*.ts"] }`,
+    });
+    const run = await list();
+    expect(run.code).toBe(0);
+    expect(run.out.join("\n")).toMatch(/\/a\/\[id\]\s+defs\/a\.test\.ts/);
+  });
+
   it("dedupes by (router, path): first file wins, later ones are reported", async () => {
     makeProject(["app/dupe/[id]/page.tsx"], {
       "lib/a-first.ts": `import { defineAppRoute, p } from "paramour";

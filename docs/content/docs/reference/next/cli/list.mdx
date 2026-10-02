@@ -35,6 +35,8 @@ and `baseUrl`), so a definition that imports shared codecs from
 Modules that fail to load are reported and skipped. Set `routeFiles` globs
 in [`paramour.config`](/docs/reference/next/with-typed-routes#paramourconfig)
 to pin which modules are scanned when the automatic content scan misfires.
+The automatic scan never loads test files (`*.test.*`, `*.spec.*`, and
+anything under `__tests__/`). `routeFiles` globs are taken as written.
 
 ## Coverage warnings
 
