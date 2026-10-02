@@ -8,6 +8,10 @@ CHANGELOG.md
 **/next-env.d.ts
 **/paramour-env.d.ts
 
+# Changesets rewrites pre.json with JSON.stringify on every Version PR while
+# in pre mode, expanding arrays prettier would collapse.
+.changeset/pre.json
+
 # MDX is hand-formatted: prettier's mdx parser predates MDX v3 and can shift
 # Twoslash's positional `// ^?` markers.
 *.mdx
