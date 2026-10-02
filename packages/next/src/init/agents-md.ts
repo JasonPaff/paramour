@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { lineEnding, sameContent } from "../emit.js";
+
 export const AGENTS_MARKER_START = "<!-- paramour:start -->";
 export const AGENTS_MARKER_END = "<!-- paramour:end -->";
 
@@ -59,20 +61,21 @@ export function upsertAgentsSection(text: string): {
   status: "added" | "unchanged" | "unterminated" | "updated";
   text: string;
 } {
+  const eol = lineEnding(text);
+  const snippet = agentsSnippet().replaceAll("\n", eol);
   const start = text.indexOf(AGENTS_MARKER_START);
   if (start === -1) {
-    const base = text === "" || text.endsWith("\n") ? text : `${text}\n`;
-    const separator = base === "" ? "" : "\n";
+    const base = text === "" || text.endsWith("\n") ? text : `${text}${eol}`;
+    const separator = base === "" ? "" : eol;
     return {
       status: "added",
-      text: `${base}${separator}${agentsSnippet()}\n`,
+      text: `${base}${separator}${snippet}${eol}`,
     };
   }
   const end = text.indexOf(AGENTS_MARKER_END, start);
   if (end === -1) return { status: "unterminated", text };
   const current = text.slice(start, end + AGENTS_MARKER_END.length);
-  const snippet = agentsSnippet();
-  if (current === snippet) return { status: "unchanged", text };
+  if (sameContent(current, snippet)) return { status: "unchanged", text };
   return {
     status: "updated",
     text:
