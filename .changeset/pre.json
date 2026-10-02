@@ -1,0 +1,18 @@
+{
+  "mode": "pre",
+  "tag": "rc",
+  "initialVersions": {
+    "docs": "0.0.13",
+    "example-basic": "0.0.18",
+    "example-kitchen-sink": "0.0.18",
+    "example-next-compat": "0.0.18",
+    "example-pages-router": "0.0.18",
+    "example-type-errors": "0.0.18",
+    "paramour": "0.11.3",
+    "@paramour-js/devtools-panel": "0.11.3",
+    "@paramour-js/eslint-plugin": "0.11.3",
+    "@paramour-js/next": "0.11.3",
+    "@paramour-js/nuqs": "0.11.3"
+  },
+  "changesets": []
+}
