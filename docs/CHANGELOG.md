@@ -1,5 +1,13 @@
 # docs
 
+## 0.0.14-rc.2
+
+### Patch Changes
+
+- Updated dependencies []:
+  - paramour@1.0.0-rc.2
+  - @paramour-js/next@1.0.0-rc.2
+
 ## 0.0.14-rc.1
 
 ### Patch Changes
