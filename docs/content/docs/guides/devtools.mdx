@@ -73,7 +73,8 @@ nothing to register per route.
 `paramourDevtoolsPlugin({ defaultOpen: true })` opens the panel on load if
 you want it in your face during a debugging session. If you're composing a
 custom devtools shell, `ParamourDevtoolsPanel` is also exported directly —
-the plugin helper is just `{ id, name, render: <ParamourDevtoolsPanel /> }`.
+the plugin helper is just
+`{ id, name, render: (_el, { theme }) => <ParamourDevtoolsPanel theme={theme} /> }`.
 
 ## Production cost: none
 
