@@ -10,9 +10,9 @@ import { Sidebar } from "./sidebar.js";
 
 export interface ParamourDevtoolsPanelProps {
   /**
-   * Injected by the TanStack shell (the one contract it guarantees every
-   * panel, regardless of framework); selects the stylesheet's token set via
-   * a `data-theme` attribute — no theme context, no remount.
+   * The shell's theme, passed through by `paramourDevtoolsPlugin()`'s
+   * render function; selects the stylesheet's token set via a `data-theme`
+   * attribute — no theme context, no remount.
    */
   readonly theme?: "dark" | "light";
 }

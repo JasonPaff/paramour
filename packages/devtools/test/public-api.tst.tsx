@@ -48,7 +48,14 @@ test("plugin helper returns the entry shape", () => {
   expect(
     paramourDevtoolsPlugin({ defaultOpen: true }),
   ).type.toBe<ParamourDevtoolsPluginEntry>();
-  expect(paramourDevtoolsPlugin().render).type.toBeAssignableTo<ReactElement>();
+  // A function, not an element: the shell passes the theme only to a
+  // function render.
+  expect(paramourDevtoolsPlugin().render).type.toBe<
+    (
+      el: HTMLElement,
+      props: { readonly theme: "dark" | "light" },
+    ) => ReactElement
+  >();
 });
 
 test("the entry is assignable to the REAL shell's plugins array", () => {

@@ -46,8 +46,8 @@ export function Devtools() {
 
 `defaultOpen: true` opens the panel on load — useful when you want it in
 your face during a debugging session. That's the only option; the helper
-just builds `{ id, name, render }` with the panel component as `render`,
-plus the flag.
+just builds `{ id, name, render }`, where `render` mounts the panel with the
+shell's theme, plus the flag.
 
 Gotchas:
 
@@ -87,8 +87,9 @@ export function CustomShellPanel({ theme }: { theme: "dark" | "light" }) {
 `theme` selects the panel's token set via a `data-theme` attribute (no
 theme context, no remount) and defaults to `"light"`. When the panel is
 mounted through [`paramourDevtoolsPlugin`](#paramourdevtoolsplugin) you
-never pass it — the TanStack shell clones the rendered element and injects
-`theme` itself; the prop exists for shells that don't.
+never pass it: the TanStack shell calls the plugin's `render` function with
+its current theme, and the panel follows the shell's theme setting live.
+In a custom shell, pass `theme` yourself.
 
 ## ParamourDevtoolsPluginEntry
 
@@ -99,14 +100,19 @@ interface ParamourDevtoolsPluginEntry {
   readonly defaultOpen?: boolean;
   readonly id: string;
   readonly name: string;
-  readonly render: ReactElement;
+  readonly render: (
+    el: HTMLElement,
+    props: { readonly theme: "dark" | "light" },
+  ) => ReactElement;
 }
 ```
 
 Declared *structurally* — the shell's contract is just
 `name`/`render`/`id`/`defaultOpen` — so this package never imports
 `@tanstack/react-devtools` at runtime; assignability to the real plugin
-type is certified by the package's type tests.
+type is certified by the package's type tests. `render` is a function
+because the shell passes its theme only to function renders. It renders
+an element `render` as-is.
 
 ```ts twoslash
 import { paramourDevtoolsPlugin } from "@paramour-js/devtools-panel";
