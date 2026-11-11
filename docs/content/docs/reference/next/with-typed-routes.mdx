@@ -32,7 +32,8 @@ Next's phase argument selects the behavior:
   that regenerates as route directories change. Two single-writer guards (an
   in-process singleton and a cross-process pidfile lock) keep repeat config
   evaluations and a concurrent `paramour generate --watch` from fighting
-  over the file.
+  over the file. If another process already holds the lock, `next dev`
+  takes over the watcher when that process exits.
 - **every other phase** (lint, info, …) — pass-through; no generation.
 
 ```ts twoslash title="next.config.ts"

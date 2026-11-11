@@ -1,6 +1,7 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { withTypedRoutes } from "../src";
@@ -402,11 +403,100 @@ describe("withTypedRoutes dev phase", { retry: 2 }, () => {
     expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
       emitApp(["/"]),
     );
-    expect(devWatcherCountForTests()).toBe(0);
+    // Registered while it waits to take over, so a re-evaluation doesn't
+    // start a second retry loop.
+    expect(devWatcherCountForTests()).toBe(1);
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining(`watcher already running (pid ${String(owner)})`),
     );
     // Declining must not disturb the owner's lock.
     expect(readFileSync(lockPath, "utf8")).toBe(String(owner));
   });
+
+  it("takes over the watcher when the lock owner exits, catching up on missed route changes", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    const lockPath = join(
+      root,
+      "node_modules",
+      ".cache",
+      "paramour",
+      "watcher.lock",
+    );
+    mkdirSync(dirname(lockPath), { recursive: true });
+    const owner = spawn(
+      process.execPath,
+      ["-e", "setInterval(() => {}, 1000)"],
+      { cwd: originalCwd },
+    );
+    children.push(owner);
+    if (owner.pid === undefined) throw new Error("spawn yielded no pid");
+    writeFileSync(lockPath, String(owner.pid));
+    const warn = silenceWarn();
+    await withTypedRoutes({})(PHASE_DEV, {});
+    // A route added while the other process still owns the watcher.
+    makeTree(root, ["app/pricing/page.tsx"]);
+    await new Promise((resolve) => {
+      owner.once("exit", resolve);
+      owner.kill();
+    });
+    await vi.waitFor(() => {
+      expect(readFileSync(lockPath, "utf8")).toBe(String(process.pid));
+    }, 5000);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `watcher taken over from pid ${String(owner.pid)}`,
+      ),
+    );
+    expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+      emitApp(["/", "/pricing"]),
+    );
+    // And it watches from here on.
+    await settle(150); // let the platform watcher become active
+    makeTree(root, ["app/about/page.tsx"]);
+    await vi.waitFor(() => {
+      expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+        emitApp(["/", "/about", "/pricing"]),
+      );
+    }, 5000);
+    expect(devWatcherCountForTests()).toBe(1);
+  });
 });
+
+/**
+ * The watcher must not keep a process alive on its own: Next loads the
+ * config in short-lived processes (the telemetry flush spawned when
+ * `next dev` stops) that exit only when their event loop drains. Runs
+ * against the BUILT package in a child process, which does nothing but load
+ * the config. Skipped when dist is absent locally; always runs in CI because
+ * `pnpm build` precedes `pnpm test` there.
+ */
+const distIndex = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+
+describe.skipIf(!existsSync(distIndex))(
+  "withTypedRoutes dev phase in a short-lived process",
+  () => {
+    it("lets the process exit once the config is loaded, releasing the lock", () => {
+      const root = makeTempDir();
+      makeTree(root, ["app/page.tsx"]);
+      const script = [
+        `import { withTypedRoutes } from ${JSON.stringify(pathToFileURL(distIndex).href)};`,
+        `await withTypedRoutes({})(${JSON.stringify(PHASE_DEV)}, {});`,
+      ].join("\n");
+      const result = spawnSync(
+        process.execPath,
+        ["--input-type=module", "-e", script],
+        { cwd: root, encoding: "utf8", timeout: 10_000 },
+      );
+      // A watcher holding the process open hits the timeout: status null.
+      expect(result.status).toBe(0);
+      expect(readFileSync(join(root, "paramour-env.d.ts"), "utf8")).toBe(
+        emitApp(["/"]),
+      );
+      expect(
+        existsSync(
+          join(root, "node_modules", ".cache", "paramour", "watcher.lock"),
+        ),
+      ).toBe(false);
+    });
+  },
+);

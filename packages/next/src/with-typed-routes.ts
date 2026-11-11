@@ -228,8 +228,27 @@ function generateSafely(
 }
 
 /**
+ * How often a dev server that found the pidfile lock held re-checks it. The
+ * check is one small file read and a liveness probe.
+ */
+const LOCK_RETRY_MS = 1000;
+
+/**
  * Start the dev watcher behind both single-writer guards. Failure at any
  * layer leaves dev running in stale-types mode — never fatal.
+ *
+ * Nothing started here keeps the process alive: the watcher is
+ * non-persistent and the retry timer is unref'd. Next loads the config in
+ * short-lived processes too — the telemetry flush it spawns when `next dev`
+ * stops never calls `process.exit()` and ends only when its event loop
+ * drains. A watcher that held that process open would keep the lock forever,
+ * and every later `next dev` would run without one.
+ *
+ * When another live process holds the lock, the dev server keeps checking
+ * and takes over once that owner exits. The owner may be a short-lived
+ * process like that flush, or a `paramour generate --watch` stopped while
+ * dev keeps running; either way this dev session would otherwise go
+ * unwatched.
  */
 function startDevWatcher(
   projectRoot: string,
@@ -243,59 +262,90 @@ function startDevWatcher(
   const key = `${watchedDirs.join(" ")} ${artifactPath}`;
   if (devWatcherTeardowns.has(key)) return;
 
-  let lock: AcquireLockResult;
-  try {
-    lock = acquireWatcherLock(watcherLockPath(projectRoot));
-  } catch (error) {
-    // A corrupt lock location (e.g. a directory at the pidfile path) must
-    // not take down `next dev` — stale-types mode, like every other
-    // watcher-layer failure.
+  const lockPath = watcherLockPath(projectRoot);
+  const onError = (error: unknown): void => {
     warnOnce(
       "paramour: dev watcher failed; dev continues with stale route types",
       error,
     );
-    return;
-  }
-  if (!lock.acquired) {
-    // Another live process owns the watcher (e.g. `paramour generate
-    // --watch` beside `next dev`). Initial generation above already ran, so
-    // dev is still correct from second zero.
-    console.warn(
-      `paramour: watcher already running (pid ${String(lock.ownerPid)})`,
-    );
+  };
+  const rescan = (): void => {
+    try {
+      generate({ ...dirs, artifactPath, pageExtensions });
+    } catch (error) {
+      if (error instanceof RouteCollisionError) {
+        // The collision watch exception: a mid-watch collision is usually
+        // a file mid-move — log loudly every time (not once: it stays
+        // broken until fixed), keep the last good artifact, keep running.
+        console.warn(
+          `paramour: ${error.message}; dev continues with the last good artifact`,
+        );
+        return;
+      }
+      throw error; // routed to onError by the watcher — non-fatal
+    }
+  };
+  const tryAcquire = (): AcquireLockResult | undefined => {
+    try {
+      return acquireWatcherLock(lockPath);
+    } catch (error) {
+      // A corrupt lock location (e.g. a directory at the pidfile path) must
+      // not take down `next dev` — stale-types mode, like every other
+      // watcher-layer failure.
+      onError(error);
+      return undefined;
+    }
+  };
+  const watchWith = (lock: AcquireLockResult): (() => void) => {
+    const watcher = watchRouteDirs(watchedDirs, {
+      ignorePaths: [artifactPath],
+      onError,
+      onRescan: rescan,
+      persistent: false,
+    });
+    return () => {
+      watcher.close();
+      lock.release?.();
+    };
+  };
+
+  const lock = tryAcquire();
+  if (lock === undefined) return;
+  if (lock.acquired) {
+    // A failed watchRouteDirs returns a no-op handle and is still
+    // registered: retrying on every config re-evaluation would just warn
+    // repeatedly.
+    devWatcherTeardowns.set(key, watchWith(lock));
     return;
   }
 
-  const watcher = watchRouteDirs(watchedDirs, {
-    ignorePaths: [artifactPath],
-    onError: (error) => {
-      warnOnce(
-        "paramour: dev watcher failed; dev continues with stale route types",
-        error,
-      );
-    },
-    onRescan: () => {
-      try {
-        generate({ ...dirs, artifactPath, pageExtensions });
-      } catch (error) {
-        if (error instanceof RouteCollisionError) {
-          // The collision watch exception: a mid-watch collision is usually
-          // a file mid-move — log loudly every time (not once: it stays
-          // broken until fixed), keep the last good artifact, keep running.
-          console.warn(
-            `paramour: ${error.message}; dev continues with the last good artifact`,
-          );
-          return;
-        }
-        throw error; // routed to onError by the watcher — non-fatal
-      }
-    },
-  });
-  // A failed watchRouteDirs returns a no-op handle and is still registered:
-  // retrying on every config re-evaluation would just warn repeatedly.
+  // Initial generation already ran, so dev is correct from second zero; only
+  // later route changes wait for the takeover.
+  const ownerPid = String(lock.ownerPid);
+  console.warn(
+    `paramour: watcher already running (pid ${ownerPid}); taking over when it exits`,
+  );
+  let stopWatching: (() => void) | undefined;
+  const retry = setInterval(() => {
+    const next = tryAcquire();
+    if (next?.acquired === false) return;
+    clearInterval(retry);
+    if (next === undefined) return;
+    stopWatching = watchWith(next);
+    console.warn(`paramour: watcher taken over from pid ${ownerPid}`);
+    // Routes may have changed while the previous owner was going away.
+    try {
+      rescan();
+    } catch (error) {
+      onError(error);
+    }
+  }, LOCK_RETRY_MS);
+  retry.unref();
+  // Registered while waiting too, so a config re-evaluation doesn't start a
+  // second retry loop.
   devWatcherTeardowns.set(key, () => {
-    watcher.close();
-    lock.release?.();
+    clearInterval(retry);
+    stopWatching?.();
   });
 }
 

@@ -24,6 +24,14 @@ export interface WatchRouteDirsOptions {
   onError?: (error: unknown) => void;
   /** The regenerate callback — full rescan → write-if-changed. */
   onRescan: () => void;
+  /**
+   * Whether the watcher keeps the process alive; defaults to `true`. `false`
+   * suits a watcher started as a side effect of loading the Next config: Next
+   * also loads the config in short-lived processes (the telemetry flush it
+   * spawns when `next dev` stops) and expects them to exit once their own
+   * work is done. The dev server stays alive through its HTTP server anyway.
+   */
+  persistent?: boolean;
 }
 
 /** ~100 ms — long enough to coalesce an editor save storm. */
@@ -57,6 +65,7 @@ export function watchRouteDirs(
     ignorePaths = [],
     onError,
     onRescan,
+    persistent = true,
   } = options;
   const ignored = new Set(ignorePaths.map((path) => resolve(path)));
 
@@ -71,6 +80,7 @@ export function watchRouteDirs(
         onError?.(error);
       }
     }, debounceMs);
+    if (!persistent) timer.unref();
   };
 
   const watchers: FSWatcher[] = [];
@@ -83,18 +93,26 @@ export function watchRouteDirs(
       // and no 'error' event. Stat first so the missing-dir skip is
       // synchronous and identical on every platform.
       if (statSync(dir, { throwIfNoEntry: false }) === undefined) continue;
-      watcher = watch(dir, { recursive: true }, (_eventType, filename) => {
-        // `filename` can be null (platform-dependent); with nothing to
-        // filter on, err toward rescanning — a spurious pass is a no-op
-        // write.
-        if (filename !== null) {
-          if (ignored.has(resolve(dir, filename))) return;
-          // Windows reports backslash-joined relative paths; split on both.
-          const segments = filename.split(/[/\\]/);
-          if (segments.some((segment) => IGNORED_SEGMENTS.has(segment))) return;
-        }
-        schedule();
-      });
+      // The `persistent` option, not `watcher.unref()`: Linux's userland
+      // recursive watcher passes `persistent` to each per-directory watch,
+      // but its `unref()` reaches none of them.
+      watcher = watch(
+        dir,
+        { persistent, recursive: true },
+        (_eventType, filename) => {
+          // `filename` can be null (platform-dependent); with nothing to
+          // filter on, err toward rescanning — a spurious pass is a no-op
+          // write.
+          if (filename !== null) {
+            if (ignored.has(resolve(dir, filename))) return;
+            // Windows reports backslash-joined relative paths; split on both.
+            const segments = filename.split(/[/\\]/);
+            if (segments.some((segment) => IGNORED_SEGMENTS.has(segment)))
+              return;
+          }
+          schedule();
+        },
+      );
     } catch (error) {
       // Watcher failure is non-fatal — dev continues in stale-types mode,
       // and the other dir's watcher (if any) keeps running.
