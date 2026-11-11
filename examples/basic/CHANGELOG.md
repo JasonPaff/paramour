@@ -1,5 +1,14 @@
 # example-basic
 
+## 0.0.19-rc.3
+
+### Patch Changes
+
+- Updated dependencies [[`34d0054`](https://github.com/JasonPaff/paramour/commit/34d0054ba506969ac641726a971de6cbbffa15a9)]:
+  - @paramour-js/next@1.0.0-rc.3
+  - @paramour-js/devtools-panel@1.0.0-rc.3
+  - paramour@1.0.0-rc.3
+
 ## 0.0.19-rc.2
 
 ### Patch Changes
