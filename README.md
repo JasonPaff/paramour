@@ -1,5 +1,7 @@
 # paramour
 
+<!-- ATK-977 scratch proof: this PR is closed unmerged. -->
+
 > _paramour_ — "param" + "amour": a library that loves your params.
 
 [![npm](https://img.shields.io/npm/v/paramour)](https://www.npmjs.com/package/paramour)
