@@ -311,6 +311,39 @@ describe("withTypedRoutes dev phase", { retry: 2 }, () => {
     expect(devWatcherCountForTests()).toBe(1);
   });
 
+  it("does nothing in Next's telemetry flush, which loads the config only for distDir", async () => {
+    const root = makeProject(["app/page.tsx"]);
+    const config = { distDir: ".next" };
+    const argv = process.argv;
+    process.argv = [
+      argv[0] ?? process.execPath,
+      join(
+        root,
+        "node_modules",
+        "next",
+        "dist",
+        "telemetry",
+        "detached-flush.js",
+      ),
+      "dev",
+      root,
+    ];
+    try {
+      await expect(withTypedRoutes(config)(PHASE_DEV, {})).resolves.toBe(
+        config,
+      );
+    } finally {
+      process.argv = argv;
+    }
+    expect(existsSync(join(root, "paramour-env.d.ts"))).toBe(false);
+    expect(
+      existsSync(
+        join(root, "node_modules", ".cache", "paramour", "watcher.lock"),
+      ),
+    ).toBe(false);
+    expect(devWatcherCountForTests()).toBe(0);
+  });
+
   it("throws on an app/pages collision at dev startup (config evaluation)", async () => {
     makeProject(["app/about/page.tsx", "pages/about.tsx"]);
     await expect(withTypedRoutes({})(PHASE_DEV, {})).rejects.toThrow(
