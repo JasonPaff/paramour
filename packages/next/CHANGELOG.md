@@ -1,5 +1,13 @@
 # @paramour-js/next
 
+## 1.0.0-rc.3
+
+### Patch Changes
+
+- [#84](https://github.com/JasonPaff/paramour/pull/84) [`6b8985b`](https://github.com/JasonPaff/paramour/commit/6b8985b26f0f146b1633010ba140b1c2643ef9b4) Thanks [@JasonPaff](https://github.com/JasonPaff)! - `withTypedRoutes` no longer generates routes or starts the dev watcher in Next's telemetry flush, the process `next dev` starts when it stops. The flush loads `next.config` in the dev phase only to read `distDir`. paramour used to regenerate `paramour-env.d.ts` there and take the watcher lock. A `next dev` started while the flush was still running logged `paramour: watcher already running (pid N); taking over when it exits`.
+
+- [#81](https://github.com/JasonPaff/paramour/pull/81) [`34d0054`](https://github.com/JasonPaff/paramour/commit/34d0054ba506969ac641726a971de6cbbffa15a9) Thanks [@JasonPaff](https://github.com/JasonPaff)! - The `withTypedRoutes` dev watcher no longer keeps a process alive. Next also loads `next.config` in short-lived processes, such as the telemetry flush it starts when `next dev` stops. That process waited for the watcher forever and kept the watcher lock, so every later `next dev` logged `paramour: watcher already running (pid N)` and did not regenerate route types when routes changed. The flush process now exits normally and releases the lock. Also, when `next dev` finds the lock held by another live process, it now takes over the watcher as soon as that process exits, instead of running without a watcher for the whole session.
+
 ## 1.0.0-rc.2
 
 ## 1.0.0-rc.1
