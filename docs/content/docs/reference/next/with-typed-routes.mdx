@@ -34,7 +34,9 @@ Next's phase argument selects the behavior:
   evaluations and a concurrent `paramour generate --watch` from fighting
   over the file. If another process already holds the lock, `next dev`
   takes over the watcher when that process exits.
-- **every other phase** (lint, info, …) — pass-through; no generation.
+- **every other phase** (lint, info, …) — pass-through; no generation. The
+  telemetry flush that Next starts when `next dev` stops loads the config in
+  the dev phase too, and gets the same pass-through.
 
 ```ts twoslash title="next.config.ts"
 import type { NextConfig } from "next";

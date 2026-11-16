@@ -1,3 +1,5 @@
+import { basename } from "node:path";
+
 import { NoRouteDirsError, resolveInputs } from "./cli-inputs.js";
 import { RouteCollisionError } from "./collisions.js";
 import { loadConfigFile } from "./config.js";
@@ -55,6 +57,19 @@ const PHASE_DEVELOPMENT_SERVER = "phase-development-server";
 const PHASE_PRODUCTION_BUILD = "phase-production-build";
 
 /**
+ * Whether this process is Next's telemetry flush
+ * (`next/dist/telemetry/detached-flush.js`), which `next dev` spawns each time
+ * it stops. The flush evaluates the config in the dev phase only to read
+ * `distDir`. Generating there would rewrite the artifact as the session ends,
+ * and taking the watcher lock would make a `next dev` started meanwhile wait
+ * to take it over. Matched by file name: if Next renames the file, the flush
+ * runs the dev pass again, and the non-persistent watcher still lets it exit.
+ */
+function isNextTelemetryFlush(): boolean {
+  return basename(process.argv[1] ?? "") === "detached-flush.js";
+}
+
+/**
  * The in-process single-writer guard — a singleton keyed by route dirs +
  * artifact path. Load-bearing even for a single `next dev`: Turbopack dev
  * invokes the config function twice in the same process.
@@ -90,7 +105,8 @@ export function resetDevWatchersForTests(): void {
  * - dev server → one immediate generation pass, then the debounced watcher
  *   behind both single-writer guards (the in-process singleton and the
  *   cross-process pidfile lock).
- * - every other phase → pass-through, no generation.
+ * - every other phase, and Next's telemetry flush → pass-through, no
+ *   generation.
  *
  * Two states throw during config evaluation instead of degrading to
  * stale-types mode, both phases alike, because Next itself has no valid
@@ -107,6 +123,7 @@ export function withTypedRoutes<C extends object>(
       typeof config === "function" ? await config(phase, ctx) : config;
     if (phase !== PHASE_DEVELOPMENT_SERVER && phase !== PHASE_PRODUCTION_BUILD)
       return resolved;
+    if (isNextTelemetryFlush()) return resolved;
 
     // The dev server and every build worker evaluate the config with the
     // project root as cwd — the same root the CLI resolves against.
